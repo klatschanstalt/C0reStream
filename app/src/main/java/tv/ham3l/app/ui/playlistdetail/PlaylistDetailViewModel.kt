@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -25,8 +27,8 @@ class PlaylistDetailViewModel(app: Application) : AndroidViewModel(app) {
     private val queryFlow = MutableStateFlow("")
     private val groupFlow = MutableStateFlow<String?>(null)
 
-    val query: Flow<String> = queryFlow
-    val selectedGroup: Flow<String?> = groupFlow
+    val query: StateFlow<String> = queryFlow.asStateFlow()
+    val selectedGroup: StateFlow<String?> = groupFlow.asStateFlow()
 
     val groups = playlistIdFlow.flatMapLatest { id -> db.channelDao().groups(id) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

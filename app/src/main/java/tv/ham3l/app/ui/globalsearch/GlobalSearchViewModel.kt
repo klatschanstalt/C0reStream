@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
@@ -22,7 +24,7 @@ class GlobalSearchViewModel(app: Application) : AndroidViewModel(app) {
     private val db = (app as Ham3LApp).database
     private val queryFlow = MutableStateFlow("")
 
-    val query: Flow<String> = queryFlow
+    val query: StateFlow<String> = queryFlow.asStateFlow()
 
     private val matched = queryFlow.flatMapLatest { q ->
         if (q.length < 2) flowOf(emptyList<ChannelEntity>())
