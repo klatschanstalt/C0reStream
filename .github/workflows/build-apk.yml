@@ -23,6 +23,9 @@ jobs:
           test -x "$SDKMANAGER"
           "$SDKMANAGER" --install 'platforms;android-35' 'build-tools;35.0.0'
       - run: gradle --warning-mode all :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --stacktrace
+      - name: Generate APK checksum
+        if: success()
+        run: cd app/build/outputs/apk/debug && sha256sum *.apk > SHA256SUMS
       - name: Upload lint reports
         if: always()
         uses: actions/upload-artifact@v7.0.2
@@ -37,5 +40,8 @@ jobs:
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: Ham3LTV-debug
-          path: app/build/outputs/apk/debug/*.apk
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/debug/SHA256SUMS
           if-no-files-found: error
+          retention-days: 14
