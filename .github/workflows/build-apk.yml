@@ -24,7 +24,7 @@ jobs:
         shell: bash
         run: |
           sdkmanager --list --channel=3 > /tmp/sdk-packages.txt
-          PLATFORM=$(awk -F '|' '{gsub(/^[ \t]+|[ \t]+$/, "", $1); if ($1 == "platforms;android-37.0" || $1 == "platforms;android-37") print $1}' /tmp/sdk-packages.txt | sort -u | tail -1)
+          PLATFORM=$(awk -F '|' '{gsub(/^[ \t]+|[ \t]+$/, "", $1); if ($1 == "platforms;android-37.1") print $1}' /tmp/sdk-packages.txt | sort -u | tail -1)
           if [[ -z "$PLATFORM" ]]; then
             grep -iE '37|cinnamon' /tmp/sdk-packages.txt || true
             exit 1

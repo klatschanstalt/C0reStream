@@ -6,7 +6,11 @@ plugins {
 
 android {
     namespace = "tv.ham3l.app"
-    compileSdk = 37
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 1
+        }
+    }
 
     defaultConfig {
         applicationId = "tv.ham3l.app"
