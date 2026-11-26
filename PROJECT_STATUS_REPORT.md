@@ -1,2 +1,2 @@
 # Verified project status
-2026-11-26: CI run 45887368865 succeeded on 9dc0b11; 0 lint errors, 1 PiP warning, no hints. APK artifact 15150046964. Dependabot run 45887527281 confirmed OkHttp 5.5.1 current. Android minimum API 30. Device tests and signed release remain unverified. Subsequent changes require CI verification.
+2026-11-26: CI run 45888552718 succeeded on 039c5a3 in 4m36s: version catalog and PiP changes compiled; 0 lint errors, 1 AGP-version warning. APK artifact 15150886800; Room schema artifact 15150104373. Android min API 30, compile API 37.1, target API 37. Runtime compatibility, historical migration and signed production release remain unverified. Subsequent changes require CI verification.
