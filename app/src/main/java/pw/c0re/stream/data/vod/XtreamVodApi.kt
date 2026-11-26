@@ -24,7 +24,7 @@ class XtreamVodApi(private val httpClient: OkHttpClient) {
         withContext(Dispatchers.IO) {
             val url = creds.baseUrl() + "?username=" + java.net.URLEncoder.encode(creds.username, "UTF-8") +
                 "&password=" + java.net.URLEncoder.encode(creds.password, "UTF-8") + "&action=" + action
-            val body = httpClient.newCall(Request.Builder().url(url).build()).execute().use { it.readMetadata() }
+            val body = httpClient.newBuilder().followSslRedirects(false).followRedirects(false).callTimeout(90, java.util.concurrent.TimeUnit.SECONDS).build().newCall(Request.Builder().url(url).build()).execute().use { it.readMetadata() }
             val root = JSONArray(body)
             (0 until root.length()).map { i ->
                 val o: JSONObject = root.getJSONObject(i)
@@ -41,7 +41,7 @@ class XtreamVodApi(private val httpClient: OkHttpClient) {
         withContext(Dispatchers.IO) {
             val url = creds.baseUrl() + "?username=" + java.net.URLEncoder.encode(creds.username, "UTF-8") +
                 "&password=" + java.net.URLEncoder.encode(creds.password, "UTF-8") + "&action=get_series_info&series_id=" + seriesId
-            val body = httpClient.newCall(Request.Builder().url(url).build()).execute().use { it.readMetadata() }
+            val body = httpClient.newBuilder().followSslRedirects(false).followRedirects(false).callTimeout(90, java.util.concurrent.TimeUnit.SECONDS).build().newCall(Request.Builder().url(url).build()).execute().use { it.readMetadata() }
             val root = JSONObject(body).optJSONObject("episodes") ?: return@withContext emptyMap()
             val result = mutableMapOf<Int, List<Episode>>()
             root.keys().forEach { seasonKey ->
@@ -62,8 +62,8 @@ class XtreamVodApi(private val httpClient: OkHttpClient) {
         }
 
     fun movieUrl(creds: XtreamApi.Credentials, id: Int, container: String = "mp4"): String =
-        creds.host.removeSuffix("/") + "/movie/" + creds.username + "/" + creds.password + "/" + id + "." + container
+        creds.streamUrl("movie", id.toString(), container)
 
     fun episodeUrl(creds: XtreamApi.Credentials, id: Int, container: String): String =
-        creds.host.removeSuffix("/") + "/series/" + creds.username + "/" + creds.password + "/" + id + "." + container
+        creds.streamUrl("series", id.toString(), container)
 }

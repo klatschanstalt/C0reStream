@@ -14,7 +14,8 @@ object M3UParser {
         val attrRegex = Regex("([a-zA-Z0-9-]+)=\"([^\"]*)\"")
 
         for (line in text.lineSequence()) {
-            val l = line.trim()
+            check(line.length <= 65536) { "Playlist line too long" }
+            val l = line.trim().removePrefix("\uFEFF")
             when {
                 l.startsWith("#EXTINF:") -> {
                     val rest = l.substringAfter("#EXTINF:")
@@ -25,19 +26,20 @@ object M3UParser {
                 }
                 l.isNotEmpty() && !l.startsWith("#") -> {
                     val attrs = pending
-                    if (attrs != null) {
+                    if (attrs != null && NetworkPolicy.parse(l) != null) {
+                        check(result.size < 100000) { "Playlist too large" }
                         val name = pendingName?.ifBlank { null } ?: attrs["tvg-name"] ?: "Unbekannt"
                         result += RawChannel(
                             name = name,
-                            logo = attrs["tvg-logo"],
+                            logo = attrs["tvg-logo"]?.takeIf { NetworkPolicy.parse(it) != null },
                             group = attrs["group-title"],
                             tvgId = attrs["tvg-id"],
                             url = l,
                             catchupSource = attrs["catchup-source"],
                         )
-                        pending = null
-                        pendingName = null
                     }
+                    pending = null
+                    pendingName = null
                 }
             }
         }

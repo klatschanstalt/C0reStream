@@ -35,7 +35,7 @@ class PlaylistRepository(private val db: AppDatabase) {
         withContext(Dispatchers.IO) {
             runCatching {
                 val body = client(ua, useProxy, proxyHost, proxyPort)
-                    .newCall(Request.Builder().url(url).build()).execute().use { resp ->
+                    .newCall(Request.Builder().url(NetworkPolicy.requireUrl(url)).build()).execute().use { resp ->
                         check(resp.isSuccessful) { "HTTP " + resp.code }
                         resp.readMetadata()
                     }
@@ -69,7 +69,7 @@ class PlaylistRepository(private val db: AppDatabase) {
         val epgUrl = pl.epgUrl ?: return@withContext emptyMap()
         runCatching {
             val text = client(pl.userAgent, pl.useProxy, pl.proxyHost, pl.proxyPort)
-                .newCall(Request.Builder().url(epgUrl).build()).execute().use { it.readMetadata() }
+                .newCall(Request.Builder().url(NetworkPolicy.requireUrl(epgUrl)).build()).execute().use { it.readMetadata() }
             EpgParser.parse(text.reader()).mapValues { entry -> entry.value.sortedBy { e -> e.start } }
         }.getOrDefault(emptyMap())
     }

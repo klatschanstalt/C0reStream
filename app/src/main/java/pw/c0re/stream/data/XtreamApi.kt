@@ -17,7 +17,15 @@ import java.util.concurrent.TimeUnit
 class XtreamApi(private val httpClient: OkHttpClient) {
 
     data class Credentials(val host: String, val username: String, val password: String) {
-        fun baseUrl(): String = host.removeSuffix("/") + "/player_api.php"
+        fun baseUrl(): String = NetworkPolicy.requireUrl(host).newBuilder().query(null).fragment(null).addPathSegment("player_api.php").build().toString()
+        override fun toString(): String = "[protected credentials]"
+        fun streamUrl(kind: String, id: String, container: String): String {
+            require(kind in setOf("live", "movie", "series"))
+            require(id.matches(Regex("[0-9]{1,20}")) && container.matches(Regex("[a-zA-Z0-9]{1,10}")))
+            return NetworkPolicy.requireUrl(host).newBuilder().query(null).fragment(null)
+                .addPathSegment(kind).addPathSegment(username).addPathSegment(password)
+                .addPathSegment("$id.$container").build().toString()
+        }
     }
 
     companion object {
@@ -44,11 +52,12 @@ class XtreamApi(private val httpClient: OkHttpClient) {
         withContext(Dispatchers.IO) {
             val url = creds.baseUrl() + "?username=" + java.net.URLEncoder.encode(creds.username, "UTF-8") +
                 "&password=" + java.net.URLEncoder.encode(creds.password, "UTF-8") + "&action=get_live_streams"
-            val body = httpClient.newCall(Request.Builder().url(url).build()).execute().use { resp ->
+            val body = httpClient.newBuilder().followSslRedirects(false).followRedirects(false).callTimeout(90, TimeUnit.SECONDS).build().newCall(Request.Builder().url(url).build()).execute().use { resp ->
                 check(resp.isSuccessful) { "HTTP " + resp.code }
                 resp.readMetadata()
             }
             val root = JSONArray(body)
+            check(root.length() <= 100000) { "Too many streams" }
             (0 until root.length()).map { i ->
                 val o: JSONObject = root.getJSONObject(i)
                 val streamId = o.optString("stream_id")
@@ -58,7 +67,7 @@ class XtreamApi(private val httpClient: OkHttpClient) {
                     logo = o.optString("stream_icon").takeIf { it.isNotBlank() },
                     group = null,
                     tvgId = o.optString("epg_channel_id").takeIf { it.isNotBlank() },
-                    url = creds.host.removeSuffix("/") + "/live/" + creds.username + "/" + creds.password + "/" + streamId + "." + container,
+                    url = creds.streamUrl("live", streamId, container),
                 )
             }
         }
