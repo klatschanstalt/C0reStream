@@ -1,2 +1,3 @@
-# Verified project status
-2026-11-26: CI run 45892082494 succeeded in 3m58s on AGP 9.5.3 / Gradle 9.6.0; debug APK artifact 15152072330, lint artifact 15152351746, Room schema artifact 15152311862. Compiler warnings remained. Android API 30 minimum, target 37, compile 37.1. Device tests and signing unverified. Subsequent security changes require CI verification; open findings in SECURITY.md.
+# PROJECT_STATUS_REPORT
+
+Letzter verifizierter CI-Stand: ea32d203043dbdedb8ce143d8ecdae1808fd6c31, Run 45906476862. Debug- und Release-Build einschließlich R8 erfolgreich; Publish-Job erzeugte https://github.com/klatschanstalt/C0reStream/releases/tag/preview-ea32d203043d mit debug-signierter APK und SHA256SUMS. Keine Produktionsfreigabe. Offen: vollständige interne Namespace-Migration, Sicherheitsbefunde gemäß SECURITY.md, tatsächliche Regressionstests und Gerätevalidierung, dauerhafte Produktionssignierung, sicherer Updatepfad sowie weitere MASTERPLAN-Anforderungen. Der autonome Fertigstellungsauftrag ist verbindlich; unabhängige Aufgaben ohne erneute Freigabe fortsetzen.

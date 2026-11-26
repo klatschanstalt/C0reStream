@@ -4,3 +4,8 @@ Work only in this repository. Implement MASTERPLAN.md incrementally, preserve ap
 Support Android 11–17; prepare Android 18 via documented compatibility checks, feature detection and isolated preview testing when official SDKs become available. Never claim device compatibility without evidence. Keep production on verified stable APIs.
 
 Before integration review changed code for security, regression, cancellation, lifecycle, resource limits and data loss. Add targeted regression tests; never claim an unexecuted test passed. Treat unresolved high-risk findings as release blockers. Keep CI permissions minimal and never log credentials.
+
+# Autonomer Fertigstellungsauftrag
+
+Verbindlich: MASTERPLAN.md vollständig bis zur Produktionsfreigabe umsetzen. Keine Zwischenfreigaben für sichere projektinterne Änderungen. C0reStream, Application ID pw.c0re.stream, min API 30. Vollständiges Rebranding, moderne stabile kompatible Toolchain, Keystore-gestützte Geheimnisspeicherung, Netzwerk- und Parser-Sicherheit, transaktionale Datenhaltung, Player/IPTV/EPG/VOD, responsive DE/EN/FR UI, Android TV, Performance und tatsächliche Regressionstests. Android 17 anhand offizieller APIs prüfen; Android 18 nur nach bestätigter Verfügbarkeit. Unabhängige Aufgaben bei Blockaden fortsetzen. Keine Kosten, externen Projektänderungen, Secrets im Git oder Force-Push. Gezielte Prüfungen, sichere Checkpoints, kompakte aktuelle Dokumentation. Produktionsfreigabe erst nach tatsächlichen Tests, keinen offenen kritischen/hohen Sicherheitsbefunden, dauerhafter geschützter Signierung und verifiziertem Updatepfad; C0reStream.apk mit SHA256 und Signaturprüfung unter GitHub Releases veröffentlichen. Debug-Pre-Releases bleiben ausdrücklich Testversionen. Keine unbelegten Erfolgsbehauptungen.
+
