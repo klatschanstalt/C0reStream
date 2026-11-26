@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "tv.ham3l.app"
+    namespace = "pw.c0re.stream"
     compileSdk {
         version = release(37) {
             minorApiLevel = 1

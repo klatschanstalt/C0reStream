@@ -1,2 +1,2 @@
--keep class tv.ham3l.app.data.** { *; }
+-keep class pw.c0re.stream.data.** { *; }
 -dontwarn okhttp3.**

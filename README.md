@@ -12,4 +12,4 @@ Android 11 minimum (API 30), target API 37, compile API 37.1. Actual Android 11â
 
 Kotlin, Jetpack Compose, Media3, Room, Gradle 9.6.0. CI builds debug and release variants, runs unit-test and lint tasks, and publishes checksummed debug previews. See MASTERPLAN.md, SECURITY.md and PROJECT_STATUS_REPORT.md. Production releases require durable signing and security acceptance.
 
-Application ID: pw.c0re.stream. Internal Kotlin namespace migration remains pending.
+Application ID: pw.c0re.stream. Internal Kotlin namespace: pw.c0re.stream.
