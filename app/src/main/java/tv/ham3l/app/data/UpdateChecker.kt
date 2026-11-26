@@ -13,7 +13,7 @@ import org.json.JSONObject
  */
 object UpdateChecker {
 
-    const val UPDATE_URL = "https://raw.githubusercontent.com/klatschanstalt/Ham3LTV/main/update.json"
+    const val UPDATE_URL = "https://raw.githubusercontent.com/klatschanstalt/C0reStream/main/update.json"
 
     data class UpdateInfo(val latestVersion: String, val notes: String?)
 

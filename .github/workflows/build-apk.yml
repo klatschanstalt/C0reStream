@@ -1,4 +1,4 @@
-name: Build Ham3L TV APK
+name: Build C0reStream APK
 on:
   push:
     branches: [main]
@@ -37,7 +37,7 @@ jobs:
         run: gradle :app:assembleRelease --stacktrace
       - name: Generate APK checksum
         if: success()
-        run: cd app/build/outputs/apk/debug && sha256sum *.apk > SHA256SUMS
+        run: cd app/build/outputs/apk/debug && mv app-debug.apk C0reStream-debug.apk && sha256sum *.apk > SHA256SUMS
       - name: Upload database schemas
         if: always()
         uses: actions/upload-artifact@v7.0.2
@@ -58,7 +58,7 @@ jobs:
           if test -f app/build/reports/lint-results-debug.txt; then cat app/build/reports/lint-results-debug.txt; fi
       - uses: actions/upload-artifact@v7.0.2
         with:
-          name: Ham3LTV-debug
+          name: C0reStream-debug
           path: |
             app/build/outputs/apk/debug/*.apk
             app/build/outputs/apk/debug/SHA256SUMS

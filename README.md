@@ -1,4 +1,4 @@
-# Ham3L TV
+# C0reStream
 
 **Powered by Ham3L** - Eigenstaendiger Android IPTV-Client (Kotlin + Jetpack Compose).
 
@@ -38,8 +38,8 @@ Mindestens Android 7.0 (API 24), Zielsystem Android 15 (API 35).
 Das Repo enthaelt einen GitHub-Actions-Workflow (.github/workflows/build-apk.yml):
 
 1. Projekt nach GitHub pushen (main-Branch)
-2. Auf github.com im Tab "Actions" den Lauf "Build Ham3L TV APK" abwarten
-3. Unter "Artifacts" die Ham3LTV-APK herunterladen und auf dem Geraet installieren
+2. Auf github.com im Tab "Actions" den Lauf "Build C0reStream APK" abwarten
+3. Unter "Artifacts" die C0reStream-APK herunterladen und auf dem Geraet installieren
    (Installation aus unbekannten Quellen erlaubt geben)
 4. Optional: einen Tag pushen (z.B. v1.0.0), dann haengt die APK automatisch
    an einem GitHub-Release

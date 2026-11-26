@@ -13,7 +13,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "tv.ham3l.app"
+        applicationId = "pw.c0re.stream"
         minSdk = 30
         targetSdk = 37
         versionCode = 3

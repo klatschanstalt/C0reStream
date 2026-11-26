@@ -1,4 +1,4 @@
-# Ham3L TV – approved roadmap
+# C0reStream – approved roadmap
 1. Modernize SDK, AGP, Gradle wrapper, Kotlin, KSP, Compose, Media3, Room, WorkManager, DataStore and dependencies; version catalog; resolve lint.
 2. Material 3 responsive UI, themes, animations, branding, accessibility, DE/EN/FR.
 3. Player: HLS/DASH, track selection, PiP, mini-player, retry, buffering, gestures, sleep timer, diagnostics, radio.

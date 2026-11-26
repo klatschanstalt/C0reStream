@@ -11,5 +11,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "Ham3LTV"
+rootProject.name = "C0reStream"
 include(":app")
