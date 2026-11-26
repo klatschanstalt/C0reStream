@@ -17,3 +17,5 @@
 16. Acceptance: zero compiler/lint errors, resolve actionable warnings, compatible stable dependencies, device tests, signed release, verified updates.
 
 Binding decision: minimum Android 11 (API 30); target latest stable SDK. Older Android versions are unsupported.
+
+Android compatibility acceptance: API 30 through Android 17, including phone/tablet/TV, edge-to-edge, lifecycle, media foreground services, PiP, adaptive layouts, permissions and native dependency page-size compatibility. Prepare Android 18 using official behavior-change documentation and preview test lanes when available; do not assume future API numbers or release dates. Record actual emulator/device results separately from compilation.
