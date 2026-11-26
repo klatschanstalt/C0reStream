@@ -26,6 +26,13 @@ jobs:
       - name: Generate APK checksum
         if: success()
         run: cd app/build/outputs/apk/debug && sha256sum *.apk > SHA256SUMS
+      - name: Upload database schemas
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: room-schemas
+          path: app/schemas/
+          if-no-files-found: warn
       - name: Upload lint reports
         if: always()
         uses: actions/upload-artifact@v7.0.2

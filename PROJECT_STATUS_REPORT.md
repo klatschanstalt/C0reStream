@@ -1,4 +1,2 @@
 # Verified project status
-2026-11-26: CI run 45868184753 succeeded on fefffe8; debug APK artifact 15140674381 uploaded. Lint: 0 errors, 22 warnings. Unit-test task completed; test coverage and device behavior not established. Production signing, release and update distribution not verified. Approved roadmap: MASTERPLAN.md. Subsequent changes require CI verification.
-
-CI run 45869232447 succeeded on aa4a5c9: 0 lint errors, 22 warnings; debug artifact 15141334515. Toolchain upgrade pending verification.
+2026-11-26: CI run 45871039044 succeeded on 8f012f0 with API 36, Kotlin 2.1.21, KSP2 and Room 2.7.2. Lint: 0 errors, 23 warnings, 1 hint. Debug APK artifact 15142932318. Production signing, device tests and update distribution remain unverified. Database schema version 2; historical version 1 schema not established. Roadmap: MASTERPLAN.md.

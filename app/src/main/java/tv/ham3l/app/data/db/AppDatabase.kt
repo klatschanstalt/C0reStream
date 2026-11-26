@@ -8,7 +8,7 @@ import androidx.room.RoomDatabase
 @Database(
     entities = [PlaylistEntity::class, ChannelEntity::class, FavoriteEntity::class, HistoryEntity::class],
     version = 2,
-    exportSchema = false,
+    exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun playlistDao(): PlaylistDao
@@ -19,7 +19,6 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "ham3l.db")
-                .fallbackToDestructiveMigration()
                 .build()
     }
 }
