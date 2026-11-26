@@ -10,8 +10,8 @@ android {
 
     defaultConfig {
         applicationId = "tv.ham3l.app"
-        minSdk = 24
-        targetSdk = 35
+        minSdk = 30
+        targetSdk = 37
         versionCode = 3
         versionName = "1.2.0"
         vectorDrawables { useSupportLibrary = true }
@@ -37,14 +37,14 @@ kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarg
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2024.09.03")
+    val composeBom = platform("androidx.compose:compose-bom:2026.11.01")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.activity:activity-compose:1.9.2")
-    implementation("androidx.navigation:navigation-compose:2.8.2")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
+    implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("androidx.navigation:navigation-compose:2.10.2")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.1")
 
     // Media3 Player (von iptvnator inspiriert: HLS/MPEG-TS/HTTP-Streams)
     implementation("androidx.media3:media3-exoplayer:1.11.1")
@@ -54,13 +54,13 @@ dependencies {
     implementation("androidx.media3:media3-session:1.11.1")
 
     // Hintergrund-Refresh
-    implementation("androidx.work:work-runtime-ktx:2.9.1")
+    implementation("androidx.work:work-runtime-ktx:2.12.0")
 
     // Persistenz
-    implementation("androidx.room:room-runtime:2.7.2")
-    implementation("androidx.room:room-ktx:2.7.2")
-    ksp("androidx.room:room-compiler:2.7.2")
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("androidx.room:room-runtime:2.8.5")
+    implementation("androidx.room:room-ktx:2.8.5")
+    ksp("androidx.room:room-compiler:2.8.5")
+    implementation("androidx.datastore:datastore-preferences:1.3.0")
 
     // Netz & Parsing
     implementation("com.squareup.okhttp3:okhttp:4.12.0")

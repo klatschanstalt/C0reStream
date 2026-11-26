@@ -15,3 +15,5 @@
 14. Compact documentation and verified status.
 15. Autonomous incremental development, safe commits and pushes, no paid services.
 16. Acceptance: zero compiler/lint errors, resolve actionable warnings, compatible stable dependencies, device tests, signed release, verified updates.
+
+Binding decision: minimum Android 11 (API 30); target latest stable SDK. Older Android versions are unsupported.
