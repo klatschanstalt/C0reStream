@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -31,6 +33,8 @@ jobs:
           fi
           sdkmanager --install --channel=3 "$PLATFORM" 'build-tools;37.0.0'
       - run: gradle --warning-mode all :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --stacktrace
+      - name: Validate release compilation
+        run: gradle :app:assembleRelease --stacktrace
       - name: Generate APK checksum
         if: success()
         run: cd app/build/outputs/apk/debug && sha256sum *.apk > SHA256SUMS

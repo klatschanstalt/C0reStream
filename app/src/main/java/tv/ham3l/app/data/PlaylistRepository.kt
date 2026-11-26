@@ -18,6 +18,8 @@ class PlaylistRepository(private val db: AppDatabase) {
         val builder = OkHttpClient.Builder()
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
+            .callTimeout(90, TimeUnit.SECONDS)
+            .followSslRedirects(false)
         if (!ua.isNullOrBlank()) {
             builder.addInterceptor { chain -> chain.proceed(chain.request().newBuilder().header("User-Agent", ua).build()) }
         }
@@ -33,7 +35,7 @@ class PlaylistRepository(private val db: AppDatabase) {
                 val body = client(ua, useProxy, proxyHost, proxyPort)
                     .newCall(Request.Builder().url(url).build()).execute().use { resp ->
                         check(resp.isSuccessful) { "HTTP " + resp.code }
-                        resp.body!!.string()
+                        resp.readMetadata()
                     }
                 val channels = M3UParser.parse(body)
                 check(channels.isNotEmpty()) { "Keine Kanaele in der Liste gefunden" }
@@ -55,7 +57,7 @@ class PlaylistRepository(private val db: AppDatabase) {
         val epgUrl = pl.epgUrl ?: return@withContext emptyMap()
         runCatching {
             val text = client(pl.userAgent, pl.useProxy, pl.proxyHost, pl.proxyPort)
-                .newCall(Request.Builder().url(epgUrl).build()).execute().use { it.body!!.string() }
+                .newCall(Request.Builder().url(epgUrl).build()).execute().use { it.readMetadata() }
             EpgParser.parse(text.reader()).mapValues { entry -> entry.value.sortedBy { e -> e.start } }
         }.getOrDefault(emptyMap())
     }

@@ -46,7 +46,7 @@ class XtreamApi(private val httpClient: OkHttpClient) {
                 "&password=" + java.net.URLEncoder.encode(creds.password, "UTF-8") + "&action=get_live_streams"
             val body = httpClient.newCall(Request.Builder().url(url).build()).execute().use { resp ->
                 check(resp.isSuccessful) { "HTTP " + resp.code }
-                resp.body!!.string()
+                resp.readMetadata()
             }
             val root = JSONArray(body)
             (0 until root.length()).map { i ->

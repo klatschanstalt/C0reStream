@@ -19,8 +19,8 @@ object UpdateChecker {
 
     suspend fun check(currentVersion: String): UpdateInfo? = withContext(Dispatchers.IO) {
         runCatching {
-            val body = OkHttpClient().newCall(Request.Builder().url(UPDATE_URL).build())
-                .execute().use { it.body!!.string() }
+            val body = OkHttpClient.Builder().followSslRedirects(false).callTimeout(30, java.util.concurrent.TimeUnit.SECONDS).build().newCall(Request.Builder().url(UPDATE_URL).build())
+                .execute().use { it.readMetadata(65536) }
             val o = JSONObject(body)
             val latest = o.optString("latestVersion")
             UpdateInfo(latest, o.optString("notes").takeIf { it.isNotBlank() })

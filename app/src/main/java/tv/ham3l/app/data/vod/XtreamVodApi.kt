@@ -7,6 +7,7 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import tv.ham3l.app.data.XtreamApi
+import tv.ham3l.app.data.readMetadata
 
 /**
  * VOD-Filme und Serien ueber die Xtream-Codes-API.
@@ -23,7 +24,7 @@ class XtreamVodApi(private val httpClient: OkHttpClient) {
         withContext(Dispatchers.IO) {
             val url = creds.baseUrl() + "?username=" + java.net.URLEncoder.encode(creds.username, "UTF-8") +
                 "&password=" + java.net.URLEncoder.encode(creds.password, "UTF-8") + "&action=" + action
-            val body = httpClient.newCall(Request.Builder().url(url).build()).execute().use { it.body!!.string() }
+            val body = httpClient.newCall(Request.Builder().url(url).build()).execute().use { it.readMetadata() }
             val root = JSONArray(body)
             (0 until root.length()).map { i ->
                 val o: JSONObject = root.getJSONObject(i)
@@ -40,7 +41,7 @@ class XtreamVodApi(private val httpClient: OkHttpClient) {
         withContext(Dispatchers.IO) {
             val url = creds.baseUrl() + "?username=" + java.net.URLEncoder.encode(creds.username, "UTF-8") +
                 "&password=" + java.net.URLEncoder.encode(creds.password, "UTF-8") + "&action=get_series_info&series_id=" + seriesId
-            val body = httpClient.newCall(Request.Builder().url(url).build()).execute().use { it.body!!.string() }
+            val body = httpClient.newCall(Request.Builder().url(url).build()).execute().use { it.readMetadata() }
             val root = JSONObject(body).optJSONObject("episodes") ?: return@withContext emptyMap()
             val result = mutableMapOf<Int, List<Episode>>()
             root.keys().forEach { seasonKey ->
