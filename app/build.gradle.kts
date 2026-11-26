@@ -1,13 +1,12 @@
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
 }
 
 android {
     namespace = "tv.ham3l.app"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "tv.ham3l.app"
