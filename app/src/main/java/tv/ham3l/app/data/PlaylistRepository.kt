@@ -1,5 +1,7 @@
 package tv.ham3l.app.data
 
+import androidx.room.withTransaction
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -29,7 +31,7 @@ class PlaylistRepository(private val db: AppDatabase) {
         return builder.build()
     }
 
-    suspend fun fetchAndStore(displayName: String, url: String, epgUrl: String?, ua: String?, useProxy: Boolean, proxyHost: String?, proxyPort: Int?): Result<Long> =
+    suspend fun fetchAndStore(displayName: String, url: String, epgUrl: String?, ua: String?, useProxy: Boolean, proxyHost: String?, proxyPort: Int?, existingId: Long? = null): Result<Long> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val body = client(ua, useProxy, proxyHost, proxyPort)
@@ -40,17 +42,27 @@ class PlaylistRepository(private val db: AppDatabase) {
                 val channels = M3UParser.parse(body)
                 check(channels.isNotEmpty()) { "Keine Kanaele in der Liste gefunden" }
 
-                val playlistId = db.playlistDao().upsert(
-                    PlaylistEntity(name = displayName, url = url, epgUrl = epgUrl, userAgent = ua, useProxy = useProxy, proxyHost = proxyHost, proxyPort = proxyPort, lastUpdated = System.currentTimeMillis()),
-                )
-                db.channelDao().deleteForPlaylist(playlistId)
-                db.channelDao().insertAll(M3UParser.toChannels(playlistId, channels).map {
-                    ChannelEntity(playlistId = it.playlistId, name = it.name, logoUrl = it.logoUrl, group = it.group, url = it.url, tvgId = it.tvgId, catchupSource = it.catchupSource)
-                })
-                db.playlistDao().updateMeta(playlistId, channels.size, System.currentTimeMillis())
-                playlistId
-            }
+                storeChannels(displayName, url, epgUrl, ua, useProxy, proxyHost, proxyPort, channels, existingId)
+            }.onFailure { if (it is CancellationException) throw it }
         }
+
+    suspend fun storeChannels(name: String, url: String?, epg: String?, ua: String?, proxy: Boolean, host: String?, port: Int?, raw: List<M3UParser.RawChannel>, existingId: Long? = null): Long = db.withTransaction {
+        check(raw.isNotEmpty()) { "Keine Kanaele gefunden" }
+        val id = if (existingId != null) {
+            check(db.playlistDao().byId(existingId) != null) { "Playlist nicht mehr vorhanden" }
+            existingId
+        } else db.playlistDao().upsert(PlaylistEntity(name = name, url = url, epgUrl = epg, userAgent = ua, useProxy = proxy, proxyHost = host, proxyPort = port))
+        val old = db.channelDao().snapshot(id)
+        val byUrl = old.groupBy { it.url }.mapValues { ArrayDeque(it.value) }
+        val channels = raw.distinctBy { it.url }.map { r ->
+            ChannelEntity(id = byUrl[r.url]?.removeFirstOrNull()?.id ?: 0L, playlistId = id, name = r.name, logoUrl = r.logo, group = r.group, url = r.url, tvgId = r.tvgId, catchupSource = r.catchupSource)
+        }
+        val retained = channels.map { it.id }.toHashSet()
+        old.filter { it.id !in retained }.forEach { db.channelDao().deleteById(it.id) }
+        db.channelDao().insertAll(channels)
+        db.playlistDao().updateMeta(id, channels.size, System.currentTimeMillis())
+        id
+    }
 
     suspend fun loadEpgNow(playlistId: Long): Map<String, List<EpgEntry>> = withContext(Dispatchers.IO) {
         val pl = db.playlistDao().byId(playlistId) ?: return@withContext emptyMap()

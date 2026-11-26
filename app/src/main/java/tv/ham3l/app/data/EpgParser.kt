@@ -12,7 +12,7 @@ import java.util.TimeZone
 object EpgParser {
 
     private fun parseXmltvTime(s: String): Long = try {
-        val fmt = SimpleDateFormat("yyyyMMddHHmmss", Locale.ROOT)
+        val fmt = SimpleDateFormat("yyyyMMddHHmmss", Locale.ROOT).apply { isLenient = false }
         fmt.timeZone = if (s.length >= 20) TimeZone.getTimeZone("GMT" + s.substring(15, 18) + ":" + s.substring(18, 20)) else TimeZone.getTimeZone("UTC")
         fmt.parse(s.take(14))?.time ?: 0L
     } catch (_: Exception) { 0L }
@@ -21,11 +21,8 @@ object EpgParser {
         val map = mutableMapOf<String, MutableList<EpgEntry>>()
         val parser = XmlPullParserFactory.newInstance().newPullParser()
         // Haertung: keine DTD/DocDecl-Verarbeitung (Schutz vor Entity-Expansion/"Billion Laughs")
-        runCatching {
-            parser.setFeature(XmlPullParser.FEATURE_PROCESS_DOCDECL, false)
-            parser.setFeature("http://xml.org/sax/features/external-general-entities", false)
-            parser.setFeature("http://xml.org/sax/features/external-parameter-entities", false)
-        }
+        parser.setFeature(XmlPullParser.FEATURE_PROCESS_DOCDECL, false)
+        check(!parser.getFeature(XmlPullParser.FEATURE_PROCESS_DOCDECL))
         parser.setInput(reader)
 
         var currentChannelId: String? = null
@@ -35,9 +32,11 @@ object EpgParser {
 
         fun currentDescOrNull(): String? = desc.toString().trim().ifBlank { null }
 
+        var count = 0
         var event = parser.eventType
         while (event != XmlPullParser.END_DOCUMENT) {
             when (event) {
+                XmlPullParser.DOCDECL -> error("DTD not allowed")
                 XmlPullParser.START_TAG -> when (parser.name) {
                     "channel" -> currentChannelId = parser.getAttributeValue(null, "id")
                     "programme" -> {
@@ -51,14 +50,15 @@ object EpgParser {
                     "desc" -> if (inProgramme) inDesc = true
                 }
                 XmlPullParser.TEXT -> {
-                    if (inTitle) title.append(parser.text)
-                    if (inDesc) desc.append(parser.text)
+                    if (inTitle) { check(title.length + parser.text.length <= 8192); title.append(parser.text) }
+                    if (inDesc) { check(desc.length + parser.text.length <= 65536); desc.append(parser.text) }
                 }
                 XmlPullParser.END_TAG -> when (parser.name) {
                     "title" -> inTitle = false
                     "desc" -> inDesc = false
                     "programme" -> {
-                        currentChannelId?.let { id ->
+                        currentChannelId?.takeIf { it.isNotBlank() && start > 0 && stop > start }?.let { id ->
+                            check(++count <= 250000)
                             map.getOrPut(id) { mutableListOf() }
                                 .add(EpgEntry(start, stop, title.toString().trim(), currentDescOrNull()))
                         }
@@ -66,7 +66,7 @@ object EpgParser {
                     }
                 }
             }
-            event = parser.next()
+            event = parser.nextToken()
         }
         return map
     }

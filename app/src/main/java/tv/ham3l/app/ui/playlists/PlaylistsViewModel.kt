@@ -1,6 +1,8 @@
 package tv.ham3l.app.ui.playlists
 
 import android.app.Application
+import androidx.room.withTransaction
+import kotlinx.coroutines.CancellationException
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -23,56 +25,37 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
             val result = if (xtream != null && xtream.enabled) {
                 runCatching {
                     val creds = tv.ham3l.app.data.XtreamApi.Credentials(xtream.host, xtream.username, xtream.password)
-                    val raw = tv.ham3l.app.data.XtreamApi(okhttp3.OkHttpClient()).fetchLiveChannels(creds)
+                    val raw = tv.ham3l.app.data.XtreamApi(okhttp3.OkHttpClient.Builder().followSslRedirects(false).callTimeout(90, java.util.concurrent.TimeUnit.SECONDS).build()).fetchLiveChannels(creds)
                     check(raw.isNotEmpty()) { "Xtream-Login fehlgeschlagen oder keine Kanaele" }
-                    // temporaere M3U bauen und normal einspeisen
-                    val m3u = buildString {
-                        append("#EXTM3U\n")
-                        raw.forEach { r ->
-                            append("#EXTINF:-1")
-                            if (!r.logo.isNullOrBlank()) append(" tvg-logo=\"").append(r.logo).append("\"")
-                            if (!r.tvgId.isNullOrBlank()) append(" tvg-id=\"").append(r.tvgId).append("\"")
-                            append(", ").append(r.name).append("\n").append(r.url).append("\n")
-                        }
-                    }
-                    val channels = tv.ham3l.app.data.M3UParser.parse(m3u)
-                    storeChannels(name, channels, tv.ham3l.app.data.XtreamApi.syntheticUrl(creds), epg, ua, proxy, host, port)
+                    repo.storeChannels(name, tv.ham3l.app.data.XtreamApi.syntheticUrl(creds), epg, ua, proxy, host, port, raw)
                 }
             } else {
                 repo.fetchAndStore(name, url, epg, ua, proxy, host, port)
             }
-            result.onSuccess { onDone(it) }.onFailure { lastError.value = it.message }
+            result.onSuccess { onDone(it) }.onFailure { if (it is CancellationException) throw it; lastError.value = "Playlist konnte nicht geladen werden" }
         }
-    }
-
-    private suspend fun storeChannels(
-        name: String, raw: List<tv.ham3l.app.data.M3UParser.RawChannel>, url: String?, epg: String?, ua: String?, proxy: Boolean, host: String?, port: Int?,
-    ): Long {
-        val dbx = db
-        val playlistId = dbx.playlistDao().upsert(
-            tv.ham3l.app.data.db.PlaylistEntity(name = name, url = url, epgUrl = epg, userAgent = ua, useProxy = proxy, proxyHost = host, proxyPort = port, lastUpdated = System.currentTimeMillis()),
-        )
-        dbx.channelDao().deleteForPlaylist(playlistId)
-        dbx.channelDao().insertAll(tv.ham3l.app.data.M3UParser.toChannels(playlistId, raw).map {
-            tv.ham3l.app.data.db.ChannelEntity(playlistId = it.playlistId, name = it.name, logoUrl = it.logoUrl, group = it.group, url = it.url, tvgId = it.tvgId, catchupSource = it.catchupSource)
-        })
-        dbx.playlistDao().updateMeta(playlistId, raw.size, System.currentTimeMillis())
-        return playlistId
     }
 
     fun refresh(id: Long) {
         viewModelScope.launch {
             val pl = db.playlistDao().byId(id) ?: return@launch
             val url = pl.url ?: return@launch
-            repo.fetchAndStore(pl.name, url, pl.epgUrl, pl.userAgent, pl.useProxy, pl.proxyHost, pl.proxyPort)
+            val result = if (url.startsWith("xtream://")) runCatching {
+                val creds = checkNotNull(tv.ham3l.app.data.XtreamApi.parseSyntheticUrl(url))
+                val raw = tv.ham3l.app.data.XtreamApi(okhttp3.OkHttpClient.Builder().followSslRedirects(false).callTimeout(90, java.util.concurrent.TimeUnit.SECONDS).build()).fetchLiveChannels(creds)
+                repo.storeChannels(pl.name, url, pl.epgUrl, pl.userAgent, pl.useProxy, pl.proxyHost, pl.proxyPort, raw, id)
+            } else repo.fetchAndStore(pl.name, url, pl.epgUrl, pl.userAgent, pl.useProxy, pl.proxyHost, pl.proxyPort, id)
+            result.onFailure { if (it is CancellationException) throw it; lastError.value = "Aktualisierung fehlgeschlagen" }
         }
     }
 
     fun delete(id: Long) = viewModelScope.launch {
+        db.withTransaction {
         // Zuerst abhaengige Favoriten/Verlaufseintraege entfernen, dann Playlist + Kanaele
         db.favoriteDao().removeForPlaylist(id)
         db.historyDao().removeForPlaylist(id)
         db.channelDao().deleteForPlaylist(id)
         db.playlistDao().delete(id)
+        }
     }
 }

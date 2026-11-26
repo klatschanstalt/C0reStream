@@ -22,6 +22,8 @@ interface ChannelDao {
     @Query("SELECT * FROM channels WHERE playlistId = :playlistId AND name LIKE '%' || :q || '%' ORDER BY name") fun search(playlistId: Long, q: String): Flow<List<ChannelEntity>>
     @Query("SELECT * FROM channels WHERE playlistId = :playlistId AND `group` = :group ORDER BY name") fun byGroup(playlistId: Long, group: String): Flow<List<ChannelEntity>>
     @Query("SELECT DISTINCT `group` FROM channels WHERE playlistId = :playlistId AND `group` IS NOT NULL ORDER BY `group`") fun groups(playlistId: Long): Flow<List<String>>
+    @Query("SELECT * FROM channels WHERE playlistId = :playlistId ORDER BY id") suspend fun snapshot(playlistId: Long): List<ChannelEntity>
+    @Query("DELETE FROM channels WHERE id = :id") suspend fun deleteById(id: Long)
     @Query("SELECT * FROM channels WHERE id = :id") suspend fun byId(id: Long): ChannelEntity?
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertAll(channels: List<ChannelEntity>)
     @Query("DELETE FROM channels WHERE playlistId = :playlistId") suspend fun deleteForPlaylist(playlistId: Long)

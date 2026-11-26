@@ -26,9 +26,9 @@ class PlaylistRefreshWorker(context: Context, params: WorkerParameters) : Corout
         db.playlistDao().all().first().forEach { pl ->
             val url = pl.url ?: return@forEach
             if (url.startsWith("xtream://")) return@forEach
-            repo.fetchAndStore(pl.name, url, pl.epgUrl, pl.userAgent, pl.useProxy, pl.proxyHost, pl.proxyPort)
+            repo.fetchAndStore(pl.name, url, pl.epgUrl, pl.userAgent, pl.useProxy, pl.proxyHost, pl.proxyPort, pl.id)
                 .onSuccess { ok++ }
-                .onFailure { failed++; AppLog.log("Refresh", "${pl.name}: ${it.message}") }
+                .onFailure { failed++; AppLog.log("Refresh", "Playlist-Aktualisierung fehlgeschlagen") }
         }
         AppLog.log("Refresh", "$ok aktualisiert, $failed fehlgeschlagen")
         return Result.success()
