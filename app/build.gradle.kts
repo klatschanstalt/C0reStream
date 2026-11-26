@@ -67,7 +67,7 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.3.0")
 
     // Netz & Parsing
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp:5.5.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
