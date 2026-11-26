@@ -55,7 +55,7 @@ dependencies {
     implementation("androidx.media3:media3-session:1.11.1")
 
     // Hintergrund-Refresh
-    implementation("androidx.work:work-runtime-ktx:2.9.1")
+    implementation("androidx.work:work-runtime-ktx:2.12.0")
 
     // Persistenz
     implementation("androidx.room:room-runtime:2.7.2")
