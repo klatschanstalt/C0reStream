@@ -152,11 +152,13 @@ fun PlayerScreen(channelId: Long, streamUrl: String?, onBack: () -> Unit, vm: Pl
                     }
                     audioGroups.forEachIndexed { i, group ->
                         TextButton(onClick = {
-                            c.trackSelectionParameters = c.trackSelectionParameters
+                            c?.let { controller ->
+                            controller.trackSelectionParameters = controller.trackSelectionParameters
                                 .buildUpon()
                                 .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
                                 .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, 0))
                                 .build()
+                            }
                             showTracks = false
                         }) { Text(group.getTrackFormat(0).label ?: ("Tonspur " + (i + 1))) }
                     }

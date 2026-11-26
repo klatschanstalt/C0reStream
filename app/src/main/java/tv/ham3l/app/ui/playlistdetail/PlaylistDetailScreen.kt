@@ -60,8 +60,8 @@ fun PlaylistDetailScreen(
     vm: PlaylistDetailViewModel = viewModel(key = "pl" + playlistId),
 ) {
     LaunchedEffect(playlistId) { vm.init(playlistId) }
-    val channels by vm.channels.collectAsState()
-    val groups by vm.groups.collectAsState()
+    val channels by vm.channels.collectAsState(initial = emptyList())
+    val groups by vm.groups.collectAsState(initial = emptyList())
     val query by vm.query.collectAsState()
     val group by vm.selectedGroup.collectAsState()
     var guideChannel by remember { mutableStateOf<tv.ham3l.app.data.db.ChannelEntity?>(null) }

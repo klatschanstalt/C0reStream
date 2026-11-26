@@ -32,7 +32,7 @@ import tv.ham3l.app.ui.playlistdetail.ChannelLogo
 @Composable
 fun GlobalSearchScreen(onPlay: (Long) -> Unit, vm: GlobalSearchViewModel = viewModel()) {
     val query by vm.query.collectAsState()
-    val results by vm.results.collectAsState()
+    val results by vm.results.collectAsState(initial = emptyList())
 
     Column(Modifier.fillMaxSize().padding(20.dp)) {
         Text("Alle Kanaele durchsuchen", style = MaterialTheme.typography.headlineMedium)
