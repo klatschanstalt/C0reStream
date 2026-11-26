@@ -24,6 +24,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -54,7 +55,7 @@ import tv.ham3l.app.service.PlaybackService
 @Composable
 fun PlayerScreen(channelId: Long, streamUrl: String?, onBack: () -> Unit, vm: PlayerViewModel = viewModel()) {
     val context = LocalContext.current
-    var currentId by remember { mutableStateOf(channelId) }
+    var currentId by remember { mutableLongStateOf(channelId) }
     val channel by vm.channelFor(currentId).collectAsState(initial = null)
     val siblings by vm.siblingsOf(channel).collectAsState(initial = emptyList())
     var controller by remember { mutableStateOf<MediaController?>(null) }
@@ -125,13 +126,11 @@ fun PlayerScreen(channelId: Long, streamUrl: String?, onBack: () -> Unit, vm: Pl
             }
             FilledTonalIconButton(onClick = {
                 val act = context as? android.app.Activity ?: return@FilledTonalIconButton
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                     act.enterPictureInPictureMode(
                         android.app.PictureInPictureParams.Builder()
                             .setAspectRatio(android.util.Rational(16, 9))
                             .build(),
                     )
-                }
             }) {
                 Icon(Icons.Filled.PictureInPictureAlt, "Bild-in-Bild", tint = Color.White)
             }
