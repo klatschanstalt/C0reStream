@@ -17,11 +17,19 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '9.4.1'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: ''
       - name: Install Android SDK packages
+        shell: bash
         run: |
-          SDKMANAGER="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
-          test -x "$SDKMANAGER"
-          "$SDKMANAGER" --install 'platforms;android-37' 'build-tools;36.0.0'
+          sdkmanager --list --channel=3 > /tmp/sdk-packages.txt
+          PLATFORM=$(awk -F '|' '{gsub(/^[ \t]+|[ \t]+$/, "", $1); if ($1 == "platforms;android-37.0" || $1 == "platforms;android-37") print $1}' /tmp/sdk-packages.txt | sort -u | tail -1)
+          if [[ -z "$PLATFORM" ]]; then
+            grep -iE '37|cinnamon' /tmp/sdk-packages.txt || true
+            exit 1
+          fi
+          sdkmanager --install --channel=3 "$PLATFORM" 'build-tools;37.0.0'
       - run: gradle --warning-mode all :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --stacktrace
       - name: Generate APK checksum
         if: success()
