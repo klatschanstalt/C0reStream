@@ -13,8 +13,10 @@
     <application
         android:name=".Ham3LApp"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:banner="@drawable/tv_banner"
         android:label="@string/app_name"
         android:supportsRtl="true"
@@ -39,6 +41,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="http" />
                 <data android:scheme="https" />
+                <data android:host="*" />
                 <data android:pathPattern=".*\\.m3u" />
                 <data android:pathPattern=".*\\.m3u8" />
             </intent-filter>
