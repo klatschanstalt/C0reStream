@@ -1,6 +1,14 @@
 package tv.ham3l.app.ui.player
 
 import android.content.ComponentName
+import android.app.Activity
+import android.app.PictureInPictureParams
+import android.content.pm.PackageManager
+import android.graphics.Rect
+import android.os.Build
+import android.util.Rational
+import androidx.media3.common.Player
+import androidx.media3.common.PlaybackException
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,6 +69,39 @@ fun PlayerScreen(channelId: Long, streamUrl: String?, onBack: () -> Unit, vm: Pl
     var controller by remember { mutableStateOf<MediaController?>(null) }
     var showTracks by remember { mutableStateOf(false) }
 
+    var playerView by remember { mutableStateOf<PlayerView?>(null) }
+    var playbackError by remember { mutableStateOf<String?>(null) }
+    val activity = context as? Activity
+    val pipSupported = activity != null && context.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
+
+    fun pipParams(autoEnter: Boolean): PictureInPictureParams {
+        val builder = PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9))
+        val bounds = Rect()
+        if (playerView?.getGlobalVisibleRect(bounds) == true) builder.setSourceRectHint(bounds)
+        if (Build.VERSION.SDK_INT >= 31) builder.setAutoEnterEnabled(autoEnter)
+        return builder.build()
+    }
+
+    DisposableEffect(controller, playerView, activity) {
+        val c = controller
+        fun updatePip() {
+            if (pipSupported) activity?.setPictureInPictureParams(pipParams(c?.isPlaying == true))
+        }
+        val listener = object : Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) { updatePip() }
+            override fun onPlayerError(error: PlaybackException) { playbackError = error.errorCodeName }
+        }
+        val layoutListener = android.view.View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> updatePip() }
+        c?.addListener(listener)
+        playerView?.addOnLayoutChangeListener(layoutListener)
+        updatePip()
+        onDispose {
+            c?.removeListener(listener)
+            playerView?.removeOnLayoutChangeListener(layoutListener)
+            if (pipSupported) activity?.setPictureInPictureParams(pipParams(false))
+        }
+    }
+
     fun zap(step: Int) {
         val list = siblings
         if (list.isEmpty()) return
@@ -72,7 +113,7 @@ fun PlayerScreen(channelId: Long, streamUrl: String?, onBack: () -> Unit, vm: Pl
     DisposableEffect(Unit) {
         val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
         val future = MediaController.Builder(context, token).buildAsync()
-        future.addListener({ controller = future.get() }, ContextCompat.getMainExecutor(context))
+        future.addListener({ if (!future.isCancelled) runCatching { future.get() }.onSuccess { controller = it }.onFailure { playbackError = "Wiedergabedienst nicht erreichbar" } }, ContextCompat.getMainExecutor(context))
         onDispose {
             PlayerHub.close()
             future.cancel(false)
@@ -89,6 +130,7 @@ fun PlayerScreen(channelId: Long, streamUrl: String?, onBack: () -> Unit, vm: Pl
         if (ch != null) vm.logWatch(ch)
         PlayerHub.title.value = ch?.name ?: "Ham3L TV"
         PlayerHub.controller.value = c
+        playbackError = null
         c.setMediaItem(MediaItem.fromUri(url))
         c.prepare()
         c.playWhenReady = true
@@ -103,12 +145,19 @@ fun PlayerScreen(channelId: Long, streamUrl: String?, onBack: () -> Unit, vm: Pl
                         player = c
                         useController = true
                         keepScreenOn = true
+                        playerView = this
                     }
                 },
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
             Text("Verbinde mit Wiedergabedienst ...", color = Color.White, modifier = Modifier.align(Alignment.Center))
+        }
+        playbackError?.let { error ->
+            Column(Modifier.align(Alignment.Center).background(Color.Black).padding(16.dp)) {
+                Text("Wiedergabe fehlgeschlagen: $error", color = Color.White)
+                TextButton(onClick = { playbackError = null; controller?.prepare(); controller?.play() }) { Text("Erneut versuchen") }
+            }
         }
         IconButton(onClick = onBack, modifier = Modifier.padding(12.dp).align(Alignment.TopStart)) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurueck", tint = Color.White)
@@ -124,13 +173,8 @@ fun PlayerScreen(channelId: Long, streamUrl: String?, onBack: () -> Unit, vm: Pl
             FilledTonalIconButton(onClick = { showTracks = true }) {
                 Icon(Icons.Filled.Audiotrack, "Tonspur", tint = Color.White)
             }
-            FilledTonalIconButton(onClick = {
-                val act = context as? android.app.Activity ?: return@FilledTonalIconButton
-                    act.enterPictureInPictureMode(
-                        android.app.PictureInPictureParams.Builder()
-                            .setAspectRatio(android.util.Rational(16, 9))
-                            .build(),
-                    )
+            FilledTonalIconButton(enabled = pipSupported && c != null, onClick = {
+                activity?.enterPictureInPictureMode(pipParams(false))
             }) {
                 Icon(Icons.Filled.PictureInPictureAlt, "Bild-in-Bild", tint = Color.White)
             }
