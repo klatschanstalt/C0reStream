@@ -1,0 +1,2 @@
+-keep class tv.ham3l.app.data.** { *; }
+-dontwarn okhttp3.**
