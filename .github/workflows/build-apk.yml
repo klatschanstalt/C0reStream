@@ -64,3 +64,36 @@ jobs:
             app/build/outputs/apk/debug/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
+
+  publish-preview:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: preview-release-${{ github.sha }}
+      cancel-in-progress: false
+    steps:
+      - name: Download verified build artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "${{ github.run_id }}" --repo "${{ github.repository }}" --name C0reStream-debug --dir preview
+      - name: Verify and publish development APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BUILD_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd preview
+          sha256sum --check SHA256SUMS
+          test -s C0reStream-debug.apk
+          TAG="preview-${BUILD_SHA:0:12}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Preview already published; preserving existing assets."
+          else
+            gh release create "$TAG" C0reStream-debug.apk SHA256SUMS --target "$BUILD_SHA" --prerelease --latest=false --title "C0reStream development preview ${BUILD_SHA:0:12}" --notes "CI-built debug APK for testing only. Not a production release. Debug signing keys may change between builds; uninstalling can erase app data. Do not enter sensitive credentials until security findings are resolved."
+          fi

@@ -1,50 +1,15 @@
 # C0reStream
 
-**Powered by Ham3L** - Eigenstaendiger Android IPTV-Client (Kotlin + Jetpack Compose).
+Android IPTV and media client for user-provided, authorized streams. Part of the C0re product family.
 
-Konzeptionell inspiriert von iptvnator (https://github.com/4gray/iptvnator),
-komplett eigene Implementierung, eigenes Design und Branding.
+## Download
 
-## Features
-- M3U / M3U8-Playlists per URL hinzufuegen (tvg-logo, tvg-id, group-title)
-- Xtream-Codes-Login (player_api.php, get_live_streams)
-- VOD-Filme und Serien (Staffeln/Episoden) ueber Xtream-Codes
-- Live-TV-Wiedergabe via Media3/ExoPlayer im MediaSession-Vordergrunddienst
-  (Lockscreen-/Kopfhoerer-Steuerung, WakeLock, konfigurierbarer Puffer)
-- XMLTV-EPG-Parser mit "laeuft gerade"-Anzeige und Tagesprogramm-Guide
-- Catch-up/Timeshift: vergangene Sendungen ueber catchup-source ansehen
-- Sender-Zapping (vor/zurueck), Tonspur-Auswahl, Bild-in-Bild, Mini-Player
-- Globale Kanalsuche ueber alle Playlists
-- Backup: alle Playlists als M3U exportieren und teilen
-- Favoriten, Wiederverlauf, Kanalgruppen als Filter-Chips
-- Pro Playlist: User-Agent und HTTP-Proxy konfigurierbar
-- Update-Check, lokales Diagnose-Protokoll, automatischer Playlist-Refresh (12 h)
-- Zwei Brand-Themes (Ham3L Cyan / Ham3L Ember), Splash-Screen, Android-TV-tauglich (Leanback)
-- M3U-Links aus dem Browser oder Teilen-Menue direkt oeffnen
+[GitHub Releases](https://github.com/klatschanstalt/C0reStream/releases) — development previews are published after successful CI builds. Download C0reStream-debug.apk and SHA256SUMS. Preview APKs are debug-signed, not production releases; updates may require uninstalling, which erases local data. Do not enter sensitive credentials while security findings remain open.
 
-## Bauen
-    ./gradlew assembleDebug
+Android 11 minimum (API 30), target API 37, compile API 37.1. Actual Android 11–17 device compatibility remains to be verified; Android 18 preparation is planned.
 
-Mindestens Android 7.0 (API 24), Zielsystem Android 15 (API 35).
+## Development
 
-## Struktur
-    app/src/main/java/tv/ham3l/app/
-    - data/       M3U- und EPG-Parser, Repository, Room-DB (Playlists, Kanaele, Favoriten, Verlauf)
-    - ui/         Compose-Screens: Playlists, Kanalliste, Player, Favoriten, Verlauf, Einstellungen
-    - ui/theme/   Ham3L-Brand-Design
+Kotlin, Jetpack Compose, Media3, Room, Gradle 9.6.0. CI builds debug and release variants, runs unit-test and lint tasks, and publishes checksummed debug previews. See MASTERPLAN.md, SECURITY.md and PROJECT_STATUS_REPORT.md. Production releases require durable signing and security acceptance.
 
-## APK selbst bauen (einfachster Weg)
-
-Das Repo enthaelt einen GitHub-Actions-Workflow (.github/workflows/build-apk.yml):
-
-1. Projekt nach GitHub pushen (main-Branch)
-2. Auf github.com im Tab "Actions" den Lauf "Build C0reStream APK" abwarten
-3. Unter "Artifacts" die C0reStream-APK herunterladen und auf dem Geraet installieren
-   (Installation aus unbekannten Quellen erlaubt geben)
-4. Optional: einen Tag pushen (z.B. v1.0.0), dann haengt die APK automatisch
-   an einem GitHub-Release
-
-Alternativ lokal: Android Studio oeffnen, Sync abwarten, Run druecken.
-
-## Lizenz
-Alle Rechte bei Ham3L.
+Application ID: pw.c0re.stream. Internal Kotlin namespace migration remains pending.
