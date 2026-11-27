@@ -16,3 +16,5 @@ Produktionsfreigabe: [C0reStream v1.3.0](https://github.com/klatschanstalt/C0reS
 - `update.json` verweist auf diese APK und denselben SHA-256; `UpdateInstaller` prüft vor der Installation zusätzlich Paketname und Signaturzertifikat.
 
 Android 11 (API 30) und Android 16 (API 36) sind per Emulator getestet; weitere API-Stufen sind kompilierungsverifiziert, aber nicht gerätezertifiziert. Android 18 ist nicht zertifiziert; Vorbereitung erfolgt nur über offizielle APIs und Feature-Erkennung.
+
+Bekannte Einschränkung (verifiziert): Das Repository ist derzeit privat. Unauthentifizierte requests an `raw.githubusercontent.com/klatschanstalt/C0reStream/main/update.json` und an die Release-Assets liefern HTTP 404 (mit Authentifizierung: 200). Die In-App-Prüfung kann Endnutzern daher erst nach einer Owner-Entscheidung zur öffentlichen Bereitstellung des Manifests/der Assets zur Verfügung stehen. Die Sichtbarkeit wurde nicht geändert; die Signatur- und Checksummenprüfung der veröffentlichten APK ist unabhängig davon verifiziert.
