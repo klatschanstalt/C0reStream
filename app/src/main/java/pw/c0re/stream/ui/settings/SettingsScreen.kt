@@ -94,8 +94,9 @@ fun SettingsScreen(onExportBackup: () -> Unit = {}, vm: SettingsViewModel = view
         Card {
             Column(Modifier.padding(16.dp)) {
                 Text("Backup & Export", style = MaterialTheme.typography.titleMedium)
+                pw.c0re.stream.ui.backup.BackupControls()
                 Text("Alle Playlists als M3U-Datei exportieren und teilen.", style = MaterialTheme.typography.bodyMedium)
-                androidx.compose.material3.TextButton(onClick = onExportBackup) { Text("Backup erstellen") }
+                androidx.compose.material3.TextButton(onClick = onExportBackup) { Text("M3U unverschlüsselt exportieren") }
             }
         }
         Spacer(Modifier.height(16.dp))
