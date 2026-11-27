@@ -36,7 +36,7 @@ object UpdateChecker {
                 .takeIf { it.matches(Regex("[0-9a-f]{64}")) }
             UpdateInfo(
                 latestVersion = latest.take(64),
-                notes = json.optString("notes").takeIf { it.isNotBlank() }?.take(8_192),
+                notes = localizedNotes(json).takeIf { it.isNotBlank() }?.take(8_192),
                 apkUrl = apk,
                 sha256 = checksum,
             )
@@ -46,6 +46,20 @@ object UpdateChecker {
             AppLog.log("Update", error.message ?: "?")
             null
         }
+    }
+
+    /**
+     * Prefers release notes in the device language. The unlocalised `notes` field remains the
+     * backwards-compatible fallback for older manifests.
+     */
+    fun localizedNotes(json: JSONObject): String {
+        val language = Locale.getDefault().language.lowercase(Locale.ROOT)
+        val localized = if (language in setOf("de", "en", "fr")) {
+            json.optString("notes_$language").trim()
+        } else {
+            ""
+        }
+        return localized.ifBlank { json.optString("notes").trim() }
     }
 
     /** Compares dotted numeric versions; pre-release suffixes make a version older. */

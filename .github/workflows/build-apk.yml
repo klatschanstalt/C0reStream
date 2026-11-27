@@ -34,8 +34,24 @@ jobs:
           version_name=$(grep '^versionName=' version.properties | cut -d= -f2)
           [[ "$version_code" =~ ^[0-9]+$ ]] && [ "$version_code" -gt 0 ] || { echo "Invalid versionCode"; exit 1; }
           [[ "$version_name" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]] || { echo "Invalid versionName"; exit 1; }
+          python3 -c "import json; d=json.load(open('update.json')); assert all(k in d and d[k].strip() for k in ('notes_de','notes_en','notes_fr')), 'missing localized release notes'"
           update_latest=$(python3 -c "import json; print(json.load(open('update.json'))['latestVersion'])")
           [ "$update_latest" = "$version_name" ] || { echo "update.json latestVersion mismatch"; exit 1; }
+      - name: Check version monotonicity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          version_code=$(grep '^versionCode=' version.properties | cut -d= -f2)
+          latest_tag=$(gh api "repos/$GH_REPO/releases/latest" --jq .tag_name 2>/dev/null || true)
+          if [ -n "$latest_tag" ] && [ "$latest_tag" != "v$version_name" ]; then
+            published_code=$(gh api "repos/$GH_REPO/contents/version.properties?ref=$latest_tag" --jq .content \
+              | base64 -d | grep '^versionCode=' | cut -d= -f2)
+            [ "$version_code" -gt "$published_code" ] || {
+              echo "versionCode must exceed published release $latest_tag ($published_code)"; exit 1;
+            }
+          fi
       - name: Unit tests and lint
         run: ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug --stacktrace
       - name: Upload verification reports
