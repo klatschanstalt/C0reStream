@@ -4,17 +4,20 @@ import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import pw.c0re.stream.data.model.EpgEntry
 import java.io.Reader
-import java.text.SimpleDateFormat
+import java.time.LocalDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.time.format.ResolverStyle
 import java.util.Locale
-import java.util.TimeZone
 
 // Minimaler XMLTV (EPG)-Parser, wie die XMLTV-Unterstuetzung von iptvnator
 object EpgParser {
 
     private fun parseXmltvTime(s: String): Long = try {
-        val fmt = SimpleDateFormat("yyyyMMddHHmmss", Locale.ROOT).apply { isLenient = false }
-        fmt.timeZone = if (s.length >= 20) TimeZone.getTimeZone("GMT" + s.substring(15, 18) + ":" + s.substring(18, 20)) else TimeZone.getTimeZone("UTC")
-        fmt.parse(s.take(14))?.time ?: 0L
+        val match = Regex("([0-9]{14})(?:\\s+([+-][0-9]{4}|Z))?").matchEntire(s.trim()) ?: error("Invalid XMLTV time")
+        val fmt = DateTimeFormatter.ofPattern("uuuuMMddHHmmss", Locale.ROOT).withResolverStyle(ResolverStyle.STRICT)
+        val offset = match.groupValues[2].ifEmpty { "Z" }
+        LocalDateTime.parse(match.groupValues[1], fmt).toInstant(ZoneOffset.of(offset)).toEpochMilli()
     } catch (_: Exception) { 0L }
 
     fun parse(reader: Reader): Map<String, MutableList<EpgEntry>> {
@@ -38,7 +41,7 @@ object EpgParser {
             when (event) {
                 XmlPullParser.DOCDECL -> error("DTD not allowed")
                 XmlPullParser.START_TAG -> when (parser.name) {
-                    "channel" -> currentChannelId = parser.getAttributeValue(null, "id")
+                    "channel" -> Unit
                     "programme" -> {
                         currentChannelId = parser.getAttributeValue(null, "channel")
                         inProgramme = true
@@ -49,7 +52,8 @@ object EpgParser {
                     "title" -> if (inProgramme) inTitle = true
                     "desc" -> if (inProgramme) inDesc = true
                 }
-                XmlPullParser.TEXT -> {
+                XmlPullParser.TEXT, XmlPullParser.CDSECT, XmlPullParser.ENTITY_REF -> {
+                    check(parser.text != null) { "Unresolved XML entity" }
                     if (inTitle) { check(title.length + parser.text.length <= 8192); title.append(parser.text) }
                     if (inDesc) { check(desc.length + parser.text.length <= 65536); desc.append(parser.text) }
                 }

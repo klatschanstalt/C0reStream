@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultLoadControl
@@ -30,7 +31,10 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         val (minBuffer, maxBuffer) = runBlocking { readBufferPrefs() }
         val player = ExoPlayer.Builder(this)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(this))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultHttpDataSource.Factory()
+                .setAllowCrossProtocolRedirects(false)
+                .setConnectTimeoutMs(15000)
+                .setReadTimeoutMs(30000)))
             .setLoadControl(
                 DefaultLoadControl.Builder()
                     .setBufferDurationsMs(
@@ -50,8 +54,8 @@ class PlaybackService : MediaSessionService() {
 
     private suspend fun readBufferPrefs(): Pair<Int, Int> {
         val prefs = playbackStore.data.first()
-        val min = prefs[intPreferencesKey("min_buffer_sec")] ?: 50
-        val max = prefs[intPreferencesKey("max_buffer_sec")] ?: 120
+        val min = (prefs[intPreferencesKey("min_buffer_sec")] ?: 50).coerceIn(5, 120)
+        val max = (prefs[intPreferencesKey("max_buffer_sec")] ?: 120).coerceIn(min, 300)
         return min to max
     }
 
