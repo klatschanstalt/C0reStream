@@ -16,10 +16,14 @@ Open or not certified:
 
 - Physical-device validation beyond the API 30/36 emulator matrix; Android 17 and 18 are not device-certified.
 - Casting needs a registered receiver ID and Play Services certification; multiview is not implemented; no DRM circumvention.
-- APK size 6,027,029 B exceeds the <5 MB goal; measured justification in `PROJECT_STATUS_REPORT.md`.
+- APK size 6,200,405 B exceeds the <5 MB goal; measured justification in `PROJECT_STATUS_REPORT.md`.
 
 Binding decisions: minimum Android 11 (API 30); HTTP and HTTPS IPTV sources supported without mandatory opt-in, HTTPS preferred, no HTTPS-to-HTTP redirects; no ads, tracking or bundled streams.
 
-## Abgeschlossener Prioritätsauftrag (2026-11-27)
+## Aktiver Auftrag (2026-11-27): Design, Branding & Responsive UI/UX
 
-Senderimport mit vollständiger Statistik, stabilen IDs und Anbieterreihenfolge (Room v6), Vollbildmodi inklusive Pixel-/Anamorph-Behandlung, modernisierter Media3-Player mit Decoder-Fallback und Diagnose, kategorisiertes Einstellungscenter mit DE/EN/FR und Performanzprofilen. Geprüft in CI-Lauf `46009609741`; Nachfolgeversion `1.5.0` wird signiert veröffentlicht. Nicht umgesetzt: Casting/Multiview (Plattform-/Zertifizierungsgrenzen), echte Geräte-Screenshots, Gerätezertifizierung jenseits API 30/36.
+Verbindlich: vollständige visuelle Überarbeitung auf Grundlage der Branding-Assets unter `assets/branding/`. Zentrale Design-Tokens, konsistente Komponenten, responsive Layouts (Smartphone/Tablet/Foldable/TV, Hoch-/Querformat, Multi-Window, Insets, große Schrift), einheitliche Player-Oberfläche, launcher/adaptive/monochrome Icons, native Splashscreen-Integration, Light/Dark/System/AMOLED, kontrollierte Animationen und Barrierefreiheit. Bestehende Funktionen, Nutzerdaten, Signatur und Updates bleiben erhalten. CI bleibt während der Implementierung pausiert; nach gebündelter Prüfung wird der Stand synchronisiert.
+
+## Abgeschlossener Prioritätsauftrag (2026-11-27): Import, Player, Performance
+
+Senderimport mit vollständiger Statistik, stabilen IDs und Anbieterreihenfolge (Room v6), Vollbildmodi inklusive Pixel-/Anamorph-Behandlung, modernisierter Media3-Player mit Decoder-Fallback und Diagnose, kategorisiertes Einstellungscenter mit DE/EN/FR und Performanzprofilen. Geprüft in CI-Lauf `46011852896`; Version `1.5.0` ist signiert veröffentlicht. Nicht umgesetzt: Casting/Multiview (Plattform-/Zertifizierungsgrenzen), echte Geräte-Screenshots, Gerätezertifizierung jenseits API 30/36.
