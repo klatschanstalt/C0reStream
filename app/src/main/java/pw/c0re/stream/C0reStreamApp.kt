@@ -11,8 +11,10 @@ import kotlinx.coroutines.launch
 import pw.c0re.stream.data.AppSettings
 import pw.c0re.stream.data.SettingsRepository
 import pw.c0re.stream.data.db.AppDatabase
+import pw.c0re.stream.data.resources.ResourceManager
 import pw.c0re.stream.work.PlaylistRefreshWorker
 import pw.c0re.stream.work.ReminderScheduler
+import pw.c0re.stream.work.UpdateWorker
 
 class C0reStreamApp : Application() {
     lateinit var database: AppDatabase
@@ -35,6 +37,8 @@ class C0reStreamApp : Application() {
             val current = settings.snapshot()
             PlaylistRefreshWorker.schedule(this@C0reStreamApp, current.refreshHours, current.autoRefresh)
             ReminderScheduler.reschedule(this@C0reStreamApp, database)
+            UpdateWorker.schedule(this@C0reStreamApp)
+            ResourceManager.refresh(this@C0reStreamApp)
         }
     }
 
@@ -48,9 +52,16 @@ class C0reStreamApp : Application() {
             description = getString(R.string.reminder_channel)
         }
         manager.createNotificationChannel(reminders)
+        val updates = NotificationChannel(
+            UPDATE_CHANNEL_ID,
+            getString(R.string.update_channel),
+            NotificationManager.IMPORTANCE_LOW,
+        )
+        manager.createNotificationChannel(updates)
     }
 
     companion object {
         const val REMINDER_CHANNEL_ID = "c0restream_reminders"
+        const val UPDATE_CHANNEL_ID = "c0restream_updates"
     }
 }

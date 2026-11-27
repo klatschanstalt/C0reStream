@@ -17,8 +17,9 @@ import java.io.File
         WatchlistEntity::class,
         EpgProgramEntity::class,
         ReminderEntity::class,
+        pw.c0re.stream.data.profiles.ProfileEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(ProtectedUrlConverters::class)
@@ -31,6 +32,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun watchlistDao(): WatchlistDao
     abstract fun epgDao(): EpgDao
     abstract fun reminderDao(): ReminderDao
+    abstract fun profileDao(): pw.c0re.stream.data.profiles.ProfileDao
 
     companion object {
         private const val databaseName = "c0restream.db"
@@ -38,7 +40,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, resolveDatabaseName(context))
-                .addMigrations(encryptUrlsMigration, schemaV4Migration)
+                .addMigrations(encryptUrlsMigration, schemaV4Migration, schemaV5Migration)
                 .build()
 
         /**

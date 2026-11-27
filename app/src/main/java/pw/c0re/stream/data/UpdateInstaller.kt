@@ -1,10 +1,10 @@
 package pw.c0re.stream.data
 
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
-import android.net.Uri
-import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
@@ -80,13 +80,32 @@ object UpdateInstaller {
         Result.Ready(target)
     }
 
+    /**
+     * Commits the verified APK to Android's PackageInstaller. The system shows its own
+     * confirmation UI; no silent installation is attempted.
+     */
     fun install(context: Context, file: File) {
-        val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        val installer = context.packageManager.packageInstaller
+        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+            .apply { setAppPackageName(context.packageName) }
+        val sessionId = installer.createSession(params)
+        val callback = PendingIntent.getBroadcast(
+            context,
+            sessionId,
+            Intent(context, pw.c0re.stream.receiver.UpdateInstallReceiver::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val session = installer.openSession(sessionId)
+        try {
+            file.inputStream().use { input ->
+                session.openWrite("c0restream-update", 0L, file.length()).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            session.commit(callback.intentSender)
+        } finally {
+            runCatching { session.close() }
         }
-        context.startActivity(intent)
     }
 
     private fun sha256(file: File): String {
