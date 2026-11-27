@@ -1,26 +1,19 @@
-# C0reStream – approved roadmap
-1. Modernize SDK, AGP, Gradle wrapper, Kotlin, KSP, Compose, Media3, Room, WorkManager, DataStore and dependencies; version catalog; resolve lint.
-2. Material 3 responsive UI, themes, animations, branding, accessibility, DE/EN/FR.
-3. Player: HLS/DASH, track selection, PiP, mini-player, retry, buffering, gestures, sleep timer, diagnostics, radio.
-4. Playlists: M3U/M3U8, Xtream, import/export, stable IDs, refresh, groups, favorites, deduplication.
-5. EPG: XMLTV, gzip, mapping, timeline, reminders, catch-up, timezone, cache.
-6. VOD: movies, series, episodes, resume, watchlist, search.
-7. TV: D-pad, focus, remote, numeric selection, TV layouts and testing.
-8. Optional casting, multiview, authorized recording, profiles, PIN, encrypted backups, QR import.
-9. Security: Keystore credentials, component and URL validation, parser limits, no secrets/logged credentials, no ads/tracking.
-10. Performance: startup, memory, large lists, caching, R8.
-11. Settings and diagnostics center.
-12. CI, tests, Dependabot, signing, release notes, checksums and artifact retention.
-13. Secure update distribution without embedded private GitHub tokens; user-confirmed installation.
-14. Compact documentation and verified status.
-15. Autonomous incremental development, safe commits and pushes, no paid services.
-16. Acceptance: zero compiler/lint errors, resolve actionable warnings, compatible stable dependencies, device tests, signed release, verified updates.
+# C0reStream – roadmap and acceptance
 
-Binding decision: minimum Android 11 (API 30); target latest stable SDK. Older Android versions are unsupported.
+Verified status 2026-11-27. CI run `45934346757`: 47 unit tests, 9 instrumented tests per API level (30 and 36), zero lint errors/warnings, signed release published with a verified certificate fingerprint.
 
-Android compatibility acceptance: API 30 through Android 17, including phone/tablet/TV, edge-to-edge, lifecycle, media foreground services, PiP, adaptive layouts, permissions and native dependency page-size compatibility. Prepare Android 18 using official behavior-change documentation and preview test lanes when available; do not assume future API numbers or release dates. Record actual emulator/device results separately from compilation.
+Delivered:
 
-## Verbindliche Entwicklungsstrategie (2026-11-27)
-Implementierungsphase zuerst: alle offenen Funktionen, Rebranding, Architektur und Sicherheitsmaßnahmen zusammenhängend implementieren. Keine CI- oder Gerätetests während dieser Phase abwarten oder manuell auslösen; automatische Push-Builds und APK-Veröffentlichungen pausieren. Quellcodeprüfung, sichere kleine Commits und Testimplementierung bleiben erforderlich. Anschließend gebündelte Integrations-, CI-, Sicherheits-, Emulator- und Gerätetests, Fehlerkorrektur bis zur Erfüllung aller Abschlusskriterien; erst danach automatische Builds wieder aktivieren und Produktionsfreigabe nach geschützter Signierung. Vorhandene verifizierte Pre-Releases erhalten. Diese Regel ersetzt widersprechende Zwischenprüfpflichten, nicht die finalen Qualitätsanforderungen.
+- Stable toolchain (JDK 17, AGP 9.5.3, Gradle 9.9.2, Compose, Media3, Room 2.8.5, WorkManager, DataStore) and version catalog.
+- Material 3 responsive UI, Light/Dark/AMOLED, German/English/French, Android TV launcher entry and Compose focus navigation.
+- Media3 live playback with mini-player, background service, PiP, track/quality selection, sleep timer, retry, catch-up and resume.
+- M3U/M3U8 and Xtream sources, stable channel IDs, deduplication, groups, favourites, local import and transactional refresh.
+- XMLTV EPG (plain/gzip), guide cache, reminders and catch-up links; movies, series, episodes, watchlist and resume.
+- Encrypted credentials/URLs, Keystore-backed Room v4 migration, hardened parsers, per-hop redirect guard, encrypted backup/restore, signed update verification.
 
-Binding owner decision: HTTP and HTTPS IPTV sources remain supported without mandatory opt-in. Prefer HTTPS where available; prevent unintended HTTPS-to-HTTP redirects and retain URL validation, credential encryption and transport-risk disclosure. HTTP support alone is not a release blocker.
+Open or not certified:
+
+- Physical-device validation beyond the API 30/36 emulator matrix; Android 17 and 18 compatibility are not certified.
+- Optional features not implemented: casting, multiview, authorized recording, profiles, PIN and QR import.
+
+Binding decisions: minimum Android 11 (API 30); HTTP and HTTPS IPTV sources supported without mandatory opt-in, HTTPS preferred, no HTTPS-to-HTTP redirects; no ads, tracking or bundled streams.

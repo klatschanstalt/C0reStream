@@ -27,14 +27,8 @@ jobs:
       - uses: android-actions/setup-android@v4
         with:
           packages: 'platforms;android-37.1 build-tools;37.0.0 platform-tools'
-      - name: Unit tests, lint and builds
-        run: ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease --stacktrace
-      - name: Generate APK checksum
-        if: success()
-        run: |
-          cd app/build/outputs/apk/debug
-          mv app-debug.apk C0reStream-debug.apk
-          sha256sum C0reStream-debug.apk > SHA256SUMS
+      - name: Unit tests, lint and release build
+        run: ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --stacktrace
       - name: Upload database schemas
         if: always()
         uses: actions/upload-artifact@v7.0.2
@@ -51,14 +45,6 @@ jobs:
             app/build/reports/tests/
             app/build/reports/lint-results-debug.*
           if-no-files-found: ignore
-      - uses: actions/upload-artifact@v7.0.2
-        with:
-          name: C0reStream-debug
-          path: |
-            app/build/outputs/apk/debug/*.apk
-            app/build/outputs/apk/debug/SHA256SUMS
-          if-no-files-found: error
-          retention-days: 14
 
   instrumented:
     needs: verify
@@ -108,39 +94,6 @@ jobs:
           name: instrumented-reports-api${{ matrix.api-level }}
           path: app/build/reports/androidTests/
           if-no-files-found: ignore
-
-  publish-preview:
-    needs: verify
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      actions: read
-    concurrency:
-      group: preview-release-${{ github.sha }}
-      cancel-in-progress: false
-    steps:
-      - name: Download verified build artifact
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run download "${{ github.run_id }}" --repo "${{ github.repository }}" --name C0reStream-debug --dir preview
-      - name: Verify and publish development APK
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          BUILD_SHA: ${{ github.sha }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd preview
-          sha256sum --check SHA256SUMS
-          test -s C0reStream-debug.apk
-          TAG="preview-${BUILD_SHA:0:12}"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Preview already published; preserving existing assets."
-          else
-            gh release create "$TAG" C0reStream-debug.apk SHA256SUMS --target "$BUILD_SHA" --prerelease --latest=false --title "C0reStream development preview ${BUILD_SHA:0:12}" --notes "CI-built debug APK for testing only. Not a production release. Debug signing keys may change between builds; uninstalling can erase app data. Do not enter sensitive credentials until security findings are resolved."
-          fi
 
   publish-production:
     needs: [verify, instrumented]
@@ -214,6 +167,15 @@ jobs:
           cp "$APK" C0reStream.apk
           sha256sum C0reStream.apk > SHA256SUMS
           TAG="v$(grep '^versionName=' ../../../../../version.properties | cut -d= -f2)"
+          BUILD_SHA256="$(sha256sum C0reStream.apk | cut -d' ' -f1)"
+          MANIFEST_VERSION="$(python3 -c 'import json; print(json.load(open("../../../../../update.json"))["latestVersion"])')"
+          MANIFEST_SHA="$(python3 -c 'import json; print(json.load(open("../../../../../update.json"))["sha256"].lower())')"
+          MANIFEST_URL="$(python3 -c 'import json; print(json.load(open("../../../../../update.json"))["apkUrl"])')"
+          if [[ "v$MANIFEST_VERSION" != "$TAG" || "$BUILD_SHA256" != "$MANIFEST_SHA" ||
+                "$MANIFEST_URL" != https://*"/download/$TAG/"* ]]; then
+            echo "update.json does not match the signed release; refusing to publish."
+            exit 1
+          fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists; preserving immutable assets. Bump version.properties for a new release."
             exit 0

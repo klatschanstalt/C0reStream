@@ -1,32 +1,58 @@
 # C0reStream
 
-Android IPTV and media client for user-provided, authorized streams. Application ID `pw.c0re.stream`, minimum Android 11 (API 30), target/compile API 37.1.
+**Your Streams. Your Rules.**
+
+[![Build](https://github.com/klatschanstalt/C0reStream/actions/workflows/build-apk.yml/badge.svg)](https://github.com/klatschanstalt/C0reStream/actions/workflows/build-apk.yml)
+[![Release](https://img.shields.io/github/v/release/klatschanstalt/C0reStream)](https://github.com/klatschanstalt/C0reStream/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/klatschanstalt/C0reStream/total)](https://github.com/klatschanstalt/C0reStream/releases)
+
+C0reStream is an Android media client for user-provided, authorized IPTV playlists and VOD libraries. It plays the streams you supply; it does **not** provide IPTV content, subscriptions, accounts or any bundled streams.
 
 ## Features
 
-- M3U/M3U8 playlists and Xtream Codes sources, stable channel IDs, deduplication, automatic refresh.
-- Live TV with Media3 (HLS/DASH/MPEG-TS), mini-player, background playback, PiP, audio/subtitle/quality selection, sleep timer, retry and resume.
-- XMLTV EPG (plain or gzip), programme guide, reminders and catch-up URLs.
-- VOD movies, series and episodes with watchlist and resume positions.
-- Encrypted backup/restore (PBKDF2-HMAC-SHA256, AES-256-GCM) including settings, favourites, history, progress, watchlist and reminders.
-- Material 3 responsive UI, Light/Dark/AMOLED, Android TV launcher, German/English/French.
-- Credentials and stream URLs encrypted at rest with an Android Keystore key; URL/parser limits and HTTPS-downgrade protection.
+- **Playlists** — M3U/M3U8, Xtream Codes, local file import, stable channel IDs, deduplication, groups, favourites and automatic refresh.
+- **Player** — Media3 HLS/DASH/MPEG-TS, mini-player, background playback, PiP, audio/subtitle/video-track selection, sleep timer, reconnect, catch-up and VOD resume.
+- **EPG** — XMLTV (plain or gzip), programme guide, cache, reminders and catch-up links.
+- **VOD** — movies, series and episodes with search, watchlist and resume positions.
+- **Library** — encrypted backup/restore including settings, favourites, history, progress, watchlist and reminders.
+- **Interface** — Material 3, Light/Dark/AMOLED, responsive layout, German/English/French, Android TV launcher entry and keyboard/D-pad focus navigation.
+- **Privacy** — credentials and URLs encrypted with an Android Keystore key, bounded parsers, URL validation and HTTPS-downgrade protection.
 
-HTTP sources remain supported by explicit owner decision; HTTPS is preferred and credentials are still encrypted. No ads, tracking or bundled streams.
+HTTP sources remain supported by owner decision; HTTPS is preferred and plaintext transport risk is shown in settings. No ads, analytics or tracking.
+
+## Requirements
+
+- Android 11 (API 30) or newer. Target API 37, compile SDK 37.1.
+- A network connection to the media sources you own or are authorized to use.
+- Android TV: launcher banner and focus navigation are present; TV hardware is not part of the automated test matrix.
+
+## Install and verify
+
+1. Download the current signed APK: [C0reStream.apk (latest)](https://github.com/klatschanstalt/C0reStream/releases/latest/download/C0reStream.apk) or the [version-bound v1.3.0 APK](https://github.com/klatschanstalt/C0reStream/releases/download/v1.3.0/C0reStream.apk).
+2. Verify the checksum with [SHA256SUMS](https://github.com/klatschanstalt/C0reStream/releases/latest/download/SHA256SUMS):
+
+   ```bash
+   sha256sum --check SHA256SUMS
+   ```
+
+   Version 1.3.0 SHA-256: `e3a98be25e6abdd32f5cefc08bf7dfb7379f5ace8da1c5e158d073e0be4b5bad` (5,786,466 bytes).
+3. Install the APK (Android may require allowing installation from unknown sources). The signing certificate fingerprint is `65FB26B0F617583228EA8813080FA7E2F8F6421022D8D279F928C726EA6E8543`.
+
+## Updates
+
+The app reads the public `update.json` from `main` without any GitHub token. If a newer version is available, it downloads the version-bound APK over HTTPS and installs it only after SHA-256, package-name and signing-certificate checks plus your confirmation. You can always use the [permanent latest-release link](https://github.com/klatschanstalt/C0reStream/releases/latest) manually.
 
 ## Build
 
 ```bash
-./gradlew :app:assembleDebug
-./gradlew :app:testDebugUnitTest :app:lintDebug
+./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleRelease
+./gradlew :app:connectedDebugAndroidTest   # requires a connected device or emulator
 ```
 
-Toolchain: JDK 17, Android SDK 37.1, build-tools 37.0.0, Gradle wrapper 9.9.2. Production signing requires `ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD` (the `C0RE_*` names are accepted as aliases); without them release builds stay unsigned. CI verifies the certificate SHA-256 fingerprint against `ANDROID_CERT_SHA256` before publishing.
+Toolchain: JDK 17, Android SDK 37.1, build-tools 37.0.0, Gradle wrapper 9.9.2. Production signing requires `ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`; CI checks the certificate fingerprint against `ANDROID_CERT_SHA256` before publishing. Only signed production releases are published.
 
-## Releases
+## Security and license
 
-CI builds and publishes checksummed debug previews from `main`. The signed production APK is published as [C0reStream v1.3.0](https://github.com/klatschanstalt/C0reStream/releases/tag/v1.3.0) with `SHA256SUMS` and a verified certificate fingerprint. Verify the checksum and signature before installation.
+See [SECURITY.md](SECURITY.md) for report channels and implemented controls. Verified CI evidence is in [PROJECT_STATUS_REPORT.md](PROJECT_STATUS_REPORT.md).
 
-Android 11–17 compatibility work covers compilation against API 37.1 plus instrumented tests on an API 30/36 emulator matrix in CI. Other API levels and physical-device behaviour are not certified; results are recorded in `PROJECT_STATUS_REPORT.md`. Android 18 work is limited to documented, feature-detected preparation until official SDKs and system images are available.
-
-See `MASTERPLAN.md`, `SECURITY.md` and `PROJECT_STATUS_REPORT.md`.
+No project license has been selected by the owner and no `LICENSE` file is included. Third-party dependencies remain under their respective upstream licenses; see `THIRD_PARTY_NOTICES.md` for the direct-dependency overview.

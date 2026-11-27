@@ -1,16 +1,9 @@
 # C0reStream
-Work only in this repository. Implement MASTERPLAN.md incrementally, preserve application ID pw.c0re.stream and minimum API 30 (Android 11). Use stable compatible dependencies, targeted tests and CI verification. Never disable lint to hide defects, commit secrets, force push or incur costs without approval. Use small commits. Update PROJECT_STATUS_REPORT.md with verified facts only. Release only after tests, durable signing and distribution are verified. No tracking, ads or bundled unauthorized streams.
 
-Support Android 11–17; prepare Android 18 via documented compatibility checks, feature detection and isolated preview testing when official SDKs become available. Never claim device compatibility without evidence. Keep production on verified stable APIs.
-
-Before integration review changed code for security, regression, cancellation, lifecycle, resource limits and data loss. Add targeted regression tests; never claim an unexecuted test passed. Treat unresolved high-risk findings as release blockers. Keep CI permissions minimal and never log credentials.
-
-# Autonomer Fertigstellungsauftrag
-
-Verbindlich: MASTERPLAN.md vollständig bis zur Produktionsfreigabe umsetzen. Keine Zwischenfreigaben für sichere projektinterne Änderungen. C0reStream, Application ID pw.c0re.stream, min API 30. Vollständiges Rebranding, moderne stabile kompatible Toolchain, Keystore-gestützte Geheimnisspeicherung, Netzwerk- und Parser-Sicherheit, transaktionale Datenhaltung, Player/IPTV/EPG/VOD, responsive DE/EN/FR UI, Android TV, Performance und tatsächliche Regressionstests. Android 17 anhand offizieller APIs prüfen; Android 18 nur nach bestätigter Verfügbarkeit. Unabhängige Aufgaben bei Blockaden fortsetzen. Keine Kosten, externen Projektänderungen, Secrets im Git oder Force-Push. Gezielte Prüfungen, sichere Checkpoints, kompakte aktuelle Dokumentation. Produktionsfreigabe erst nach tatsächlichen Tests, keinen offenen kritischen/hohen Sicherheitsbefunden, dauerhafter geschützter Signierung und verifiziertem Updatepfad; C0reStream.apk mit SHA256 und Signaturprüfung unter GitHub Releases veröffentlichen. Debug-Pre-Releases bleiben ausdrücklich Testversionen. Keine unbelegten Erfolgsbehauptungen.
-
-
-## Verbindliche Entwicklungsstrategie (2026-11-27)
-Implementierungsphase zuerst: alle offenen Funktionen, Rebranding, Architektur und Sicherheitsmaßnahmen zusammenhängend implementieren. Keine CI- oder Gerätetests während dieser Phase abwarten oder manuell auslösen; automatische Push-Builds und APK-Veröffentlichungen pausieren. Quellcodeprüfung, sichere kleine Commits und Testimplementierung bleiben erforderlich. Anschließend gebündelte Integrations-, CI-, Sicherheits-, Emulator- und Gerätetests, Fehlerkorrektur bis zur Erfüllung aller Abschlusskriterien; erst danach automatische Builds wieder aktivieren und Produktionsfreigabe nach geschützter Signierung. Vorhandene verifizierte Pre-Releases erhalten. Diese Regel ersetzt widersprechende Zwischenprüfpflichten, nicht die finalen Qualitätsanforderungen.
-
-Binding owner decision: HTTP and HTTPS IPTV sources remain supported without mandatory opt-in. Prefer HTTPS where available; prevent unintended HTTPS-to-HTTP redirects and retain URL validation, credential encryption and transport-risk disclosure. HTTP support alone is not a release blocker.
+- Work only in this repository. Preserve application ID `pw.c0re.stream` and minimum API 30 (Android 11).
+- Production signing uses the owner-managed `ANDROID_*` GitHub secrets. Never generate a new release key, commit secrets, force push, add paid services or change global configuration.
+- CI verifies unit tests, lint and instrumented tests on every push to `main`. Only verified, durably signed production releases are published; no debug previews.
+- Before integration, review security, regressions, cancellation, lifecycle, resource limits and data loss. Add targeted regression tests; never claim an unexecuted test passed.
+- Never disable lint to hide defects. Update `PROJECT_STATUS_REPORT.md` with verified facts only.
+- No tracking, ads, bundled content or unauthorized streams. HTTP and HTTPS sources are supported by owner decision; prefer HTTPS and block HTTPS-to-HTTP redirects.
+- Target API 37, compile SDK 37.1. Support claims for Android 11–17 require evidence; Android 18 preparation uses official APIs and feature detection only.
