@@ -47,4 +47,68 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         val current = repository.settings.first()
         PlaylistRefreshWorker.schedule(appContext, normalized, current.autoRefresh)
     }
+
+    fun setExpertMode(enabled: Boolean) = viewModelScope.launch {
+        repository.setExpertMode(enabled)
+    }
+
+    fun setVideoMode(value: String) = viewModelScope.launch {
+        repository.setVideoMode(value)
+    }
+
+    fun setAudioLanguage(value: String) = viewModelScope.launch {
+        repository.setAudioLanguage(value)
+    }
+
+    fun setAudioOffsetMs(value: Int) = viewModelScope.launch {
+        repository.setAudioOffsetMs(value)
+    }
+
+    fun setHwDecoder(enabled: Boolean) = viewModelScope.launch {
+        repository.setHwDecoder(enabled)
+    }
+
+    fun setDecoderFallback(enabled: Boolean) = viewModelScope.launch {
+        repository.setDecoderFallback(enabled)
+    }
+
+    fun setSubtitlesEnabled(enabled: Boolean) = viewModelScope.launch {
+        repository.setSubtitlesEnabled(enabled)
+    }
+
+    fun setSubtitleLanguage(value: String) = viewModelScope.launch {
+        repository.setSubtitleLanguage(value)
+    }
+
+    fun setConnectTimeoutSec(value: Int) = viewModelScope.launch {
+        repository.setConnectTimeoutSec(value)
+    }
+
+    fun setFullscreen(enabled: Boolean) = viewModelScope.launch {
+        repository.setFullscreen(enabled)
+    }
+
+    fun setPerformanceProfile(value: String) = viewModelScope.launch {
+        repository.setPerformanceProfile(value)
+    }
+
+    fun setGestureSeek(enabled: Boolean) = viewModelScope.launch {
+        repository.setGestureSeek(enabled)
+    }
+
+    fun setEpgEnabled(enabled: Boolean) = viewModelScope.launch {
+        repository.setEpgEnabled(enabled)
+    }
+
+    fun resetVideo() = viewModelScope.launch {
+        repository.resetVideo()
+        AppLog.log("Settings", "Video settings reset to defaults")
+    }
+
+    fun resetToDefaults() = viewModelScope.launch {
+        repository.resetToDefaults()
+        AppLog.log("Settings", "All preferences reset to defaults")
+        val defaults = AppSettings()
+        PlaylistRefreshWorker.schedule(appContext, defaults.refreshHours, defaults.autoRefresh)
+    }
 }

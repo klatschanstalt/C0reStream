@@ -364,7 +364,7 @@ object ResourceCatalog {
                         return@withContext DownloadResult.Failure(DownloadResult.Reason.RANGE_UNSUPPORTED)
                     }
                 }
-                val body = response.body ?: return@withContext DownloadResult.Failure(DownloadResult.Reason.HTTP)
+                val body = response.body
                 if (response.code == 200 && resumeFrom > 0) {
                     resumeFrom = 0
                 }

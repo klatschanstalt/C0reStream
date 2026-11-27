@@ -300,19 +300,55 @@ private fun EpgRow(
 }
 
 /** Bounded logo loader; rejects non-HTTP(S) URLs and oversized responses. */
+/** Bounded logo cache: avoids refetching the same artwork while scrolling large lists. */
+private object LogoCache {
+    private const val maxEntries = 128
+    private const val maxBytes = 8L * 1024 * 1024
+    private var bytes = 0L
+    private val cache = object : LinkedHashMap<String, Bitmap>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap>?): Boolean {
+            if (eldest == null) return false
+            val remove = size > maxEntries || bytes > maxBytes
+            if (remove) bytes -= eldest.value.byteCount
+            return remove
+        }
+    }
+
+    @Synchronized
+    fun get(url: String): Bitmap? = cache[url]
+
+    @Synchronized
+    fun put(url: String, bitmap: Bitmap) {
+        cache[url]?.let { bytes -= it.byteCount }
+        cache[url] = bitmap
+        bytes += bitmap.byteCount
+    }
+}
+
 @Composable
 fun ChannelLogo(url: String?, modifier: Modifier = Modifier) {
-    var bitmap by remember(url) { mutableStateOf<Bitmap?>(null) }
+    var bitmap by remember(url) { mutableStateOf(url?.let { LogoCache.get(it) }) }
     LaunchedEffect(url) {
-        if (url.isNullOrBlank() || NetworkPolicy.parse(url) == null) return@LaunchedEffect
+        val key = url
+        if (key.isNullOrBlank() || NetworkPolicy.parse(key) == null) return@LaunchedEffect
+        val cached = LogoCache.get(key)
+        if (cached != null) {
+            bitmap = cached
+            return@LaunchedEffect
+        }
         withContext(Dispatchers.IO) {
             runCatching {
-                NetworkPolicy.client().newCall(Request.Builder().url(url).build()).execute().use { response ->
+                NetworkPolicy.client().newCall(Request.Builder().url(key).build()).execute().use { response ->
                     if (!response.isSuccessful) return@runCatching null
                     val bytes = response.readBytes(4L * 1024 * 1024)
                     BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                 }
-            }.onSuccess { bitmap = it }
+            }.onSuccess { decoded ->
+                if (decoded != null) {
+                    LogoCache.put(key, decoded)
+                    bitmap = decoded
+                }
+            }
         }
     }
     val image = bitmap
