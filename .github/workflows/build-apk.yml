@@ -158,7 +158,7 @@ jobs:
           set -euo pipefail
           expected_version_code=$(grep '^versionCode=' version.properties | cut -d= -f2)
           expected_version_name=$(grep '^versionName=' version.properties | cut -d= -f2)
-          badging=$(aapt dump badging app/build/outputs/apk/release/app-release.apk)
+          badging=$("$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging app/build/outputs/apk/release/app-release.apk)
           actual_version_code=$(printf '%s\n' "$badging" | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p" | head -n1)
           actual_version_name=$(printf '%s\n' "$badging" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p" | head -n1)
           [ "$actual_version_code" = "$expected_version_code" ] || { echo "APK versionCode mismatch"; exit 1; }
