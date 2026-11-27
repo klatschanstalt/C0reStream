@@ -1,6 +1,6 @@
 {
-    "latestVersion": "1.3.0",
-    "notes": "C0reStream 1.3.0: signierte Produktionsversion mit verschlüsselten Zugangsdaten, stabilen Kanal-IDs, EPG-Erinnerungen, VOD-Watchlist, DE/EN/FR und responsiver Oberfläche. Signatur und SHA-256 geprüft.",
-    "apkUrl": "https://github.com/klatschanstalt/C0reStream/releases/download/v1.3.0/C0reStream.apk",
-    "sha256": "e3a98be25e6abdd32f5cefc08bf7dfb7379f5ace8da1c5e158d073e0be4b5bad"
+    "latestVersion": "1.4.0",
+    "notes": "C0reStream 1.4.0: signierte Ressourcen-Updates, PackageInstaller, Profile mit PIN, QR-Import, Aufnahmen und Speicherbereinigung. Apache-2.0.",
+    "apkUrl": "https://github.com/klatschanstalt/C0reStream/releases/download/v1.4.0/C0reStream.apk",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
 }
