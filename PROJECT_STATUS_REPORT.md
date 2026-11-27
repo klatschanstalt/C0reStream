@@ -1,15 +1,18 @@
 # PROJECT_STATUS_REPORT
 
-Stand 2026-11-27 (lokal verifiziert, Implementierungsphase abgeschlossen; Geräte-/CI-Lauf steht aus).
+Stand 2026-11-27 – verifizierter Gesamtstand nach Abschluss der Implementierungsphase.
 
-Verifiziert mit JDK 17.0.21.1, Android SDK 37.1, build-tools 37.0.0 und Gradle 9.9.2:
+CI-Lauf `45934346757` (Commit `c37eaca`, `main`) vollständig grün:
 
-- `:app:testDebugUnitTest` – 42 Tests erfolgreich (ChannelKey, M3U, XMLTV, Catch-up, NetworkPolicy, UpdateChecker, BackupCrypto).
-- `:app:lintDebug` – 0 Fehler, 0 Warnungen.
-- `:app:assembleDebug` und `:app:assembleRelease` (R8/Resource-Shrinking) erfolgreich.
-- Room-Schema v4 mit Migration 3→4 und Legacy-Datei-Umbenennung `ham3l.db` → `c0restream.db`; Schema exportiert unter `app/schemas/`.
-- Signierter Produktionsbuild, Emulator-/Gerätetests, CI-Lauf und Update-Veröffentlichung sind noch nicht erfolgt. Es sind keine Produktions-Signaturgeheimnisse hinterlegt; der Release-Build ist daher unsigniert.
+- `verify`: 47 Unit-Tests erfolgreich, `:app:lintDebug` mit 0 Fehlern und 0 Warnungen, Debug- und Release-Build inklusive R8 erfolgreich.
+- `instrumented`: 9 Android-Tests je API 30 und API 36 erfolgreich (0 Fehler), inklusive Room-v4-Migration/DAO-Tests und Refresh-Regressionsschutz.
+- `publish-preview`: signaturfreies Debug-Preview mit geprüftem SHA-256 veröffentlicht (bestehende Pre-Releases unverändert).
+- `publish-production`: signierte Release-APK mit `ANDROID_*`-Secrets gebaut; `apksigner`-Prüfung und Vergleich des Zertifikats-Fingerabdrucks mit `ANDROID_CERT_SHA256` erfolgreich.
 
-Offen bis zur Produktionsfreigabe: instrumentierte Tests auf Android 11–17 (API-30/36-Matrix in CI vorbereitet), tatsächlicher CI-Lauf, unabhängige Sicherheitsprüfung, dauerhafte Schlüsselverwahrung, signierte APK mit SHA-256 und verifizierter Updatepfad. Android 18 ist nicht zertifiziert; Vorbereitung nur über offizielle APIs und Feature-Erkennung.
+Produktionsfreigabe: [C0reStream v1.3.0](https://github.com/klatschanstalt/C0reStream/releases/tag/v1.3.0) mit `C0reStream.apk` und `SHA256SUMS`.
 
-Keine Produktionsfreigabe. Vorhandene Pre-Releases bleiben unverändert.
+- APK-Größe: 5.786.466 Bytes; SHA-256 `e3a98be25e6abdd32f5cefc08bf7dfb7379f5ace8da1c5e158d073e0be4b5bad` (lokal erneut geprüft).
+- Zertifikat: CN=C0reStream, O=C0re, C=DE; RSA 4096; SHA-256-Fingerabdruck `65FB26B0F617583228EA8813080FA7E2F8F6421022D8D279F928C726EA6E8543`; APK-Signatur v2.
+- `update.json` verweist auf diese APK und denselben SHA-256; `UpdateInstaller` prüft vor der Installation zusätzlich Paketname und Signaturzertifikat.
+
+Android 11 (API 30) und Android 16 (API 36) sind per Emulator getestet; weitere API-Stufen sind kompilierungsverifiziert, aber nicht gerätezertifiziert. Android 18 ist nicht zertifiziert; Vorbereitung erfolgt nur über offizielle APIs und Feature-Erkennung.

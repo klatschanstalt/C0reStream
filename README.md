@@ -25,7 +25,7 @@ Toolchain: JDK 17, Android SDK 37.1, build-tools 37.0.0, Gradle wrapper 9.9.2. P
 
 ## Releases
 
-CI builds and publishes checksummed debug previews from `main`. Production APKs are published only after unit/instrumented tests, lint, durable signing and signature verification succeed. See [Releases](https://github.com/klatschanstalt/C0reStream/releases).
+CI builds and publishes checksummed debug previews from `main`. The signed production APK is published as [C0reStream v1.3.0](https://github.com/klatschanstalt/C0reStream/releases/tag/v1.3.0) with `SHA256SUMS` and a verified certificate fingerprint. Verify the checksum and signature before installation.
 
 Android 11–17 compatibility work covers compilation against API 37.1 plus instrumented tests on an API 30/36 emulator matrix in CI. Other API levels and physical-device behaviour are not certified; results are recorded in `PROJECT_STATUS_REPORT.md`. Android 18 work is limited to documented, feature-detected preparation until official SDKs and system images are available.
 

@@ -1,6 +1,8 @@
 name: Build C0reStream
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -213,8 +215,8 @@ jobs:
           sha256sum C0reStream.apk > SHA256SUMS
           TAG="v$(grep '^versionName=' ../../../../../version.properties | cut -d= -f2)"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG already exists; refusing to overwrite immutable assets."
-            exit 1
+            echo "Release $TAG already exists; preserving immutable assets. Bump version.properties for a new release."
+            exit 0
           fi
           gh release create "$TAG" C0reStream.apk SHA256SUMS --target "$BUILD_SHA" \
             --title "C0reStream $TAG" --notes "Signed production APK. Verify SHA256SUMS and the signing certificate before installation."
