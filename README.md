@@ -58,6 +58,6 @@ Toolchain: JDK 17, Android SDK 37.1, build-tools 37.0.0, Gradle wrapper 9.9.2. P
 
 ## Security and license
 
-See [SECURITY.md](SECURITY.md) for report channels and implemented controls. Verified CI evidence is in [PROJECT_STATUS_REPORT.md](PROJECT_STATUS_REPORT.md). Branding artwork is in `docs/`; the social preview is `docs/social-preview.png`.
+See [SECURITY.md](SECURITY.md) for report channels and implemented controls. Verified CI evidence is in [PROJECT_STATUS_REPORT.md](PROJECT_STATUS_REPORT.md). Branding artwork, app icons and the GitHub social preview are in `assets/branding/` and `docs/`.
 
 C0reStream is licensed under the Apache License 2.0 (`LICENSE`). Full direct and transitive dependency notices are in `NOTICE.md` and `THIRD_PARTY_NOTICES.md`. No IPTV content, subscriptions or bundled streams are included.
