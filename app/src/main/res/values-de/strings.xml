@@ -14,6 +14,7 @@
     <string name="action_close">Schließen</string>
     <string name="action_confirm">Bestätigen</string>
     <string name="action_back">Zurück</string>
+    <string name="common_loading">Lädt</string>
     <string name="action_play">Abspielen</string>
     <string name="action_pause">Pause</string>
     <string name="action_next_channel">Nächster Sender</string>

@@ -14,6 +14,7 @@
     <string name="action_close">Fermer</string>
     <string name="action_confirm">Confirmer</string>
     <string name="action_back">Retour</string>
+    <string name="common_loading">Chargement</string>
     <string name="action_play">Lire</string>
     <string name="action_pause">Pause</string>
     <string name="action_next_channel">Chaîne suivante</string>

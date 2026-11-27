@@ -1,6 +1,6 @@
 package pw.c0re.stream.ui.components
 
-import androidx.compose.animation.animateFloatAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -35,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import pw.c0re.stream.R
 import androidx.compose.ui.draw.clip
@@ -43,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -309,12 +311,13 @@ fun BrandEmptyState(
 @Composable
 fun BrandLoading(label: String? = null) {
     val tokens = LocalBrandTokens.current
+    val description = label ?: stringResource(R.string.common_loading)
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(tokens.spacing.xl)
             .semantics(mergeDescendants = true) {
-                contentDescription = label ?: stringResource(R.string.common_loading)
+                contentDescription = description
             },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(

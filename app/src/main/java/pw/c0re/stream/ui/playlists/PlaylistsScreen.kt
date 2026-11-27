@@ -1,29 +1,31 @@
 package pw.c0re.stream.ui.playlists
 
+import android.graphics.ImageDecoder
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import android.graphics.ImageDecoder
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,7 +34,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -42,17 +43,30 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import pw.c0re.stream.R
+import pw.c0re.stream.data.ImportStats
+import pw.c0re.stream.data.db.PlaylistEntity
 import pw.c0re.stream.data.profiles.QrPlaylistParser
+import pw.c0re.stream.ui.components.AdaptivePane
+import pw.c0re.stream.ui.components.BrandBadge
+import pw.c0re.stream.ui.components.BrandBackdrop
+import pw.c0re.stream.ui.components.BrandCard
+import pw.c0re.stream.ui.components.BrandEmptyState
+import pw.c0re.stream.ui.components.BrandPrimaryButton
+import pw.c0re.stream.ui.components.BrandSecondaryButton
+import pw.c0re.stream.ui.components.BrandSectionTitle
+import pw.c0re.stream.ui.components.BrandTopBar
 import pw.c0re.stream.ui.components.C0reStreamWordmark
 import pw.c0re.stream.ui.components.PoweredByFooter
+import pw.c0re.stream.ui.components.rememberResponsivePadding
 
 @Composable
 fun PlaylistsScreen(
@@ -69,6 +83,7 @@ fun PlaylistsScreen(
     var deleteId by remember { mutableStateOf<Long?>(null) }
     var qrError by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val horizontalPadding = rememberResponsivePadding()
 
     LaunchedEffect(sharedUrl) {
         if (sharedUrl != null) showAdd = true
@@ -91,98 +106,78 @@ fun PlaylistsScreen(
         }
     }
 
-    Scaffold(
-        floatingActionButton = {
-            FloatingActionButton(onClick = { showAdd = true }) {
-                Icon(Icons.Filled.Add, stringResource(R.string.action_add_playlist))
-            }
-        },
-    ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(20.dp)) {
-            C0reStreamWordmark()
-            Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.playlists_title),
-                    Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium,
+    BrandBackdrop(Modifier.fillMaxSize()) {
+        Scaffold(
+            // The root Scaffold already consumed system bars; avoid applying them twice.
+            contentWindowInsets = WindowInsets(0.dp),
+            containerColor = Color.Transparent,
+            floatingActionButton = {
+                FloatingActionButton(onClick = { showAdd = true }) {
+                    Icon(Icons.Filled.Add, stringResource(R.string.action_add_playlist))
+                }
+            },
+        ) { padding ->
+            Column(
+                Modifier.fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = horizontalPadding, vertical = 16.dp),
+            ) {
+                C0reStreamWordmark()
+                Spacer(Modifier.height(12.dp))
+                BrandTopBar(
+                    title = stringResource(R.string.playlists_title),
+                    actions = {
+                        IconButton(onClick = onGlobalSearch) {
+                            Icon(Icons.Filled.Search, stringResource(R.string.action_search))
+                        }
+                        IconButton(onClick = { importQr.launch("image/*") }) {
+                            Icon(Icons.Filled.QrCode, stringResource(R.string.qr_import))
+                        }
+                        BrandSecondaryButton(
+                            stringResource(R.string.action_import_file),
+                            onClick = { importFile.launch(arrayOf("*/*")) },
+                        )
+                    },
                 )
-                IconButton(onClick = onGlobalSearch) {
-                    Icon(Icons.Filled.Search, stringResource(R.string.action_search))
-                }
-                IconButton(onClick = { importQr.launch("image/*") }) {
-                    Icon(Icons.Filled.QrCode, stringResource(R.string.qr_import))
-                }
-                TextButton(onClick = { importFile.launch(arrayOf("*/*")) }) {
-                    Text(stringResource(R.string.action_import_file))
-                }
-            }
-            Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(12.dp))
+                BrandSectionTitle(stringResource(R.string.nav_live))
+                Spacer(Modifier.height(8.dp))
 
-            if (playlists.isEmpty()) {
-                Text(stringResource(R.string.playlists_empty), style = MaterialTheme.typography.bodyMedium)
-            }
-            error?.let { message ->
-                Text(
-                    stringResource(R.string.error_playlist_load) + ": " + message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
+                if (playlists.isEmpty()) {
+                    BrandEmptyState(stringResource(R.string.playlists_empty))
+                }
+                error?.let { message ->
+                    Text(
+                        stringResource(R.string.error_playlist_load) + ": " + message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                if (qrError) {
+                    Text(stringResource(R.string.qr_invalid), color = MaterialTheme.colorScheme.error)
+                }
+                importResult?.let { result ->
+                    ImportStatsCard(result.stats)
+                }
+
+                AdaptivePane(
+                    modifier = Modifier.weight(1f),
+                    compact = {
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            items(playlists, key = { it.id }) { playlist ->
+                                PlaylistCard(
+                                    playlist = playlist,
+                                    onOpen = onOpen,
+                                    onRefresh = { vm.refresh(playlist.id) },
+                                    onDelete = { deleteId = playlist.id },
+                                )
+                            }
+                            item { PoweredByFooter() }
+                        }
+                    },
+                    medium = { WidePlaylists(playlists, onOpen, vm, onDelete = { deleteId = it }) },
+                    expanded = { WidePlaylists(playlists, onOpen, vm, onDelete = { deleteId = it }) },
                 )
-            }
-            if (qrError) {
-                Text(stringResource(R.string.qr_invalid), color = MaterialTheme.colorScheme.error)
-            }
-            importResult?.let { result ->
-                val stats = result.stats
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(stringResource(R.string.import_received, stats.received))
-                        Text(stringResource(R.string.import_imported, stats.accepted))
-                        Text(stringResource(R.string.import_merged, stats.merged))
-                        Text(stringResource(R.string.import_rejected, stats.rejected))
-                        if (stats.truncated) Text(stringResource(R.string.import_limit))
-                        if (stats.rejections.any { it.code == "SHRINK_GUARD" }) {
-                            Text(stringResource(R.string.import_shrink_guard))
-                        }
-                        stats.rejections.take(4).forEach { rejection ->
-                            Text(reasonLabel(rejection.code), style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-            }
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
-                items(playlists, key = { it.id }) { playlist ->
-                    Card(onClick = { onOpen(playlist.id) }, shape = RoundedCornerShape(18.dp)) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    playlist.name,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    pluralStringResource(
-                                        R.plurals.channels_count,
-                                        playlist.channelCount,
-                                        playlist.channelCount,
-                                    ),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                            }
-                            IconButton(onClick = { vm.refresh(playlist.id) }) {
-                                Icon(Icons.Filled.Refresh, stringResource(R.string.action_refresh))
-                            }
-                            IconButton(onClick = { deleteId = playlist.id }) {
-                                Icon(Icons.Filled.Delete, stringResource(R.string.action_delete))
-                            }
-                        }
-                    }
-                }
-                item { PoweredByFooter() }
             }
         }
     }
@@ -193,15 +188,13 @@ fun PlaylistsScreen(
             title = { Text(stringResource(R.string.playlist_delete_title)) },
             text = { Text(stringResource(R.string.playlist_delete_message)) },
             confirmButton = {
-                TextButton(onClick = {
+                BrandPrimaryButton(stringResource(R.string.action_delete), onClick = {
                     vm.delete(id)
                     deleteId = null
-                }) { Text(stringResource(R.string.action_delete)) }
+                })
             },
             dismissButton = {
-                TextButton(onClick = { deleteId = null }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
+                BrandSecondaryButton(stringResource(R.string.action_cancel), onClick = { deleteId = null })
             },
         )
     }
@@ -218,6 +211,89 @@ fun PlaylistsScreen(
                 showAdd = false
             },
         )
+    }
+}
+
+@Composable
+private fun WidePlaylists(
+    playlists: List<PlaylistEntity>,
+    onOpen: (Long) -> Unit,
+    vm: PlaylistsViewModel,
+    onDelete: (Long) -> Unit,
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 280.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        gridItems(playlists, key = { it.id }) { playlist ->
+            PlaylistCard(
+                playlist = playlist,
+                onOpen = onOpen,
+                onRefresh = { vm.refresh(playlist.id) },
+                onDelete = { onDelete(playlist.id) },
+            )
+        }
+        item { PoweredByFooter() }
+    }
+}
+
+@Composable
+private fun PlaylistCard(
+    playlist: PlaylistEntity,
+    onOpen: (Long) -> Unit,
+    onRefresh: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    BrandCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = { onOpen(playlist.id) },
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    playlist.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                BrandBadge(
+                    pluralStringResource(
+                        R.plurals.channels_count,
+                        playlist.channelCount,
+                        playlist.channelCount,
+                    ),
+                )
+            }
+            IconButton(onClick = onRefresh) {
+                Icon(Icons.Filled.Refresh, stringResource(R.string.action_refresh))
+            }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Filled.Delete, stringResource(R.string.action_delete))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImportStatsCard(stats: ImportStats) {
+    BrandCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(R.string.import_received, stats.received))
+            Text(stringResource(R.string.import_imported, stats.accepted))
+            Text(stringResource(R.string.import_merged, stats.merged))
+            Text(stringResource(R.string.import_rejected, stats.rejected))
+            if (stats.truncated) BrandBadge(stringResource(R.string.import_limit))
+            if (stats.rejections.any { it.code == "SHRINK_GUARD" }) {
+                BrandBadge(stringResource(R.string.import_shrink_guard))
+            }
+            stats.rejections.take(4).forEach { rejection ->
+                Text(reasonLabel(rejection.code), style = MaterialTheme.typography.bodySmall)
+            }
+        }
     }
 }
 
@@ -343,21 +419,25 @@ private fun AddPlaylistDialog(
             }
         },
         confirmButton = {
-            TextButton(enabled = canConfirm, onClick = {
-                onConfirm(
-                    name.trim(),
-                    url.trim(),
-                    epg.trim().ifBlank { null },
-                    userAgent.trim().ifBlank { null },
-                    useProxy,
-                    proxyHost.trim().ifBlank { null },
-                    proxyPort.toIntOrNull(),
-                    XtreamInput(useXtream, xtreamHost.trim(), xtreamUser.trim(), xtreamPass),
-                )
-            }) { Text(stringResource(R.string.action_add_playlist)) }
+            BrandPrimaryButton(
+                stringResource(R.string.action_add_playlist),
+                enabled = canConfirm,
+                onClick = {
+                    onConfirm(
+                        name.trim(),
+                        url.trim(),
+                        epg.trim().ifBlank { null },
+                        userAgent.trim().ifBlank { null },
+                        useProxy,
+                        proxyHost.trim().ifBlank { null },
+                        proxyPort.toIntOrNull(),
+                        XtreamInput(useXtream, xtreamHost.trim(), xtreamUser.trim(), xtreamPass),
+                    )
+                },
+            )
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+            BrandSecondaryButton(stringResource(R.string.action_cancel), onClick = onDismiss)
         },
     )
 }

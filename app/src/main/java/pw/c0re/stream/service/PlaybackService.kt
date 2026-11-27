@@ -353,8 +353,7 @@ class PlaybackService : MediaSessionService() {
                     .setEnableFloatOutput(enableFloatOutput)
                     .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParameters)
                     .setAudioProcessors(arrayOf<AudioProcessor>(AudioDelayProcessor(audioOffsetMs)))
-                    .build()
-                    ?: super.buildAudioSink(context, enableFloatOutput, enableAudioOutputPlaybackParameters),
+                    .build(),
             )
         }
     }
@@ -383,6 +382,7 @@ class PlaybackService : MediaSessionService() {
             return inputAudioFormat
         }
 
+        @Suppress("DEPRECATION")
         override fun isActive(): Boolean = direction != 0 || super.isActive()
 
         override fun onFlush() {

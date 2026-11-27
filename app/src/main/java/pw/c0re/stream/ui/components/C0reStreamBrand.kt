@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
@@ -29,7 +30,7 @@ fun C0reStreamMark(size: Int = 28) {
     // The mark sits next to a text label wherever it is used, so it is
     // decorative for screen readers rather than a second, unlabeled control.
     Canvas(Modifier.size(size.dp).clearAndSetSemantics { }) {
-        val dimension = size.toPx()
+        val dimension = size.dp.toPx()
         val stroke = dimension * 0.09f
         val inset = stroke * 0.7f
         val arcSize = Size(dimension - inset * 2f, dimension - inset * 2f)

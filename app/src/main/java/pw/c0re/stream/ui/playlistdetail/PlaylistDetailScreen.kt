@@ -12,11 +12,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.items as listItems
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -25,14 +29,12 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -61,7 +63,17 @@ import pw.c0re.stream.data.NetworkPolicy
 import pw.c0re.stream.data.readBytes
 import pw.c0re.stream.data.db.ChannelEntity
 import pw.c0re.stream.data.model.EpgEntry
+import pw.c0re.stream.ui.components.AdaptivePane
+import pw.c0re.stream.ui.components.BrandBackdrop
+import pw.c0re.stream.ui.components.BrandBadge
+import pw.c0re.stream.ui.components.BrandCard
+import pw.c0re.stream.ui.components.BrandEmptyState
+import pw.c0re.stream.ui.components.BrandLoading
+import pw.c0re.stream.ui.components.BrandPrimaryButton
+import pw.c0re.stream.ui.components.BrandSecondaryButton
+import pw.c0re.stream.ui.components.BrandTopBar
 import pw.c0re.stream.ui.components.PoweredByFooter
+import pw.c0re.stream.ui.components.rememberResponsivePadding
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -80,94 +92,70 @@ fun PlaylistDetailScreen(
     val query by vm.query.collectAsState()
     val group by vm.selectedGroup.collectAsState()
     var guideChannel by remember { mutableStateOf<ChannelEntity?>(null) }
+    val horizontalPadding = rememberResponsivePadding()
 
-    Column(Modifier.fillMaxSize().padding(20.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    BrandBackdrop(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.fillMaxSize().padding(horizontal = horizontalPadding, vertical = 16.dp),
+        ) {
+            BrandTopBar(
+                title = stringResource(R.string.nav_live),
+                actions = {
+                    BrandBadge(channels.size.toString())
+                    BrandSecondaryButton(
+                        stringResource(R.string.detail_movies_series),
+                        onClick = { onOpenVod(playlistId) },
+                    )
+                },
+            )
+            Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = query,
                 onValueChange = vm::setQuery,
-                leadingIcon = { Icon(Icons.Filled.Search, null) },
+                leadingIcon = {
+                    Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.action_search))
+                },
                 placeholder = { Text(stringResource(R.string.field_search_channel)) },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
-            TextButton(onClick = { onOpenVod(playlistId) }) {
-                Text(stringResource(R.string.detail_movies_series))
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            item {
-                FilterChip(
-                    selected = group == null,
-                    onClick = { vm.selectGroup(null) },
-                    label = { Text(stringResource(R.string.detail_all)) },
-                )
-            }
-            items(groups) { value ->
-                FilterChip(
-                    selected = group == value,
-                    onClick = { vm.selectGroup(value) },
-                    label = { Text(value, maxLines = 1) },
-                )
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f)) {
-            items(channels, key = { it.id }) { channel ->
-                Card(onClick = { onPlayChannel(channel.id) }, shape = RoundedCornerShape(16.dp)) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        ChannelLogo(
-                            channel.logoUrl,
-                            Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)),
-                        )
-                        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                            Text(
-                                channel.name,
-                                style = MaterialTheme.typography.titleMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            val now by vm.nowFor(playlistId, channel).collectAsState(initial = null)
-                            if (now != null) {
-                                Text(
-                                    "\u25B6 " + now!!.title,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            } else {
-                                channel.group?.let {
-                                    Text(
-                                        it,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
-                        }
-                        val favorite by vm.isFavorite(channel.id).collectAsState(initial = false)
-                        IconButton(onClick = { vm.toggleFavorite(channel) }) {
-                            Icon(
-                                if (favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                stringResource(R.string.content_desc_favorite),
-                            )
-                        }
-                        IconButton(onClick = { guideChannel = channel }) {
-                            Icon(
-                                Icons.Filled.CalendarMonth,
-                                stringResource(R.string.detail_program),
-                            )
-                        }
-                    }
+            Spacer(Modifier.height(12.dp))
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                item(key = "all") {
+                    FilterChip(
+                        selected = group == null,
+                        onClick = { vm.selectGroup(null) },
+                        label = { Text(stringResource(R.string.detail_all)) },
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    )
+                }
+                listItems(groups, key = { it }) { value ->
+                    FilterChip(
+                        selected = group == value,
+                        onClick = { vm.selectGroup(value) },
+                        label = { Text(value, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    )
                 }
             }
-            item { PoweredByFooter() }
+            Spacer(Modifier.height(12.dp))
+
+            AdaptivePane(
+                modifier = Modifier.weight(1f),
+                compact = {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        listItems(channels, key = { it.id }) { channel ->
+                            ChannelCard(channel, playlistId, vm, onPlayChannel) { guideChannel = it }
+                        }
+                        item(key = "footer") { PoweredByFooter() }
+                    }
+                },
+                medium = { ChannelGrid(channels, playlistId, vm, onPlayChannel) { guideChannel = it } },
+                expanded = { ChannelGrid(channels, playlistId, vm, onPlayChannel) { guideChannel = it } },
+            )
         }
     }
 
@@ -186,6 +174,89 @@ fun PlaylistDetailScreen(
 }
 
 @Composable
+private fun ChannelGrid(
+    channels: List<ChannelEntity>,
+    playlistId: Long,
+    vm: PlaylistDetailViewModel,
+    onPlayChannel: (Long) -> Unit,
+    onGuide: (ChannelEntity) -> Unit,
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 320.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        gridItems(channels, key = { it.id }) { channel ->
+            ChannelCard(channel, playlistId, vm, onPlayChannel, onGuide)
+        }
+        item(key = "footer") { PoweredByFooter() }
+    }
+}
+
+@Composable
+private fun ChannelCard(
+    channel: ChannelEntity,
+    playlistId: Long,
+    vm: PlaylistDetailViewModel,
+    onPlayChannel: (Long) -> Unit,
+    onGuide: (ChannelEntity) -> Unit,
+) {
+    BrandCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = { onPlayChannel(channel.id) },
+    ) {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ChannelLogo(
+                channel.logoUrl,
+                Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)),
+            )
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                Text(
+                    channel.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val now by vm.nowFor(playlistId, channel).collectAsState(initial = null)
+                if (now != null) {
+                    Text(
+                        "\u25B6 " + now!!.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                } else {
+                    channel.group?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+            val favorite by vm.isFavorite(channel.id).collectAsState(initial = false)
+            IconButton(onClick = { vm.toggleFavorite(channel) }) {
+                Icon(
+                    if (favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                    stringResource(R.string.content_desc_favorite),
+                )
+            }
+            IconButton(onClick = { onGuide(channel) }) {
+                Icon(
+                    Icons.Filled.CalendarMonth,
+                    stringResource(R.string.detail_program),
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun GuideDialog(
     playlistId: Long,
     channel: ChannelEntity,
@@ -194,9 +265,11 @@ private fun GuideDialog(
     onPlayUrl: (String, String) -> Unit,
 ) {
     var refreshKey by remember { mutableIntStateOf(0) }
+    var refreshing by remember { mutableStateOf(false) }
     val entries by produceState(initialValue = emptyList<EpgEntry>(), channel.id, refreshKey) {
         value = vm.guideFor(playlistId, channel).first()
     }
+    LaunchedEffect(entries) { refreshing = false }
     val formatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
     val now = remember(entries) { System.currentTimeMillis() }
 
@@ -211,6 +284,7 @@ private fun GuideDialog(
                     overflow = TextOverflow.Ellipsis,
                 )
                 IconButton(onClick = {
+                    refreshing = true
                     vm.refreshGuide(playlistId)
                     refreshKey++
                 }) {
@@ -219,25 +293,26 @@ private fun GuideDialog(
             }
         },
         text = {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (entries.isEmpty()) {
-                    item { Text(stringResource(R.string.epg_empty)) }
-                }
-                items(entries) { entry ->
-                    EpgRow(
-                        channel = channel,
-                        entry = entry,
-                        running = entry.start <= now && now < entry.stop,
-                        formatter = formatter,
-                        now = now,
-                        vm = vm,
-                        onPlayUrl = onPlayUrl,
-                    )
+            when {
+                refreshing -> BrandLoading()
+                entries.isEmpty() -> BrandEmptyState(stringResource(R.string.epg_empty))
+                else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listItems(entries, key = { "${it.start}-${it.stop}-${it.title}" }) { entry ->
+                        EpgRow(
+                            channel = channel,
+                            entry = entry,
+                            running = entry.start <= now && now < entry.stop,
+                            formatter = formatter,
+                            now = now,
+                            vm = vm,
+                            onPlayUrl = onPlayUrl,
+                        )
+                    }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
+            BrandSecondaryButton(stringResource(R.string.action_close), onClick = onDismiss)
         },
     )
 }
@@ -256,13 +331,18 @@ private fun EpgRow(
     LaunchedEffect(entry.start) {
         reminderSet = vm.hasReminder(channel.id, entry.start).first()
     }
-    Column {
+    BrandCard(modifier = Modifier.fillMaxWidth()) {
         Text(
             formatter.format(Date(entry.start)) + " - " + formatter.format(Date(entry.stop)) +
                 if (running) "  \u25B6 " + stringResource(R.string.epg_now) else "",
             style = MaterialTheme.typography.labelSmall,
         )
-        Text(entry.title, style = MaterialTheme.typography.titleMedium)
+        Text(
+            entry.title,
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
         entry.description?.let {
             Text(
                 it,
@@ -273,16 +353,15 @@ private fun EpgRow(
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (entry.start > now) {
-                TextButton(onClick = {
-                    vm.toggleReminder(channel, entry)
-                    reminderSet = !reminderSet
-                }) {
-                    Text(
-                        stringResource(
-                            if (reminderSet) R.string.epg_reminder_set else R.string.epg_reminder,
-                        ),
-                    )
-                }
+                BrandPrimaryButton(
+                    stringResource(
+                        if (reminderSet) R.string.epg_reminder_set else R.string.epg_reminder,
+                    ),
+                    onClick = {
+                        vm.toggleReminder(channel, entry)
+                        reminderSet = !reminderSet
+                    },
+                )
             }
             val catchupSource = channel.catchupSource
             val catchupUrl = if (!running && entry.stop < now && catchupSource != null) {
@@ -291,9 +370,10 @@ private fun EpgRow(
                 null
             }
             catchupUrl?.let { url ->
-                TextButton(onClick = { onPlayUrl(url, channel.name + " - " + entry.title) }) {
-                    Text(stringResource(R.string.catchup_watch))
-                }
+                BrandSecondaryButton(
+                    stringResource(R.string.catchup_watch),
+                    onClick = { onPlayUrl(url, channel.name + " - " + entry.title) },
+                )
             }
         }
     }
@@ -353,7 +433,12 @@ fun ChannelLogo(url: String?, modifier: Modifier = Modifier) {
     }
     val image = bitmap
     if (image != null) {
-        Image(image.asImageBitmap(), null, modifier = modifier, contentScale = ContentScale.Fit)
+        Image(
+            image.asImageBitmap(),
+            contentDescription = stringResource(R.string.common_tv),
+            modifier = modifier,
+            contentScale = ContentScale.Fit,
+        )
     } else {
         Box(
             modifier.background(MaterialTheme.colorScheme.surfaceVariant),

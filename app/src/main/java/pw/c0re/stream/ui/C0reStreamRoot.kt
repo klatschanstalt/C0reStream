@@ -2,14 +2,16 @@ package pw.c0re.stream.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
@@ -23,10 +25,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
-import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PermanentDrawerSheet
+import androidx.compose.material3.PermanentNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -40,10 +44,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -53,11 +59,14 @@ import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.launch
 import pw.c0re.stream.C0reStreamApp
 import pw.c0re.stream.R
-import pw.c0re.stream.data.profiles.PinManager
 import pw.c0re.stream.data.profiles.PinVerification
 import pw.c0re.stream.data.profiles.ProfileEntity
 import pw.c0re.stream.data.profiles.ProfileSessionRepository
 import pw.c0re.stream.ui.backup.M3UExporter
+import pw.c0re.stream.ui.components.AdaptivePane
+import pw.c0re.stream.ui.components.BrandBackdrop
+import pw.c0re.stream.ui.components.BrandPrimaryButton
+import pw.c0re.stream.ui.components.C0reStreamWordmark
 import pw.c0re.stream.ui.favorites.FavoritesScreen
 import pw.c0re.stream.ui.globalsearch.GlobalSearchScreen
 import pw.c0re.stream.ui.history.HistoryScreen
@@ -131,112 +140,176 @@ fun C0reStreamRoot(sharedM3uUrl: String?) {
         }
     }
 
+    // A single NavHost is shared by every width class so the back stack, saved state,
+    // view models and all callbacks survive a window resize or a fold/unfold.
+    val navHost: @Composable (Modifier) -> Unit = { hostModifier ->
+        NavHost(
+            navController = nav,
+            startDestination = Routes.PLAYLISTS,
+            modifier = hostModifier,
+        ) {
+            composable(Routes.PLAYLISTS) {
+                PlaylistsScreen(
+                    sharedUrl = sharedM3uUrl,
+                    onOpen = { nav.navigate("detail/$it") },
+                    onAddNew = { nav.navigate("detail/$it") },
+                    onGlobalSearch = { nav.navigate(Routes.GLOBAL_SEARCH) },
+                )
+            }
+            composable("detail/{playlistId}") { entry ->
+                PlaylistDetailScreen(
+                    playlistId = entry.arguments?.getString("playlistId")?.toLongOrNull() ?: 0L,
+                    onPlayChannel = { nav.navigate(Routes.player(it)) },
+                    onPlayUrl = { url, title ->
+                        PlayerHub.prepare(url, title, null, "live", 0L)
+                        nav.navigate(Routes.player(0L))
+                    },
+                    onOpenVod = { nav.navigate("vod/$it") },
+                )
+            }
+            composable(Routes.PLAYER) { entry ->
+                PlayerScreen(
+                    channelId = entry.arguments?.getString("channelId")?.toLongOrNull() ?: 0L,
+                    onBack = { nav.popBackStack() },
+                )
+            }
+            composable("vod/{playlistId}") { entry ->
+                val playlistId = entry.arguments?.getString("playlistId")?.toLongOrNull() ?: 0L
+                VodScreen(
+                    playlistId = playlistId,
+                    onPlayMedia = { url, title, mediaKey, kind ->
+                        PlayerHub.prepare(url, title, mediaKey, kind, playlistId)
+                        nav.navigate(Routes.player(0L))
+                    },
+                )
+            }
+            composable(Routes.FAVORITES) {
+                FavoritesScreen(onPlay = { nav.navigate(Routes.player(it)) })
+            }
+            composable(Routes.HISTORY) {
+                HistoryScreen(onPlay = { nav.navigate(Routes.player(it)) })
+            }
+            composable(Routes.SETTINGS) {
+                SettingsScreen(
+                    onExportBackup = {
+                        scope.launch { M3UExporter.share(context, app.database) }
+                    },
+                    onOpenProfiles = { nav.navigate(Routes.PROFILES) },
+                )
+            }
+            composable(Routes.GLOBAL_SEARCH) {
+                GlobalSearchScreen(onPlay = { nav.navigate(Routes.player(it)) })
+            }
+            composable(Routes.PROFILES) {
+                ProfilesScreen(onDone = { nav.popBackStack() })
+            }
+        }
+    }
+
+    val railItems: @Composable () -> Unit = {
+        tabs.forEach { tab ->
+            NavigationRailItem(
+                selected = current == tab.route,
+                onClick = { selectTab(tab.route) },
+                icon = { Icon(tab.icon, contentDescription = stringResource(tab.labelRes)) },
+                label = { Text(stringResource(tab.labelRes)) },
+            )
+        }
+    }
+
+    val drawerItems: @Composable () -> Unit = {
+        tabs.forEach { tab ->
+            NavigationDrawerItem(
+                selected = current == tab.route,
+                onClick = { selectTab(tab.route) },
+                icon = { Icon(tab.icon, contentDescription = stringResource(tab.labelRes)) },
+                label = { Text(stringResource(tab.labelRes)) },
+                modifier = Modifier.padding(horizontal = 12.dp),
+            )
+        }
+    }
+
     val gate = gateProfile
     if (!unlocked && gate != null) {
         PinGate(profile = gate, onUnlocked = { unlocked = true })
     } else {
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val wide = maxWidth >= 840.dp
-        Scaffold(
-            bottomBar = {
-                Column {
-                    if (!playerRoute) {
-                        MiniPlayer(onExpand = {
-                            nav.navigate(Routes.player(PlayerHub.channelId))
-                        })
+        BrandBackdrop(Modifier.fillMaxSize()) {
+            Scaffold(
+                // Explicit, single source of truth for safe areas. Scaffold distributes these
+                // insets to the top/bottom bars and the content; no manual unions are needed.
+                containerColor = Color.Transparent,
+                contentWindowInsets = WindowInsets.systemBars,
+                bottomBar = {
+                    Column {
+                        if (!playerRoute) {
+                            MiniPlayer(onExpand = {
+                                nav.navigate(Routes.player(PlayerHub.channelId))
+                            })
+                        }
+                        AdaptivePane(
+                            compact = {
+                                if (topLevel) {
+                                    NavigationBar {
+                                        tabs.forEach { tab ->
+                                            NavigationBarItem(
+                                                selected = current == tab.route,
+                                                onClick = { selectTab(tab.route) },
+                                                icon = {
+                                                    Icon(
+                                                        tab.icon,
+                                                        contentDescription = stringResource(tab.labelRes),
+                                                    )
+                                                },
+                                                label = { Text(stringResource(tab.labelRes)) },
+                                            )
+                                        }
+                                    }
+                                }
+                            },
+                            medium = {},
+                            expanded = {},
+                        )
                     }
-                    if (topLevel && !wide) {
-                        NavigationBar {
-                            tabs.forEach { tab ->
-                                NavigationBarItem(
-                                    selected = current == tab.route,
-                                    onClick = { selectTab(tab.route) },
-                                    icon = { Icon(tab.icon, contentDescription = stringResource(tab.labelRes)) },
-                                    label = { Text(stringResource(tab.labelRes)) },
+                },
+            ) { padding ->
+                Row(Modifier.fillMaxSize().padding(padding)) {
+                    AdaptivePane(
+                        modifier = Modifier.weight(1f),
+                        compact = { navHost(Modifier.fillMaxSize()) },
+                        medium = {
+                            Row(Modifier.fillMaxSize()) {
+                                NavigationRail(
+                                    header = {
+                                        C0reStreamWordmark(compact = true)
+                                        Spacer(Modifier.height(12.dp))
+                                    },
+                                    content = { railItems() },
                                 )
+                                navHost(Modifier.weight(1f))
                             }
-                        }
-                    }
-                }
-            },
-        ) { padding ->
-            Row(Modifier.fillMaxSize().padding(padding)) {
-                if (wide) {
-                    NavigationRail {
-                        tabs.forEach { tab ->
-                            NavigationRailItem(
-                                selected = current == tab.route,
-                                onClick = { selectTab(tab.route) },
-                                icon = { Icon(tab.icon, contentDescription = stringResource(tab.labelRes)) },
-                                label = { Text(stringResource(tab.labelRes)) },
-                            )
-                        }
-                    }
-                }
-                NavHost(
-                    navController = nav,
-                    startDestination = Routes.PLAYLISTS,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    composable(Routes.PLAYLISTS) {
-                        PlaylistsScreen(
-                            sharedUrl = sharedM3uUrl,
-                            onOpen = { nav.navigate("detail/$it") },
-                            onAddNew = { nav.navigate("detail/$it") },
-                            onGlobalSearch = { nav.navigate(Routes.GLOBAL_SEARCH) },
-                        )
-                    }
-                    composable("detail/{playlistId}") { entry ->
-                        PlaylistDetailScreen(
-                            playlistId = entry.arguments?.getString("playlistId")?.toLongOrNull() ?: 0L,
-                            onPlayChannel = { nav.navigate(Routes.player(it)) },
-                            onPlayUrl = { url, title ->
-                                PlayerHub.prepare(url, title, null, "live", 0L)
-                                nav.navigate(Routes.player(0L))
-                            },
-                            onOpenVod = { nav.navigate("vod/$it") },
-                        )
-                    }
-                    composable(Routes.PLAYER) { entry ->
-                        PlayerScreen(
-                            channelId = entry.arguments?.getString("channelId")?.toLongOrNull() ?: 0L,
-                            onBack = { nav.popBackStack() },
-                        )
-                    }
-                    composable("vod/{playlistId}") { entry ->
-                        val playlistId = entry.arguments?.getString("playlistId")?.toLongOrNull() ?: 0L
-                        VodScreen(
-                            playlistId = playlistId,
-                            onPlayMedia = { url, title, mediaKey, kind ->
-                                PlayerHub.prepare(url, title, mediaKey, kind, playlistId)
-                                nav.navigate(Routes.player(0L))
-                            },
-                        )
-                    }
-                    composable(Routes.FAVORITES) {
-                        FavoritesScreen(onPlay = { nav.navigate(Routes.player(it)) })
-                    }
-                    composable(Routes.HISTORY) {
-                        HistoryScreen(onPlay = { nav.navigate(Routes.player(it)) })
-                    }
-                    composable(Routes.SETTINGS) {
-                        SettingsScreen(
-                            onExportBackup = {
-                                scope.launch { M3UExporter.share(context, app.database) }
-                            },
-                            onOpenProfiles = { nav.navigate(Routes.PROFILES) },
-                        )
-                    }
-                    composable(Routes.GLOBAL_SEARCH) {
-                        GlobalSearchScreen(onPlay = { nav.navigate(Routes.player(it)) })
-                    }
-                    composable(Routes.PROFILES) {
-                        ProfilesScreen(onDone = { nav.popBackStack() })
-                    }
+                        },
+                        expanded = {
+                            // Wide windows get a dedicated navigation pane. The remaining pane
+                            // is a single NavHost, ready for a future secondary detail pane.
+                            PermanentNavigationDrawer(
+                                modifier = Modifier.fillMaxSize(),
+                                drawerContent = {
+                                    PermanentDrawerSheet {
+                                        Column(Modifier.padding(vertical = 16.dp)) {
+                                            C0reStreamWordmark(compact = true)
+                                            Spacer(Modifier.height(16.dp))
+                                            drawerItems()
+                                        }
+                                    }
+                                },
+                            ) {
+                                navHost(Modifier.fillMaxSize())
+                            }
+                        },
+                    )
                 }
             }
         }
-    }
     }
 }
 
@@ -244,8 +317,7 @@ fun C0reStreamRoot(sharedM3uUrl: String?) {
 private fun PinGate(profile: ProfileEntity, onUnlocked: () -> Unit) {
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    Surface(Modifier.fillMaxSize()) {
+    BrandBackdrop(Modifier.fillMaxSize()) {
         Column(
             Modifier.fillMaxSize().padding(24.dp),
             verticalArrangement = Arrangement.Center,
@@ -264,7 +336,7 @@ private fun PinGate(profile: ProfileEntity, onUnlocked: () -> Unit) {
                 Text(stringResource(R.string.profiles_pin_wrong), color = MaterialTheme.colorScheme.error)
             }
             Spacer(Modifier.height(16.dp))
-            Button(onClick = {
+            BrandPrimaryButton(stringResource(R.string.action_confirm), onClick = {
                 val value = pin
                 pin = ""
                 val chars = value.toCharArray()
@@ -272,7 +344,7 @@ private fun PinGate(profile: ProfileEntity, onUnlocked: () -> Unit) {
                 chars.fill('\u0000')
                 if (result == PinVerification.Success || result == PinVerification.NoPin) onUnlocked()
                 else error = true
-            }) { Text(stringResource(R.string.action_confirm)) }
+            })
         }
     }
 }
@@ -287,6 +359,7 @@ private fun MiniPlayer(onExpand: () -> Unit) {
         Row(
             Modifier.fillMaxWidth()
                 .clickable(onClick = onExpand)
+                .heightIn(min = 56.dp)
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -294,7 +367,8 @@ private fun MiniPlayer(onExpand: () -> Unit) {
                 title,
                 Modifier.weight(1f),
                 style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
             IconButton(onClick = {
                 if (controller.isPlaying) controller.pause() else controller.play()

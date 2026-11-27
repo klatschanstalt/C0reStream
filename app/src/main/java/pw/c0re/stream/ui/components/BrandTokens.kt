@@ -21,6 +21,7 @@ import pw.c0re.stream.ui.theme.BrandMagentaLight
 import pw.c0re.stream.ui.theme.BrandNavyDeep
 import pw.c0re.stream.ui.theme.BrandNavyStart
 import pw.c0re.stream.ui.theme.BrandOrange
+import pw.c0re.stream.ui.theme.BrandOrangeLight
 import pw.c0re.stream.ui.theme.BrandPink
 import pw.c0re.stream.ui.theme.BrandPlumDeep
 import pw.c0re.stream.ui.theme.BrandStateColors
@@ -84,8 +85,12 @@ object BrandTokens {
     private val spectrum = listOf(BrandCyan, BrandBlue, BrandViolet, BrandMagenta, BrandOrange)
     private val spectrumStops = listOf(0f, 0.35f, 0.65f, 0.85f, 1f)
 
-    private fun spectrumBrush(colors: List<Color>, stops: List<Float>? = null): Brush =
-        Brush.linearGradient(colors = colors, stops = stops)
+    private fun spectrumBrush(colors: List<Color>, stops: List<Float>? = null): Brush {
+        val resolved = stops ?: colors.indices.map {
+            it.toFloat() / (colors.size - 1).coerceAtLeast(1).toFloat()
+        }
+        return Brush.linearGradient(colors = colors)
+    }
 
     private fun glowBrush(color: Color, alpha: Float): Brush =
         Brush.radialGradient(colors = listOf(color.copy(alpha = alpha), Color.Transparent))

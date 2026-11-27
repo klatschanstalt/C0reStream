@@ -11,7 +11,6 @@ import android.os.Build
 import android.util.Rational
 import android.view.WindowManager
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitPointerEventScope
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -72,9 +71,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.awaitPointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -250,7 +246,7 @@ fun PlayerScreen(
     LaunchedEffect(controller, playing, playerView, orientation) {
         val pipActivity = activity
         if (pipSupported) {
-            pipActivity?.setPictureInPictureParams(pipParams(playing))
+            pipActivity.setPictureInPictureParams(pipParams(playing))
         }
     }
 
@@ -759,7 +755,7 @@ fun PlayerScreen(
     if (showSleep) {
         AlertDialog(
             onDismissRequest = { showSleep = false },
-            modifier = dialogModifier(),
+            modifier = Modifier.dialogModifier(),
             containerColor = MaterialTheme.colorScheme.surface,
             titleContentColor = MaterialTheme.colorScheme.onSurface,
             textContentColor = MaterialTheme.colorScheme.onSurface,
@@ -798,19 +794,13 @@ fun PlayerScreen(
 }
 
 @Composable
-private fun dialogModifier(): Modifier = Modifier
+private fun Modifier.dialogModifier(): Modifier = this
     .widthIn(max = 520.dp)
     .windowInsetsPadding(WindowInsets.systemBars)
     .windowInsetsPadding(WindowInsets.displayCutout)
 
-private fun Modifier.revealControls(onInteraction: () -> Unit): Modifier = pointerInput(Unit) {
-    awaitPointerEventScope {
-        while (true) {
-            val event = awaitPointerEvent(PointerEventPass.Initial)
-            if (event.type == PointerEventType.Press) onInteraction()
-        }
-    }
-}
+private fun Modifier.revealControls(onInteraction: () -> Unit): Modifier =
+    pointerInput(Unit) { detectTapGestures(onTap = { onInteraction() }) }
 
 @Composable
 private fun DiagnosticLine(labelRes: Int, value: String) {
@@ -852,7 +842,7 @@ private fun PlaybackOptionsDialog(
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        modifier = dialogModifier(),
+        modifier = Modifier.dialogModifier(),
         containerColor = MaterialTheme.colorScheme.surface,
         titleContentColor = MaterialTheme.colorScheme.onSurface,
         textContentColor = MaterialTheme.colorScheme.onSurface,
@@ -1002,7 +992,7 @@ private fun TrackDialog(controller: androidx.media3.session.MediaController, onD
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        modifier = dialogModifier(),
+        modifier = Modifier.dialogModifier(),
         containerColor = MaterialTheme.colorScheme.surface,
         titleContentColor = MaterialTheme.colorScheme.onSurface,
         textContentColor = MaterialTheme.colorScheme.onSurface,

@@ -9,20 +9,10 @@
     <color name="violet_950">#210C40</color>
 
     <!-- Brand gradient stops (g gradient) -->
-    <color name="cyan_300">#52FAFF</color>
-    <color name="blue_500">#008CFF</color>
-    <color name="violet_500">#6434FF</color>
-    <color name="magenta_500">#FF36CF</color>
-    <color name="orange_300">#FFB34E</color>
 
     <!-- Warm accent (hot gradient) -->
-    <color name="yellow_300">#FFDA72</color>
-    <color name="pink_500">#FF36AD</color>
 
     <!-- Light / night text tokens from logo-transparent.svg and splashscreen.svg -->
-    <color name="text_primary">#F3F7FF</color>
-    <color name="text_secondary">#B9D5F5</color>
-    <color name="surface_light">#F3F7FF</color>
 
     <!-- Window gradient tokens (overridden in values-night/colors.xml) -->
     <color name="window_gradient_start">@color/navy_800</color>
