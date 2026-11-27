@@ -27,6 +27,6 @@ Toolchain: JDK 17, Android SDK 37.1, build-tools 37.0.0, Gradle wrapper 9.9.2. P
 
 CI builds and publishes checksummed debug previews from `main`. Production APKs are published only after unit/instrumented tests, lint, durable signing and signature verification succeed. See [Releases](https://github.com/klatschanstalt/C0reStream/releases).
 
-Android 11–17 compatibility is validated by compilation plus the instrumented test matrix; device-specific results are recorded separately in `PROJECT_STATUS_REPORT.md`. Android 18 work is limited to documented, feature-detected preparation until official SDKs and system images are available.
+Android 11–17 compatibility work covers compilation against API 37.1 plus instrumented tests on an API 30/36 emulator matrix in CI. Other API levels and physical-device behaviour are not certified; results are recorded in `PROJECT_STATUS_REPORT.md`. Android 18 work is limited to documented, feature-detected preparation until official SDKs and system images are available.
 
 See `MASTERPLAN.md`, `SECURITY.md` and `PROJECT_STATUS_REPORT.md`.
