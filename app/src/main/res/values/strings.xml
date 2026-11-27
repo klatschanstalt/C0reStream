@@ -1,3 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">C0reStream</string>
+
+    <string name="nav_live">Live TV</string>
+    <string name="nav_favorites">Favorites</string>
+    <string name="nav_history">History</string>
+    <string name="nav_settings">Settings</string>
+
+    <string name="action_add_playlist">Add playlist</string>
+    <string name="action_import_file">Import file</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_save">Save</string>
+    <string name="action_close">Close</string>
+    <string name="action_confirm">Confirm</string>
+    <string name="action_back">Back</string>
+    <string name="action_play">Play</string>
+    <string name="action_pause">Pause</string>
+    <string name="action_next_channel">Next channel</string>
+    <string name="action_previous_channel">Previous channel</string>
+    <string name="action_pip">Picture in picture</string>
+    <string name="action_retry">Try again</string>
+    <string name="action_search">Search</string>
+
+    <string name="playlists_title">Your playlists</string>
+    <string name="playlists_empty">No playlist yet. Tap + to add an M3U URL or import a local file.</string>
+    <plurals name="channels_count">
+        <item quantity="one">%d channel</item>
+        <item quantity="other">%d channels</item>
+    </plurals>
+    <string name="playlist_delete_title">Delete playlist?</string>
+    <string name="playlist_delete_message">Related favorites, history and playback progress will be removed.</string>
+    <string name="playlist_new">New playlist</string>
+    <string name="field_name">Name</string>
+    <string name="field_m3u_url">M3U URL (HTTP or HTTPS)</string>
+    <string name="field_epg_url">EPG URL (optional, XMLTV or gzip)</string>
+    <string name="field_user_agent">User agent (optional)</string>
+    <string name="field_proxy">Use proxy</string>
+    <string name="field_proxy_host">Host</string>
+    <string name="field_proxy_port">Port</string>
+    <string name="field_xtream_login">Xtream Codes login</string>
+    <string name="field_server">Server URL (https://host:port)</string>
+    <string name="field_username">Username</string>
+    <string name="field_password">Password</string>
+    <string name="field_search_channel">Search channel</string>
+    <string name="xtream_hint">Prefer HTTPS. HTTP stays available for providers that require it.</string>
+
+    <string name="error_playlist_load">Playlist could not be loaded.</string>
+
+    <string name="detail_movies_series">Movies &amp; series</string>
+    <string name="detail_all">All</string>
+    <string name="detail_program">Guide</string>
+    <string name="epg_empty">No guide data for this channel.</string>
+    <string name="epg_now">now</string>
+    <string name="epg_reminder">Remind me</string>
+    <string name="epg_reminder_set">Reminder set</string>
+    <string name="epg_title">Guide · %1$s</string>
+    <string name="catchup_watch">Watch catch-up</string>
+
+    <string name="player_connecting">Connecting to playback service…</string>
+    <string name="player_failed">Playback failed: %1$s</string>
+    <string name="player_tracks">Audio, subtitles and quality</string>
+    <string name="player_audio">Audio track</string>
+    <string name="player_subtitles">Subtitles</string>
+    <string name="player_quality">Video quality</string>
+    <string name="player_auto">Automatic</string>
+    <string name="player_sleep_timer">Sleep timer</string>
+    <string name="player_sleep_off">Off</string>
+    <plurals name="player_sleep_minutes">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
+    <string name="player_resumed">Resumed at %1$s</string>
+    <string name="player_live">Live</string>
+    <string name="player_no_tracks">No alternative tracks found.</string>
+    <string name="player_subtitles_off">Subtitles off</string>
+
+    <string name="favorites_title">Favorites</string>
+    <string name="history_title">History</string>
+    <string name="history_clear">Clear history</string>
+    <string name="search_title">Search all channels</string>
+    <string name="search_hint">At least 2 characters…</string>
+
+    <string name="vod_movies">Movies</string>
+    <string name="vod_series">Series</string>
+    <string name="vod_search">Search movies and series</string>
+    <string name="vod_rating">Rating: %1$s</string>
+    <string name="vod_resume">Resume</string>
+    <string name="vod_season">Season %d</string>
+    <string name="vod_loading">Loading…</string>
+    <string name="vod_xtream_only">Movies and series require an Xtream Codes login.</string>
+    <string name="watchlist_title">Watchlist</string>
+    <string name="watchlist_empty">Your watchlist is empty.</string>
+
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_theme">Theme</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_system">System</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="settings_brand">Brand palette</string>
+    <string name="brand_cyan">Cyan</string>
+    <string name="brand_ember">Ember</string>
+    <string name="settings_playback">Playback</string>
+    <string name="settings_buffer">Buffer size</string>
+    <string name="settings_buffer_hint">Increase for unstable streams. Applies after the next player start.</string>
+    <string name="settings_buffer_min">Min (seconds)</string>
+    <string name="settings_buffer_max">Max (seconds)</string>
+    <string name="settings_refresh">Automatic refresh</string>
+    <string name="settings_auto_refresh">Refresh playlists in the background</string>
+    <string name="settings_refresh_hours">Interval (hours)</string>
+    <string name="settings_backup">Backup and export</string>
+    <string name="settings_export_m3u">Export M3U (unencrypted)</string>
+    <string name="settings_diagnostics">Diagnostics</string>
+    <string name="settings_log_refresh">Refresh log</string>
+    <string name="settings_version">C0reStream %1$s</string>
+    <string name="settings_update_available">Version %1$s is available.</string>
+    <string name="settings_update_download">Download and verify</string>
+    <string name="settings_update_verify_failed">Update verification failed. Installation was blocked.</string>
+    <string name="settings_update_install">Verified. Continue with the system installer.</string>
+    <string name="settings_security">Security</string>
+    <string name="settings_http_warning">HTTP sources are supported, but traffic can be read or modified on the network. Prefer HTTPS. HTTPS-to-HTTP redirects are blocked.</string>
+    <string name="settings_about_text">Independent IPTV client for authorized M3U, Xtream Codes, VOD and series sources with EPG, catch-up, favorites, history, search, mini-player and proxy support. No tracking, no ads.</string>
+
+    <string name="backup_create">Create encrypted backup</string>
+    <string name="backup_restore">Restore backup</string>
+    <string name="backup_password">Backup password</string>
+    <string name="backup_password_hint">At least 12 characters. The password cannot be recovered.</string>
+    <string name="backup_saved">Encrypted backup saved.</string>
+    <plurals name="backup_restored_playlists">
+        <item quantity="one">%d playlist merged. Settings, watchlist and progress restored.</item>
+        <item quantity="other">%d playlists merged. Settings, watchlist and progress restored.</item>
+    </plurals>
+    <string name="backup_failed">Backup failed. Check file, password and free storage.</string>
+    <string name="backup_import_merge_note">Restore merges with the existing library. Identical playlists and channels are not duplicated.</string>
+    <string name="backup_export_m3u_warning">The file can contain credentials. Share it only with trusted recipients.</string>
+    <string name="backup_export_m3u_share">Share</string>
+
+    <string name="reminder_channel">Program reminders</string>
+    <string name="reminder_notification_title">C0reStream reminder</string>
+    <string name="reminder_notification_text">%1$s starts now on %2$s.</string>
+
+    <string name="common_tv">TV</string>
+
+    <string name="content_desc_favorite">Toggle favorite</string>
+    <string name="content_desc_watchlist">Toggle watchlist</string>
 </resources>

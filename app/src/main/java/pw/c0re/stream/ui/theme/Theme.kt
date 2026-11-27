@@ -35,7 +35,7 @@ private val LightScheme = lightColorScheme(
     onSurfaceVariant = LightTextDim,
 )
 
-// Zweit-Brand: "Ember" (Orange/Rot)
+// Second brand: "Ember" (orange/red).
 private val EmberDark = darkColorScheme(
     primary = androidx.compose.ui.graphics.Color(0xFFFF7A45),
     secondary = androidx.compose.ui.graphics.Color(0xFFFF4D6D),
@@ -54,15 +54,19 @@ enum class Brand { HAM3L, EMBER }
 @Composable
 fun C0reStreamThemeFromPrefs(content: @Composable () -> Unit) {
     val vm: SettingsViewModel = viewModel()
-    val mode by vm.themeMode.collectAsState()
-    val brand by vm.brand.collectAsState()
+    val settings by vm.settings.collectAsState()
+    val mode = runCatching { ThemeMode.valueOf(settings.themeMode) }.getOrDefault(ThemeMode.DARK)
+    val brand = runCatching { Brand.valueOf(settings.brand) }.getOrDefault(Brand.HAM3L)
     val dark = when (mode) {
         ThemeMode.DARK, ThemeMode.AMOLED -> true
         ThemeMode.LIGHT -> false
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
     }
     val scheme = when {
-        mode == ThemeMode.AMOLED -> DarkScheme.copy(background = androidx.compose.ui.graphics.Color.Black, surface = androidx.compose.ui.graphics.Color.Black)
+        mode == ThemeMode.AMOLED -> DarkScheme.copy(
+            background = androidx.compose.ui.graphics.Color.Black,
+            surface = androidx.compose.ui.graphics.Color.Black,
+        )
         brand == Brand.EMBER && dark -> EmberDark
         dark -> DarkScheme
         else -> LightScheme

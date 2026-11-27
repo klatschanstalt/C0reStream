@@ -19,8 +19,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import pw.c0re.stream.R
 import pw.c0re.stream.ui.components.PoweredByFooter
 import pw.c0re.stream.ui.playlistdetail.ChannelLogo
 
@@ -28,13 +30,23 @@ import pw.c0re.stream.ui.playlistdetail.ChannelLogo
 fun FavoritesScreen(onPlay: (Long) -> Unit, vm: FavoritesViewModel = viewModel()) {
     val favorites by vm.favorites.collectAsState()
     Column(Modifier.fillMaxSize().padding(20.dp)) {
-        Text("Favoriten", style = MaterialTheme.typography.headlineMedium)
+        Text(stringResource(R.string.favorites_title), style = MaterialTheme.typography.headlineMedium)
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f)) {
-            items(favorites, key = { it.id }) { f ->
-                Card(onClick = { onPlay(f.channelId) }, shape = RoundedCornerShape(16.dp)) {
-                    Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        ChannelLogo(f.logoUrl, Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)).padding(end = 12.dp))
-                        Text(f.name, style = MaterialTheme.typography.titleMedium)
+            items(favorites, key = { it.id }) { favorite ->
+                Card(onClick = { onPlay(favorite.channelId) }, shape = RoundedCornerShape(16.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        ChannelLogo(
+                            favorite.logoUrl,
+                            Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)),
+                        )
+                        Text(
+                            favorite.name,
+                            Modifier.padding(start = 12.dp),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
                     }
                 }
             }

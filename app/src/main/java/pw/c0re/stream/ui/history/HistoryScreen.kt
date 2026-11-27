@@ -20,8 +20,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import pw.c0re.stream.R
 import pw.c0re.stream.ui.components.PoweredByFooter
 import java.text.DateFormat
 import java.util.Date
@@ -31,15 +33,24 @@ fun HistoryScreen(onPlay: (Long) -> Unit, vm: HistoryViewModel = viewModel()) {
     val history by vm.history.collectAsState()
     Column(Modifier.fillMaxSize().padding(20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Verlauf", Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium)
-            IconButton(onClick = vm::clear) { Icon(Icons.Filled.DeleteSweep, "Leeren") }
+            Text(
+                stringResource(R.string.history_title),
+                Modifier.weight(1f),
+                style = MaterialTheme.typography.headlineMedium,
+            )
+            IconButton(onClick = vm::clear) {
+                Icon(Icons.Filled.DeleteSweep, stringResource(R.string.history_clear))
+            }
         }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f)) {
-            items(history, key = { it.id }) { h ->
-                Card(onClick = { onPlay(h.channelId) }, shape = RoundedCornerShape(16.dp)) {
+            items(history, key = { it.id }) { entry ->
+                Card(onClick = { onPlay(entry.channelId) }, shape = RoundedCornerShape(16.dp)) {
                     Column(Modifier.padding(12.dp)) {
-                        Text(h.name, style = MaterialTheme.typography.titleMedium)
-                        Text(DateFormat.getDateTimeInstance().format(Date(h.watchedAt)), style = MaterialTheme.typography.bodyMedium)
+                        Text(entry.name, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            DateFormat.getDateTimeInstance().format(Date(entry.watchedAt)),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
                     }
                 }
             }

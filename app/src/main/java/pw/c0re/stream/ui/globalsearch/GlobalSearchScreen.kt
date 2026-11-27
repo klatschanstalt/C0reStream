@@ -23,9 +23,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import pw.c0re.stream.R
 import pw.c0re.stream.ui.components.PoweredByFooter
 import pw.c0re.stream.ui.playlistdetail.ChannelLogo
 
@@ -35,22 +37,33 @@ fun GlobalSearchScreen(onPlay: (Long) -> Unit, vm: GlobalSearchViewModel = viewM
     val results by vm.results.collectAsState(initial = emptyList())
 
     Column(Modifier.fillMaxSize().padding(20.dp)) {
-        Text("Alle Kanaele durchsuchen", style = MaterialTheme.typography.headlineMedium)
+        Text(stringResource(R.string.search_title), style = MaterialTheme.typography.headlineMedium)
         OutlinedTextField(
             value = query,
             onValueChange = vm::setQuery,
             leadingIcon = { Icon(Icons.Filled.Search, null) },
-            placeholder = { Text("Mindestens 2 Zeichen ...") },
+            placeholder = { Text(stringResource(R.string.search_hint)) },
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
             singleLine = true,
         )
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f)) {
-            items(results, key = { it.first.id }) { (ch, playlistName) ->
-                Card(onClick = { onPlay(ch.id) }, shape = RoundedCornerShape(16.dp)) {
-                    Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        ChannelLogo(ch.logoUrl, Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)))
+            items(results, key = { it.first.id }) { (channel, playlistName) ->
+                Card(onClick = { onPlay(channel.id) }, shape = RoundedCornerShape(16.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        ChannelLogo(
+                            channel.logoUrl,
+                            Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)),
+                        )
                         Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                            Text(ch.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                channel.name,
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                             Text(playlistName, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
