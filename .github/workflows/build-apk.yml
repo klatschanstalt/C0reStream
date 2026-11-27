@@ -27,6 +27,15 @@ jobs:
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
           packages: 'platforms;android-37.1 build-tools;37.0.0 platform-tools'
+      - name: Validate version metadata
+        run: |
+          set -euo pipefail
+          version_code=$(grep '^versionCode=' version.properties | cut -d= -f2)
+          version_name=$(grep '^versionName=' version.properties | cut -d= -f2)
+          [[ "$version_code" =~ ^[0-9]+$ ]] && [ "$version_code" -gt 0 ] || { echo "Invalid versionCode"; exit 1; }
+          [[ "$version_name" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]] || { echo "Invalid versionName"; exit 1; }
+          update_latest=$(python3 -c "import json; print(json.load(open('update.json'))['latestVersion'])")
+          [ "$update_latest" = "$version_name" ] || { echo "update.json latestVersion mismatch"; exit 1; }
       - name: Unit tests and lint
         run: ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug --stacktrace
       - name: Upload verification reports
@@ -143,6 +152,17 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew --no-daemon :app:assembleRelease --stacktrace
+      - name: Verify APK version metadata
+        if: steps.signing.outputs.available == 'true'
+        run: |
+          set -euo pipefail
+          expected_version_code=$(grep '^versionCode=' version.properties | cut -d= -f2)
+          expected_version_name=$(grep '^versionName=' version.properties | cut -d= -f2)
+          badging=$(aapt dump badging app/build/outputs/apk/release/app-release.apk)
+          actual_version_code=$(printf '%s\n' "$badging" | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p" | head -n1)
+          actual_version_name=$(printf '%s\n' "$badging" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p" | head -n1)
+          [ "$actual_version_code" = "$expected_version_code" ] || { echo "APK versionCode mismatch"; exit 1; }
+          [ "$actual_version_name" = "$expected_version_name" ] || { echo "APK versionName mismatch"; exit 1; }
       - name: Sign resource manifest
         if: steps.signing.outputs.available == 'true'
         env:

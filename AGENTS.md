@@ -10,6 +10,17 @@
 - Maintain `README.md` as the canonical branded, trilingual (DE/EN/FR) public documentation. Preserve its banner, badges, language navigation, download and verification links, and legal notices. Update all three language sections together whenever verified user-facing features, requirements, build instructions or security behavior change. Document only implemented features; distinguish device-dependent support and unverified capabilities. Use permanent latest-release links and dynamic badges instead of hardcoded release metadata; do not introduce a separate README-only automation or redundant CI loops. Include documentation changes in the corresponding implementation commit before release.
 - No fixed APK size limit or target; report size for information only. Prioritize functionality, stability, security, playback quality and compatibility while avoiding unnecessary dependencies.
 
+## Versioning and releases
+
+- Use Semantic Versioning `MAJOR.MINOR.PATCH` from `version.properties` only. `MAJOR` requires explicit operator approval; C0reStream stays on 1.x.x unless approved. `MINOR` = new usable features or substantial compatible improvements. `PATCH` = compatible fixes, security fixes, dependency/toolchain updates affecting the APK.
+- `versionCode` always increases monotonically and never resets; it is the update decision basis. Use the next free integer.
+- `version.properties` is the sole source of `versionName` and `versionCode`; no redundant hard-coded versions. Missing/invalid metadata must abort the build or release.
+- Conventional Commits (`feat`, `fix`, `security`, `perf`, `build`, `ci`, `docs`, `test`, `refactor`, `chore`) for traceability; commits do not auto-release.
+- Release only fully verified stable signed APKs. Never overwrite tags/artifacts. Release notes in DE/EN/FR, no empty categories, no unverified claims. Git history is the changelog; no separate CHANGELOG.
+- Revert released defects with a new correctly versioned release, never by rewriting.
+- Pure docs/CI/test/project cleanup changes do not bump app version or publish APKs.
+- Update compatibility: semantic versions are parsed numerically (1.9.x → 1.10.x → 1.11.x); `versionCode` remains authoritative.
+
 ## Maintenance
 
 - Review this project for currency on relevant mandates; prefer current stable, mutually compatible technologies and replace deprecated implementations.
