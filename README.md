@@ -21,7 +21,7 @@ HTTP sources remain supported by explicit owner decision; HTTPS is preferred and
 ./gradlew :app:testDebugUnitTest :app:lintDebug
 ```
 
-Toolchain: JDK 17, Android SDK 37.1, build-tools 37.0.0, Gradle wrapper 9.9.2. Production signing requires `C0RE_KEYSTORE_FILE`, `C0RE_KEYSTORE_PASSWORD`, `C0RE_KEY_ALIAS` and `C0RE_KEY_PASSWORD`; without them release builds stay unsigned.
+Toolchain: JDK 17, Android SDK 37.1, build-tools 37.0.0, Gradle wrapper 9.9.2. Production signing requires `ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD` (the `C0RE_*` names are accepted as aliases); without them release builds stay unsigned. CI verifies the certificate SHA-256 fingerprint against `ANDROID_CERT_SHA256` before publishing.
 
 ## Releases
 

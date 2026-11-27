@@ -13,12 +13,16 @@ fun versionProperty(key: String, fallback: String): String =
     (project.findProperty("c0re.$key") as String?) ?: versionProps.getProperty(key) ?: fallback
 
 val releaseStoreFile = System.getenv("C0RE_KEYSTORE_FILE")
+    ?: System.getenv("ANDROID_KEYSTORE_FILE")
     ?: (project.findProperty("c0re.keystoreFile") as String?)
 val releaseStorePassword = System.getenv("C0RE_KEYSTORE_PASSWORD")
+    ?: System.getenv("ANDROID_KEYSTORE_PASSWORD")
     ?: (project.findProperty("c0re.keystorePassword") as String?)
 val releaseKeyAlias = System.getenv("C0RE_KEY_ALIAS")
+    ?: System.getenv("ANDROID_KEY_ALIAS")
     ?: (project.findProperty("c0re.keyAlias") as String?)
 val releaseKeyPassword = System.getenv("C0RE_KEY_PASSWORD")
+    ?: System.getenv("ANDROID_KEY_PASSWORD")
     ?: (project.findProperty("c0re.keyPassword") as String?)
 val hasReleaseSigning = !releaseStoreFile.isNullOrBlank() && !releaseStorePassword.isNullOrBlank() &&
     !releaseKeyAlias.isNullOrBlank() && !releaseKeyPassword.isNullOrBlank()
