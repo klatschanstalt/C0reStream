@@ -149,7 +149,7 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew --no-daemon :app:signResourceManifest --stacktrace
-      - name: Verify signature and publish
+      - name: Verify signature and checksum
         if: steps.signing.outputs.available == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -172,6 +172,26 @@ jobs:
           fi
           cp "$APK" C0reStream.apk
           sha256sum C0reStream.apk > SHA256SUMS
+      - name: Upload signed APK for verification
+        if: steps.signing.outputs.available == 'true'
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: C0reStream-signed-verification
+          path: |
+            app/build/outputs/apk/release/C0reStream.apk
+            app/build/outputs/apk/release/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
+      - name: Publish release
+        if: steps.signing.outputs.available == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BUILD_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd app/build/outputs/apk/release
           cp ../../../../../resources/manifest.json resources.json
           cp ../../../../../resources/manifest.sig resources.sig
           TAG="v$(grep '^versionName=' ../../../../../version.properties | cut -d= -f2)"
