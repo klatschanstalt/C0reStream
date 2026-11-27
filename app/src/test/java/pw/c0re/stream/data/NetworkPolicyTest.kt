@@ -6,6 +6,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.IOException
 
 class NetworkPolicyTest {
 
@@ -73,5 +74,36 @@ class NetworkPolicyTest {
         assertNull(NetworkPolicy.proxy("user@host", 8080))
         assertNull(NetworkPolicy.proxy(null, 8080))
         assertNotNull(NetworkPolicy.proxy("127.0.0.1", 8080))
+    }
+
+    @Test
+    fun `redirect guard blocks https downgrade on any hop`() {
+        val https = NetworkPolicy.requireUrl("https://example.com/player_api.php")
+        assertTrue(runCatching {
+            NetworkPolicy.redirectTarget(https, "http://example.com/plain", originalHttps = true)
+        }.exceptionOrNull() is IOException)
+        assertEquals(
+            "https://example.com/next",
+            NetworkPolicy.redirectTarget(https, "/next", originalHttps = true).toString(),
+        )
+        assertEquals(
+            "https://cdn.example/next",
+            NetworkPolicy.redirectTarget(https, "https://cdn.example/next", originalHttps = true).toString(),
+        )
+    }
+
+    @Test
+    fun `http upgrade is allowed but credential urls are rejected`() {
+        val http = NetworkPolicy.requireUrl("http://example.com/live")
+        assertEquals(
+            "https://example.com/live",
+            NetworkPolicy.redirectTarget(http, "https://example.com/live", originalHttps = false).toString(),
+        )
+        assertTrue(runCatching {
+            NetworkPolicy.redirectTarget(http, "https://user:secret@example.com/live", originalHttps = false)
+        }.exceptionOrNull() is IOException)
+        assertTrue(runCatching {
+            NetworkPolicy.redirectTarget(http, "ftp://example.com/live", originalHttps = false)
+        }.exceptionOrNull() is IOException)
     }
 }

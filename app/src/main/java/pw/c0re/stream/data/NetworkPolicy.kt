@@ -60,15 +60,42 @@ object NetworkPolicy {
         return Proxy(Proxy.Type.HTTP, InetSocketAddress(host, port))
     }
 
-    /** Rejects HTTPS-to-HTTP redirects even if a caller enables redirect following. */
-    private val downgradeGuard = Interceptor { chain ->
-        val request = chain.request()
-        val response = chain.proceed(request)
-        if (request.url.isHttps && !response.request.url.isHttps) {
-            response.close()
-            throw IOException("HTTPS downgrade blocked")
+    /**
+     * Resolves one redirect hop. The original transport class is enforced on every hop, so an
+     * HTTPS -> HTTP -> HTTPS chain cannot replay credentials over plaintext in the middle.
+     */
+    internal fun redirectTarget(current: HttpUrl, location: String, originalHttps: Boolean): HttpUrl {
+        val next = current.resolve(location) ?: throw IOException("Invalid redirect URL")
+        parse(next.toString()) ?: throw IOException("Invalid redirect URL")
+        if (originalHttps && !next.isHttps) throw IOException("HTTPS downgrade blocked")
+        return next
+    }
+
+    /**
+     * OkHttp's automatic redirect handling runs below application interceptors, so it cannot
+     * see intermediate hops. Follow redirects manually to enforce the policy per hop.
+     */
+    private val redirectGuard = Interceptor { chain ->
+        var request = chain.request()
+        val originalHttps = request.url.isHttps
+        var redirects = 0
+        var finalResponse: Response? = null
+        while (finalResponse == null) {
+            val response = chain.proceed(request)
+            val location = if (response.isRedirect) response.header("Location") else null
+            if (location == null) {
+                finalResponse = response
+            } else {
+                val next = redirectTarget(request.url, location, originalHttps)
+                response.close()
+                if (next.host != request.url.host && request.header("Authorization") != null) {
+                    throw IOException("Credential-bearing cross-host redirect blocked")
+                }
+                if (++redirects > 5) throw IOException("Too many redirects")
+                request = request.newBuilder().url(next).build()
+            }
         }
-        response
+        finalResponse
     }
 
     fun client(
@@ -81,10 +108,10 @@ object NetworkPolicy {
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .callTimeout(90, TimeUnit.SECONDS)
-            .followRedirects(true)
-            // HTTP -> HTTPS upgrades are useful; the interceptor below blocks the reverse.
-            .followSslRedirects(true)
-            .addInterceptor(downgradeGuard)
+            .followRedirects(false)
+            // Redirects are resolved by redirectGuard so every hop is validated.
+            .followSslRedirects(false)
+            .addInterceptor(redirectGuard)
         userAgent(userAgent)?.let { value ->
             builder.addInterceptor { chain ->
                 chain.proceed(chain.request().newBuilder().header("User-Agent", value).build())

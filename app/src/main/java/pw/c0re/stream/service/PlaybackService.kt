@@ -10,9 +10,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
-import kotlinx.coroutines.runBlocking
+import pw.c0re.stream.C0reStreamApp
 import pw.c0re.stream.data.NetworkPolicy
-import pw.c0re.stream.data.SettingsRepository
 
 /**
  * Foreground playback service: MediaSession (lock screen, headphones, TV remotes),
@@ -25,7 +24,7 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
-        val settings = runBlocking { SettingsRepository(applicationContext).snapshot() }
+        val settings = (application as C0reStreamApp).cachedSettings.value
         val minBufferMs = settings.minBufferSec.coerceIn(5, 300) * 1000
         val maxBufferMs = settings.maxBufferSec.coerceIn(settings.minBufferSec.coerceIn(5, 300), 600) * 1000
         val dataSourceFactory = OkHttpDataSource.Factory(NetworkPolicy.client())

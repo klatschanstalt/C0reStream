@@ -82,7 +82,7 @@ fun PlayerScreen(
 ) {
     val context = LocalContext.current
     val activity = context.findActivity()
-    val pending = remember { PlayerHub.pending }
+    val pending = PlayerHub.pending
     var currentId by remember { mutableLongStateOf(channelId) }
     val channel by vm.channelFor(currentId).collectAsState(initial = null)
     val siblings by vm.siblingsOf(channel).collectAsState(initial = emptyList())
@@ -170,6 +170,7 @@ fun PlayerScreen(
             playlistId = effectivePlaylistId,
         )
         channel?.let(vm::logWatch)
+        PlayerHub.consumePending()
         playbackError = null
         retryCount = 0
         player.setMediaItem(

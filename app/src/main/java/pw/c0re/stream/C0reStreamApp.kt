@@ -6,7 +6,9 @@ import android.app.NotificationManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import pw.c0re.stream.data.AppSettings
 import pw.c0re.stream.data.SettingsRepository
 import pw.c0re.stream.data.db.AppDatabase
 import pw.c0re.stream.work.PlaylistRefreshWorker
@@ -18,6 +20,7 @@ class C0reStreamApp : Application() {
     lateinit var settings: SettingsRepository
         private set
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val cachedSettings = MutableStateFlow(AppSettings())
 
     override fun onCreate() {
         super.onCreate()
@@ -25,6 +28,9 @@ class C0reStreamApp : Application() {
         database = AppDatabase.build(this)
         settings = SettingsRepository(this)
         createNotificationChannels()
+        appScope.launch {
+            settings.settings.collect { cachedSettings.value = it }
+        }
         appScope.launch {
             val current = settings.snapshot()
             PlaylistRefreshWorker.schedule(this@C0reStreamApp, current.refreshHours, current.autoRefresh)

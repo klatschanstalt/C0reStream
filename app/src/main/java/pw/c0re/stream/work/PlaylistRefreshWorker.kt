@@ -21,9 +21,14 @@ import java.util.concurrent.TimeUnit
 class PlaylistRefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val app = applicationContext as C0reStreamApp
-        val settings = runCatching { app.settings.snapshot() }.getOrDefault(
-            pw.c0re.stream.data.AppSettings(),
-        )
+        val settings = try {
+            app.settings.snapshot()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            AppLog.log("Refresh", "Settings unavailable: ${error.message ?: "?"}")
+            pw.c0re.stream.data.AppSettings()
+        }
         if (!settings.autoRefresh) return Result.success()
         val repo = PlaylistRepository(app.database)
         var refreshed = 0

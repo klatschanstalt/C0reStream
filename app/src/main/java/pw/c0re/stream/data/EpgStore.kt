@@ -1,6 +1,7 @@
 package pw.c0re.stream.data
 
 import androidx.room.withTransaction
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import pw.c0re.stream.data.db.AppDatabase
@@ -22,7 +23,14 @@ class EpgStore(private val db: AppDatabase, private val repo: PlaylistRepository
         if (!force && playlist.epgUpdatedAt > 0 && now - playlist.epgUpdatedAt < ttlMs) {
             return@withLock true
         }
-        val parsed = runCatching { repo.loadEpg(playlistId) }.getOrDefault(emptyMap())
+        val parsed = try {
+            repo.loadEpg(playlistId)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            AppLog.log("EPG", error.message ?: "?")
+            emptyMap()
+        }
         if (parsed.isEmpty()) return@withLock false
         db.withTransaction {
             db.epgDao().deleteForPlaylist(playlistId)
@@ -50,7 +58,13 @@ class EpgStore(private val db: AppDatabase, private val repo: PlaylistRepository
 
     suspend fun nowFor(playlistId: Long, tvgId: String?): EpgEntry? {
         if (tvgId.isNullOrBlank()) return null
-        runCatching { ensureFresh(playlistId) }
+        try {
+            ensureFresh(playlistId)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            AppLog.log("EPG", error.message ?: "?")
+        }
         val now = System.currentTimeMillis()
         return db.epgDao().current(playlistId, tvgId, now)?.toModel()
             ?: db.epgDao().next(playlistId, tvgId, now)?.toModel()
@@ -58,7 +72,13 @@ class EpgStore(private val db: AppDatabase, private val repo: PlaylistRepository
 
     suspend fun guideFor(playlistId: Long, tvgId: String?): List<EpgEntry> {
         if (tvgId.isNullOrBlank()) return emptyList()
-        runCatching { ensureFresh(playlistId) }
+        try {
+            ensureFresh(playlistId)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            AppLog.log("EPG", error.message ?: "?")
+        }
         val now = System.currentTimeMillis()
         val entries = db.epgDao().range(playlistId, tvgId, now - 6 * 60 * 60 * 1000L, now + 48 * 60 * 60 * 1000L)
         return if (entries.isEmpty()) {

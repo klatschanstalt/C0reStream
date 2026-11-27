@@ -1,5 +1,6 @@
 package pw.c0re.stream.data
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
@@ -21,14 +22,14 @@ object UpdateChecker {
     )
 
     suspend fun check(currentVersion: String): UpdateInfo? = withContext(Dispatchers.IO) {
-        runCatching {
+        try {
             val client = NetworkPolicy.client()
             val body = client.newCall(
                 Request.Builder().url(NetworkPolicy.requireUrl(UPDATE_URL)).build(),
             ).execute().use { response -> response.readMetadata(64 * 1024) }
             val json = JSONObject(body)
             val latest = json.optString("latestVersion").trim()
-            if (latest.isBlank() || !isNewer(latest, currentVersion)) return@runCatching null
+            if (latest.isBlank() || !isNewer(latest, currentVersion)) return@withContext null
             val apk = json.optString("apkUrl").trim().takeIf { it.isNotBlank() }
                 ?.takeIf { NetworkPolicy.isHttps(it) }
             val checksum = json.optString("sha256").trim().lowercase(Locale.ROOT)
@@ -39,7 +40,12 @@ object UpdateChecker {
                 apkUrl = apk,
                 sha256 = checksum,
             )
-        }.getOrNull()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            AppLog.log("Update", error.message ?: "?")
+            null
+        }
     }
 
     /** Compares dotted numeric versions; pre-release suffixes make a version older. */

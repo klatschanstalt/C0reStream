@@ -43,7 +43,7 @@ object PlayerHub {
 
     @androidx.annotation.OptIn(UnstableApi::class)
     fun connect(context: Context) {
-        if (controller != null) return
+        if (controller != null || future != null) return
         val appContext = context.applicationContext
         val pendingFuture = future ?: MediaController.Builder(
             appContext,
@@ -80,6 +80,10 @@ object PlayerHub {
 
     fun prepare(url: String, title: String?, mediaKey: String?, kind: String, playlistId: Long) {
         pending = PendingPlayback(url, title, mediaKey, kind, playlistId)
+    }
+
+    fun consumePending() {
+        pending = null
     }
 
     fun attach(

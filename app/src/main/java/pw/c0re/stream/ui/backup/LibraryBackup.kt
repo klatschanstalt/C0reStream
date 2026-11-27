@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import pw.c0re.stream.data.AppLog
 import pw.c0re.stream.data.ChannelKey
 import pw.c0re.stream.data.NetworkPolicy
 import pw.c0re.stream.data.SettingsRepository
@@ -166,6 +167,7 @@ object LibraryBackup {
         val restored = db.withTransaction {
             val playlistIds = mutableMapOf<Long, Long>()
             val channelEntities = mutableMapOf<Long, ChannelEntity>()
+            val seenChannelKeys = HashSet<String>()
             val existingPlaylists = db.playlistDao().allOnce()
             val byIdentity = existingPlaylists.associateBy { "${it.name}\u0000${it.url.orEmpty()}" }
 
@@ -215,6 +217,7 @@ object LibraryBackup {
                 val tvgId = item.optional("tvg")
                 val stableKey = item.optional("stableKey")?.takeIf { it.isNotBlank() }
                     ?: ChannelKey.stableKey(url, tvgId)
+                if (!seenChannelKeys.add("$playlistId\u0000$stableKey")) continue
                 val existing = db.channelDao().byStableKey(playlistId, stableKey)
                 val entity = ChannelEntity(
                     id = existing?.id ?: 0L,
@@ -245,15 +248,16 @@ object LibraryBackup {
             }
             for (item in history) {
                 val channel = channelEntities[item.getLong("channel")] ?: continue
-                // One history row per channel keeps repeated restores idempotent.
-                db.historyDao().deleteByChannel(channel.id)
+                // Idempotent per (channel, timestamp) so repeated restores keep all visits.
+                val watchedAt = item.optLong("time", System.currentTimeMillis())
+                db.historyDao().deleteByChannelAndTime(channel.id, watchedAt)
                 db.historyDao().add(
                     HistoryEntity(
                         channelId = channel.id,
                         name = channel.name,
                         logoUrl = channel.logoUrl,
                         url = channel.url,
-                        watchedAt = item.optLong("time", System.currentTimeMillis()),
+                        watchedAt = watchedAt,
                     ),
                 )
             }
@@ -306,7 +310,13 @@ object LibraryBackup {
             }
             RestoreResult(playlists.size, channels.size, format >= 2 && root.has("settings"))
         }
-        settings.restoreJson(root.optJSONObject("settings"))
+        try {
+            settings.restoreJson(root.optJSONObject("settings"))
+        } catch (error: Exception) {
+            // Settings live in DataStore, outside the Room transaction; keep the library and
+            // report the failure instead of silently reverting a successful restore.
+            AppLog.log("Backup", "Settings restore failed: ${error.message ?: "?"}")
+        }
         restored
     }
 

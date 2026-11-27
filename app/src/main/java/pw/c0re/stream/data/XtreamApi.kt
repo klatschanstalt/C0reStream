@@ -76,8 +76,9 @@ class XtreamApi(private val httpClient: OkHttpClient) {
     }
 
     private fun client(): OkHttpClient = httpClient.newBuilder()
-        .followRedirects(true)
-        .followSslRedirects(true)
+        // NetworkPolicy.redirectGuard validates every hop; automatic redirects must stay off.
+        .followRedirects(false)
+        .followSslRedirects(false)
         .callTimeout(90, TimeUnit.SECONDS)
         .build()
 
@@ -96,7 +97,14 @@ class XtreamApi(private val httpClient: OkHttpClient) {
         }
 
     suspend fun fetchLiveChannels(creds: Credentials): List<RawChannel> {
-        val categories = runCatching { fetchCategories(creds) }.getOrDefault(emptyMap())
+        val categories = try {
+            fetchCategories(creds)
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            AppLog.log("Xtream", error.message ?: "?")
+            emptyMap()
+        }
         val root = JSONArray(fetchJson(creds, "get_live_streams"))
         check(root.length() <= maxJsonRecords) { "Too many streams" }
         val result = ArrayList<RawChannel>(root.length())

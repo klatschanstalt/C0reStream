@@ -105,6 +105,9 @@ class PlaylistRepository(private val db: AppDatabase) {
         }
 
         val old = db.channelDao().snapshot(playlistId)
+        if (existingId != null && old.size > 4 && deduplicated.size < old.size / 2) {
+            error("Playlist shrank unexpectedly; keeping previous channels")
+        }
         val oldByKey = old.filter { it.stableKey.isNotBlank() }.associateBy { it.stableKey }
         val oldByUrl = old.groupBy { it.url }.mapValues { ArrayDeque(it.value) }
         val channels = deduplicated.map { (key, channel) ->
@@ -123,7 +126,10 @@ class PlaylistRepository(private val db: AppDatabase) {
         }
         val retainedIds = channels.mapNotNull { it.id.takeIf { id -> id > 0 } }.toSet()
         val removedIds = old.filter { it.id !in retainedIds }.map { it.id }
-        if (removedIds.isNotEmpty()) db.channelDao().deleteByIds(removedIds)
+        if (removedIds.isNotEmpty()) {
+            db.channelDao().deleteByIds(removedIds)
+            db.reminderDao().deleteForChannels(removedIds)
+        }
         db.channelDao().insertAll(channels)
         db.favoriteDao().removeOrphans()
         db.historyDao().removeOrphans()
@@ -145,7 +151,7 @@ class PlaylistRepository(private val db: AppDatabase) {
     suspend fun loadEpg(playlistId: Long): Map<String, List<EpgEntry>> = withContext(Dispatchers.IO) {
         val playlist = db.playlistDao().byId(playlistId) ?: return@withContext emptyMap()
         val epgUrl = playlist.epgUrl ?: return@withContext emptyMap()
-        runCatching {
+        try {
             val client = NetworkPolicy.client(
                 playlist.userAgent, playlist.useProxy, playlist.proxyHost, playlist.proxyPort,
             )
@@ -153,7 +159,12 @@ class PlaylistRepository(private val db: AppDatabase) {
                 .execute()
                 .use { response -> response.readText(48L * 1024 * 1024) }
             EpgParser.parse(text)
-        }.getOrDefault(emptyMap())
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            AppLog.log("EPG", error.message ?: "?")
+            emptyMap()
+        }
     }
 
     suspend fun setRefreshPolicy(playlistId: Long, enabled: Boolean, hours: Int) =

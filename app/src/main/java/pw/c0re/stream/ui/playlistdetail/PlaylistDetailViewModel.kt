@@ -116,8 +116,6 @@ class PlaylistDetailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refreshGuide(playlistId: Long) = viewModelScope.launch {
         epgStore.refresh(playlistId)
-        // Touch the query so guide-backed rows are re-collected after a manual refresh.
-        queryFlow.value = queryFlow.value
     }
 
     suspend fun playlistName(playlistId: Long): String? = db.playlistDao().byId(playlistId)?.name
