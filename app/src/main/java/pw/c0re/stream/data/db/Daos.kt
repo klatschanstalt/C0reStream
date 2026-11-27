@@ -17,6 +17,7 @@ interface PlaylistDao {
 
 @Dao
 interface ChannelDao {
+    @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertOne(channel: ChannelEntity): Long
     @Query("SELECT * FROM channels WHERE playlistId = :playlistId ORDER BY name") fun byPlaylist(playlistId: Long): Flow<List<ChannelEntity>>
     @Query("SELECT * FROM channels WHERE name LIKE '%' || :q || '%' ORDER BY name LIMIT 100") fun searchAll(q: String): Flow<List<ChannelEntity>>
     @Query("SELECT * FROM channels WHERE playlistId = :playlistId AND name LIKE '%' || :q || '%' ORDER BY name") fun search(playlistId: Long, q: String): Flow<List<ChannelEntity>>
@@ -40,6 +41,7 @@ interface FavoriteDao {
 
 @Dao
 interface HistoryDao {
+    @Query("SELECT * FROM history ORDER BY id") suspend fun snapshot(): List<HistoryEntity>
     @Query("SELECT * FROM history ORDER BY watchedAt DESC LIMIT 50") fun recent(): Flow<List<HistoryEntity>>
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun add(h: HistoryEntity)
     @Query("DELETE FROM history") suspend fun clear()
