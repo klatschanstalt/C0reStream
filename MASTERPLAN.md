@@ -17,3 +17,7 @@ Open or not certified:
 - Optional features not implemented: casting, multiview, authorized recording, profiles, PIN and QR import.
 
 Binding decisions: minimum Android 11 (API 30); HTTP and HTTPS IPTV sources supported without mandatory opt-in, HTTPS preferred, no HTTPS-to-HTTP redirects; no ads, tracking or bundled streams.
+
+## Aktiver Auftrag (2026-11-27): Ultra-Light, Self-Updating & Feature Expansion
+
+Verbindlich, auf Basis der verifizierten v1.3.0: APK auf <5 MB optimieren; nicht ausführbare Ressourcen signiert, versioniert und offline-fähig nachladen; Selbstupdate für Ressourcen und APK mit Delta-Fallback; Speicherbereinigung ohne Nutzerdatenverlust; Casting, Multiview, autorisierte Aufnahmen, Profile, PIN und QR-Import unter Plattformgrenzen prüfen; Material-3-Design, Branding und Grafikaufbereitung; ausschließlich vorhandene `ANDROID_*` Secrets und `ANDROID_CERT_SHA256`; Apache-2.0-Lizenz und vollständige Lizenzhinweise. CI und Veröffentlichung bleiben während der Implementierung pausiert; nach gebündelter Verifikation wird die nächste signierte Version ohne Pre-Releases veröffentlicht. v1.3.0 bleibt bis dahin öffentlich verfügbar.
