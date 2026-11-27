@@ -4,7 +4,7 @@ Letzter vollständig verifizierter Gesamtstand, 2026-11-27.
 
 ## Verifikation
 
-CI-Lauf `45945401657` (Commit `bda9a97`) vollständig grün:
+CI-Lauf `45945401657` (Commit `bda9a97`) vollständig grün. Der reaktivierte Push-Lauf `45946882051` (Commit `f0d71aa`) ebenfalls vollständig grün; der Release-Job erkannte `v1.4.0` als vorhanden und veröffentlichte nichts erneut:
 
 - 63 Unit-Tests ohne Fehler; `:app:lintDebug` mit 0 Fehlern und 0 Warnungen.
 - 10 instrumentierte Tests je API 30 und API 36 ohne Fehler, inklusive Room-v5-Profile.
