@@ -2,5 +2,5 @@
     "latestVersion": "1.7.1",
     "notes": "C0reStream 1.7.1: modernisierte Toolchain und Abhängigkeiten, gehärtete CI/Signaturprüfung, behobene Ressourcen-, Update- und Aufnahmefehler.",
     "apkUrl": "https://github.com/klatschanstalt/C0reStream/releases/download/v1.7.1/C0reStream.apk",
-    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    "sha256": "82444a5e7367e4475035701c42a91264fa0c33ab6a0a2bbd9920e66e9f867f49"
 }
