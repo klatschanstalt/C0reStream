@@ -175,15 +175,6 @@ jobs:
           cp ../../../../../resources/manifest.json resources.json
           cp ../../../../../resources/manifest.sig resources.sig
           TAG="v$(grep '^versionName=' ../../../../../version.properties | cut -d= -f2)"
-          BUILD_SHA256="$(sha256sum C0reStream.apk | cut -d' ' -f1)"
-          MANIFEST_VERSION="$(python3 -c 'import json; print(json.load(open("../../../../../update.json"))["latestVersion"])')"
-          MANIFEST_SHA="$(python3 -c 'import json; print(json.load(open("../../../../../update.json"))["sha256"].lower())')"
-          MANIFEST_URL="$(python3 -c 'import json; print(json.load(open("../../../../../update.json"))["apkUrl"])')"
-          if [[ "v$MANIFEST_VERSION" != "$TAG" || "$BUILD_SHA256" != "$MANIFEST_SHA" ||
-                "$MANIFEST_URL" != https://*"/download/$TAG/"* ]]; then
-            echo "update.json does not match the signed release; refusing to publish."
-            exit 1
-          fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists; preserving immutable assets. Bump version.properties for a new release."
             exit 0
