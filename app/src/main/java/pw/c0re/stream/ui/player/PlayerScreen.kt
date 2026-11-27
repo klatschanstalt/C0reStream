@@ -8,30 +8,47 @@ import android.content.pm.PackageManager
 import android.graphics.Rect
 import android.os.Build
 import android.util.Rational
+import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Audiotrack
-import androidx.compose.material.icons.filled.FiberManualRecord
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.FiberManualRecord
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PictureInPictureAlt
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -49,11 +66,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -63,18 +84,23 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import pw.c0re.stream.R
 import pw.c0re.stream.data.NetworkPolicy
 import pw.c0re.stream.data.RecordingManager
+import pw.c0re.stream.data.player.PerformanceProfile
+import pw.c0re.stream.data.player.PlaybackSettings
+import pw.c0re.stream.data.player.VideoMode
 import java.util.Locale
 
 /**
  * Media3 player screen. Playback is owned by [PlayerHub]/PlaybackService, so leaving this
  * screen keeps background playback and the mini-player alive. Supports PiP, audio/subtitle/
- * quality selection, sleep timer, reconnection, resume and catch-up URLs.
+ * quality selection, sleep timer, reconnection, resume and catch-up URLs, plus immersive
+ * fullscreen, per-channel video scaling and compact service-side diagnostics.
  */
 @androidx.annotation.OptIn(UnstableApi::class)
 @Composable
@@ -89,13 +115,20 @@ fun PlayerScreen(
     var currentId by remember { mutableLongStateOf(channelId) }
     val channel by vm.channelFor(currentId).collectAsState(initial = null)
     val siblings by vm.siblingsOf(channel).collectAsState(initial = emptyList())
+    val preferenceKey = vm.preferenceKey(channel)
+    val prefs by vm.playbackPrefs.settingsFor(preferenceKey).collectAsState(initial = PlaybackSettings())
     val controller = PlayerHub.controller
     val hubError = PlayerHub.error
     val playing = PlayerHub.isPlaying
+    val diagnostics = PlayerHub.diagnostics
+    val videoSize = PlayerHub.videoSize
     val recording by RecordingManager.active.collectAsState()
 
     var showTracks by remember { mutableStateOf(false) }
     var showSleep by remember { mutableStateOf(false) }
+    var showPlaybackOptions by remember { mutableStateOf(false) }
+    var showDiagnostics by remember { mutableStateOf(false) }
+    var immersive by remember { mutableStateOf(true) }
     var sleepMinutes by remember { mutableIntStateOf(0) }
     var playbackError by remember { mutableStateOf<String?>(null) }
     var retryCount by remember { mutableIntStateOf(0) }
@@ -104,6 +137,7 @@ fun PlayerScreen(
     var loadedKey by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val liveLabel = stringResource(R.string.player_live)
+    val orientation = LocalConfiguration.current.orientation
 
     val effectiveUrl = channel?.url ?: pending?.url ?: PlayerHub.streamUrl
     val effectiveTitle = channel?.name ?: pending?.title ?: PlayerHub.title
@@ -128,6 +162,39 @@ fun PlayerScreen(
         return builder.build()
     }
 
+    // True edge-to-edge playback: bars hidden, transient bars swipeable, cutout respected by
+    // controls only. Restores the previous window state when leaving the player.
+    DisposableEffect(activity, immersive) {
+        val window = activity?.window
+        if (window != null) {
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            val bars = WindowCompat.getInsetsController(window, window.decorView)
+            bars.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            if (immersive) bars.hide(WindowInsetsCompat.Type.systemBars()) else bars.show(WindowInsetsCompat.Type.systemBars())
+            if (Build.VERSION.SDK_INT >= 33) {
+                window.attributes = window.attributes.apply {
+                    layoutInDisplayCutoutMode = if (immersive) {
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    } else {
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
+                    }
+                }
+            }
+        }
+        onDispose {
+            if (window != null) {
+                WindowCompat.getInsetsController(window, window.decorView)
+                    .show(WindowInsetsCompat.Type.systemBars())
+                WindowCompat.setDecorFitsSystemWindows(window, false)
+                if (Build.VERSION.SDK_INT >= 33) {
+                    window.attributes = window.attributes.apply {
+                        layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
+                    }
+                }
+            }
+        }
+    }
+
     DisposableEffect(Unit) {
         PlayerHub.connect(context)
         onDispose {
@@ -146,10 +213,10 @@ fun PlayerScreen(
         }
     }
 
-    LaunchedEffect(controller, playing, playerView) {
+    LaunchedEffect(controller, playing, playerView, orientation) {
         val pipActivity = activity
         if (pipSupported) {
-            pipActivity.setPictureInPictureParams(pipParams(playing))
+            pipActivity?.setPictureInPictureParams(pipParams(playing))
         }
     }
 
@@ -265,22 +332,55 @@ fun PlayerScreen(
         PlayerHub.channelId = next.id
     }
 
+    val mode = prefs.videoMode
+    val resizeMode = when (mode) {
+        VideoMode.FILL, VideoMode.ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+        VideoMode.STRETCH -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+        else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+    }
+
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        if (controller != null) {
-            AndroidView(
-                factory = { ctx ->
-                    PlayerView(ctx).apply {
-                        player = controller
-                        useController = true
-                        keepScreenOn = true
-                        setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-                        playerView = this
-                    }
-                },
-                update = { view -> view.player = controller },
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val containerRatio = if (maxHeight.value > 0f) maxWidth.value / maxHeight.value else 16f / 9f
+            val naturalRatio = if (videoSize.width > 0 && videoSize.height > 0) {
+                val par = if (videoSize.pixelWidthHeightRatio > 0f) videoSize.pixelWidthHeightRatio else 1f
+                videoSize.width * par / videoSize.height
+            } else {
+                containerRatio
+            }
+            val frameRatio = mode.forcedAspectRatio ?: when (mode) {
+                VideoMode.AUTO, VideoMode.ORIGINAL -> naturalRatio
+                else -> containerRatio
+            }
+            val frameModifier = if (mode.forcedAspectRatio != null) {
+                val width = minOf(maxWidth, maxHeight * frameRatio)
+                Modifier.size(width, width / frameRatio).align(Alignment.Center)
+            } else {
+                Modifier.fillMaxSize()
+            }
+
+            if (controller != null) {
+                AndroidView(
+                    factory = { ctx ->
+                        PlayerView(ctx).apply {
+                            player = controller
+                            useController = true
+                            keepScreenOn = true
+                            setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                            setResizeMode(resizeMode)
+                            playerView = this
+                        }
+                    },
+                    update = { view ->
+                        view.player = controller
+                        view.setResizeMode(resizeMode)
+                    },
+                    modifier = frameModifier.background(Color.Black),
+                )
+            }
+        }
+
+        if (controller == null) {
             Text(
                 stringResource(R.string.player_connecting),
                 color = Color.White,
@@ -306,6 +406,37 @@ fun PlayerScreen(
             }
         }
 
+        if (showDiagnostics) {
+            Column(
+                Modifier.align(Alignment.TopStart)
+                    .windowInsetsPadding(WindowInsets.systemBars)
+                    .padding(start = 64.dp, top = 4.dp)
+                    .background(Color.Black.copy(alpha = 0.62f))
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    stringResource(R.string.diagnostics_title),
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                DiagnosticLine(R.string.diagnostics_fps, String.format(Locale.ROOT, "%.1f", diagnostics.fps))
+                DiagnosticLine(R.string.diagnostics_bitrate, "${diagnostics.bitrateKbps} kbps")
+                DiagnosticLine(
+                    R.string.diagnostics_resolution,
+                    if (diagnostics.videoWidth > 0 && diagnostics.videoHeight > 0) {
+                        "${diagnostics.videoWidth}x${diagnostics.videoHeight}"
+                    } else {
+                        "—"
+                    },
+                )
+                DiagnosticLine(R.string.diagnostics_codec, diagnostics.codec.ifBlank { "—" })
+                DiagnosticLine(R.string.diagnostics_decoder, diagnostics.decoder.ifBlank { "—" })
+                DiagnosticLine(R.string.diagnostics_buffer, "${diagnostics.bufferMs} ms")
+                DiagnosticLine(R.string.diagnostics_dropped, diagnostics.droppedFrames.toString())
+                DiagnosticLine(R.string.diagnostics_audio, diagnostics.audioFormat.ifBlank { "—" })
+            }
+        }
+
         resumedPosition?.let { position ->
             Surface(
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 24.dp),
@@ -324,7 +455,12 @@ fun PlayerScreen(
             ) { Text(stringResource(R.string.player_recording, name), Modifier.padding(8.dp)) }
         }
 
-        IconButton(onClick = onBack, modifier = Modifier.padding(12.dp).align(Alignment.TopStart)) {
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier.padding(12.dp)
+                .windowInsetsPadding(WindowInsets.systemBars)
+                .align(Alignment.TopStart),
+        ) {
             Icon(
                 Icons.AutoMirrored.Filled.ArrowBack,
                 stringResource(R.string.action_back),
@@ -333,7 +469,30 @@ fun PlayerScreen(
         }
 
         Row(
-            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+            modifier = Modifier.align(Alignment.TopEnd)
+                .windowInsetsPadding(WindowInsets.systemBars)
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FilledTonalIconButton(onClick = { showPlaybackOptions = true }) {
+                Icon(Icons.Filled.Settings, stringResource(R.string.video_mode))
+            }
+            FilledTonalIconButton(onClick = { showDiagnostics = !showDiagnostics }) {
+                Icon(Icons.Filled.Info, stringResource(R.string.diagnostics_title))
+            }
+            FilledTonalIconButton(onClick = { immersive = !immersive }) {
+                Icon(
+                    if (immersive) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
+                    stringResource(R.string.player_fullscreen),
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.align(Alignment.BottomEnd)
+                .windowInsetsPadding(WindowInsets.systemBars)
+                .padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -391,6 +550,44 @@ fun PlayerScreen(
         }
     }
 
+    if (showPlaybackOptions) {
+        PlaybackOptionsDialog(
+            prefs = prefs,
+            onDismiss = { showPlaybackOptions = false },
+            onVideoMode = { value ->
+                scope.launch { vm.playbackPrefs.setVideoMode(value, preferenceKey) }
+            },
+            onHardwareDecoder = { value ->
+                scope.launch { vm.playbackPrefs.setHardwareDecoder(value) }
+            },
+            onDecoderFallback = { value ->
+                scope.launch { vm.playbackPrefs.setDecoderFallback(value) }
+            },
+            onAudioLanguage = { value ->
+                scope.launch { vm.playbackPrefs.setPreferredAudioLanguage(value, preferenceKey) }
+                controller?.let { active ->
+                    active.setTrackSelectionParameters(
+                        active.trackSelectionParameters.buildUpon()
+                            .setPreferredAudioLanguage(value.trim().lowercase(Locale.ROOT))
+                            .build(),
+                    )
+                }
+            },
+            onAudioOffset = { value ->
+                scope.launch { vm.playbackPrefs.setAudioOffsetMs(value) }
+            },
+            onPerformanceProfile = { value ->
+                scope.launch { vm.playbackPrefs.setPerformanceProfile(value) }
+            },
+            onReset = {
+                scope.launch {
+                    if (preferenceKey != null) vm.playbackPrefs.clearChannel(preferenceKey)
+                    else vm.playbackPrefs.setVideoMode(VideoMode.AUTO)
+                }
+            },
+        )
+    }
+
     if (showSleep) {
         AlertDialog(
             onDismissRequest = { showSleep = false },
@@ -417,6 +614,121 @@ fun PlayerScreen(
             },
         )
     }
+}
+
+@Composable
+private fun DiagnosticLine(labelRes: Int, value: String) {
+    // Labels are plain translations; the measured value is rendered next to the label.
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            stringResource(labelRes),
+            color = Color.White.copy(alpha = 0.72f),
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Text(
+            value,
+            color = Color.White,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(start = 6.dp),
+        )
+    }
+}
+
+@Composable
+private fun PlaybackOptionsDialog(
+    prefs: PlaybackSettings,
+    onDismiss: () -> Unit,
+    onVideoMode: (VideoMode) -> Unit,
+    onHardwareDecoder: (Boolean) -> Unit,
+    onDecoderFallback: (Boolean) -> Unit,
+    onAudioLanguage: (String) -> Unit,
+    onAudioOffset: (Long) -> Unit,
+    onPerformanceProfile: (PerformanceProfile) -> Unit,
+    onReset: () -> Unit,
+) {
+    var languageDraft by remember(prefs.preferredAudioLanguage) {
+        mutableStateOf(prefs.preferredAudioLanguage)
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.video_mode)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                VideoMode.entries.forEach { value ->
+                    val label = when (value) {
+                        VideoMode.AUTO -> R.string.video_mode_auto
+                        VideoMode.ORIGINAL -> R.string.video_mode_original
+                        VideoMode.FIT -> R.string.video_mode_fit
+                        VideoMode.FILL -> R.string.video_mode_fill
+                        VideoMode.ZOOM -> R.string.video_mode_zoom
+                        VideoMode.STRETCH -> R.string.video_mode_stretch
+                        VideoMode.RATIO_16_9 -> R.string.video_mode_16_9
+                        VideoMode.RATIO_4_3 -> R.string.video_mode_4_3
+                        VideoMode.RATIO_21_9 -> R.string.video_mode_21_9
+                    }
+                    TextButton(onClick = { onVideoMode(value) }) {
+                        Text(
+                            stringResource(label),
+                            color = if (value == prefs.videoMode) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                        )
+                    }
+                }
+                TextButton(onClick = onReset) { Text(stringResource(R.string.player_reset_video)) }
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = prefs.hardwareDecoder, onCheckedChange = onHardwareDecoder)
+                    Text(stringResource(R.string.player_hw_decoder))
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = prefs.decoderFallback, onCheckedChange = onDecoderFallback)
+                    Text(stringResource(R.string.player_decoder_fallback))
+                }
+                OutlinedTextField(
+                    value = languageDraft,
+                    onValueChange = { languageDraft = it },
+                    label = { Text(stringResource(R.string.player_audio_language)) },
+                    singleLine = true,
+                )
+                TextButton(onClick = { onAudioLanguage(languageDraft) }) {
+                    Text(stringResource(R.string.action_save))
+                }
+                Text(stringResource(R.string.player_audio_offset))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    FilledTonalIconButton(onClick = { onAudioOffset(prefs.audioOffsetMs - 100) }) {
+                        Icon(Icons.Filled.Remove, stringResource(R.string.player_audio_offset))
+                    }
+                    Text("${prefs.audioOffsetMs} ms")
+                    FilledTonalIconButton(onClick = { onAudioOffset(prefs.audioOffsetMs + 100) }) {
+                        Icon(Icons.Filled.Add, stringResource(R.string.player_audio_offset))
+                    }
+                }
+                Text(stringResource(R.string.player_performance_profile))
+                PerformanceProfile.entries.forEach { value ->
+                    val label = when (value) {
+                        PerformanceProfile.AUTO -> R.string.profile_auto
+                        PerformanceProfile.PERFORMANCE -> R.string.profile_performance
+                        PerformanceProfile.QUALITY -> R.string.profile_quality
+                        PerformanceProfile.LOW_LATENCY -> R.string.profile_low_latency
+                        PerformanceProfile.STABLE -> R.string.profile_stable
+                        PerformanceProfile.POWER_SAVE -> R.string.profile_power
+                    }
+                    TextButton(onClick = { onPerformanceProfile(value) }) {
+                        Text(
+                            stringResource(label),
+                            color = if (value == prefs.performanceProfile) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                Color.Unspecified
+                            },
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
+        },
+    )
 }
 
 @androidx.annotation.OptIn(UnstableApi::class)

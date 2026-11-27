@@ -2,16 +2,21 @@ package pw.c0re.stream.ui.player
 
 import android.content.ComponentName
 import android.content.Context
+import android.os.Bundle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
+import pw.c0re.stream.data.player.PlaybackDiagnostics
 import pw.c0re.stream.service.PlaybackService
 
 /**
@@ -38,17 +43,45 @@ object PlayerHub {
     var playlistId by mutableLongStateOf(0L)
     var pending by mutableStateOf<PendingPlayback?>(null)
 
+    /** Latest service-side telemetry, delivered through MediaSession extras (no URLs). */
+    var diagnostics by mutableStateOf(PlaybackDiagnostics())
+
+    /** Current item metadata, exposed for the diagnostics overlay and player UI. */
+    var mediaMetadata by mutableStateOf(MediaMetadata.EMPTY)
+
+    /** Current decoded video size, including pixel aspect ratio. */
+    var videoSize by mutableStateOf(VideoSize.UNKNOWN)
+
     private var future: ListenableFuture<MediaController>? = null
-    private var listener: Player.Listener? = null
+    private var playerListener: Player.Listener? = null
+    private var controllerListener: MediaController.Listener? = null
 
     @androidx.annotation.OptIn(UnstableApi::class)
     fun connect(context: Context) {
         if (controller != null || future != null) return
         val appContext = context.applicationContext
-        val pendingFuture = future ?: MediaController.Builder(
+        val controllerListenerImpl = object : MediaController.Listener {
+            override fun onExtrasChanged(controller: MediaController, extras: Bundle) {
+                if (this@PlayerHub.controller === controller) {
+                    diagnostics = PlaybackDiagnostics.fromBundle(extras)
+                }
+            }
+
+            override fun onDisconnected(controller: MediaController) {
+                if (this@PlayerHub.controller !== controller) return
+                detachPlayerListener()
+                this@PlayerHub.controller = null
+                isPlaying = false
+            }
+        }.also { controllerListener = it }
+
+        val pendingFuture = MediaController.Builder(
             appContext,
             SessionToken(appContext, ComponentName(appContext, PlaybackService::class.java)),
-        ).buildAsync().also { future = it }
+        )
+            .setListener(controllerListenerImpl)
+            .buildAsync()
+            .also { future = it }
         pendingFuture.addListener({
             if (pendingFuture.isCancelled || future !== pendingFuture) return@addListener
             runCatching { pendingFuture.get() }.onSuccess { mediaController ->
@@ -56,26 +89,52 @@ object PlayerHub {
                     runCatching { mediaController.release() }
                     return@onSuccess
                 }
-                listener = object : Player.Listener {
-                    override fun onIsPlayingChanged(playing: Boolean) {
-                        isPlaying = playing
-                    }
-
-                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                        PlayerHub.error = error.errorCodeName
-                    }
-
-                    override fun onPlaybackStateChanged(playbackState: Int) {
-                        if (playbackState == Player.STATE_READY) PlayerHub.error = null
-                    }
-                }.also(mediaController::addListener)
+                attachPlayerListener(mediaController)
+                diagnostics = PlaybackDiagnostics.fromBundle(mediaController.sessionExtras)
+                mediaMetadata = mediaController.mediaMetadata
+                videoSize = mediaController.videoSize
                 controller = mediaController
                 error = null
             }.onFailure {
                 future = null
+                controllerListener = null
                 error = "Playback service unavailable"
             }
         }, ContextCompat.getMainExecutor(appContext))
+    }
+
+    private fun attachPlayerListener(mediaController: MediaController) {
+        if (playerListener != null) return
+        val listener = object : Player.Listener {
+            override fun onIsPlayingChanged(playing: Boolean) {
+                isPlaying = playing
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                PlayerHub.error = error.errorCodeName
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY) PlayerHub.error = null
+            }
+
+            override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
+                this@PlayerHub.mediaMetadata = mediaMetadata
+            }
+
+            override fun onVideoSizeChanged(videoSize: VideoSize) {
+                this@PlayerHub.videoSize = videoSize
+            }
+        }
+        playerListener = listener
+        mediaController.addListener(listener)
+    }
+
+    private fun detachPlayerListener() {
+        val active = controller
+        val listener = playerListener
+        if (active != null && listener != null) runCatching { active.removeListener(listener) }
+        playerListener = null
     }
 
     fun prepare(url: String, title: String?, mediaKey: String?, kind: String, playlistId: Long) {
@@ -104,12 +163,12 @@ object PlayerHub {
 
     fun close() {
         val current = controller
+        detachPlayerListener()
         current?.let { mediaController ->
-            listener?.let(mediaController::removeListener)
             runCatching { mediaController.stop() }
             runCatching { mediaController.release() }
         }
-        listener = null
+        controllerListener = null
         controller = null
         future?.cancel(false)
         future = null
@@ -122,5 +181,8 @@ object PlayerHub {
         kind = "live"
         playlistId = 0L
         pending = null
+        diagnostics = PlaybackDiagnostics()
+        mediaMetadata = MediaMetadata.EMPTY
+        videoSize = VideoSize.UNKNOWN
     }
 }

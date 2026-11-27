@@ -8,12 +8,23 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import pw.c0re.stream.C0reStreamApp
+import pw.c0re.stream.data.ChannelKey
 import pw.c0re.stream.data.db.ChannelEntity
 import pw.c0re.stream.data.db.HistoryEntity
 import pw.c0re.stream.data.db.ProgressEntity
+import pw.c0re.stream.data.player.PlaybackPreferences
 
 class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     private val db = (app as C0reStreamApp).database
+
+    /** Playback settings store; video mode is scoped per channel, decoder/buffering globally. */
+    val playbackPrefs = PlaybackPreferences(app)
+
+    /** Stable, URL-free key for per-channel playback overrides. */
+    fun preferenceKey(channel: ChannelEntity?): String? = channel?.let {
+        val stable = ChannelKey.stableKey(it.url, it.tvgId)
+        PlaybackPreferences.channelKey("live", it.id) + "_" + stable.take(24)
+    }
 
     fun channelFor(id: Long): Flow<ChannelEntity?> = flow {
         emit(if (id <= 0) null else db.channelDao().byId(id))
