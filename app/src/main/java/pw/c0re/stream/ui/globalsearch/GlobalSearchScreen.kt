@@ -52,6 +52,7 @@ fun GlobalSearchScreen(onPlay: (Long) -> Unit, vm: GlobalSearchViewModel = viewM
     val query by vm.query.collectAsState()
     val results = vm.results.collectAsLazyPagingItems()
     val playlistNames by vm.playlistNames.collectAsState()
+    val totalCount by vm.totalCount.collectAsState()
     val horizontalPadding = rememberResponsivePadding()
 
     BrandBackdrop(Modifier.fillMaxSize()) {
@@ -60,7 +61,7 @@ fun GlobalSearchScreen(onPlay: (Long) -> Unit, vm: GlobalSearchViewModel = viewM
         ) {
             BrandTopBar(
                 title = stringResource(R.string.search_title),
-                actions = { BrandBadge(results.itemCount.toString()) },
+                actions = { BrandBadge(totalCount.toString()) },
             )
             OutlinedTextField(
                 value = query,

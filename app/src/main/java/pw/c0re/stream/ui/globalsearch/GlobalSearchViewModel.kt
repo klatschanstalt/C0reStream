@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -54,6 +55,15 @@ class GlobalSearchViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         .cachedIn(viewModelScope)
+
+    /** True total independently of the bounded paging window. */
+    val totalCount: StateFlow<Int> = queryFlow
+        .map { it.trim() }
+        .distinctUntilChanged()
+        .flatMapLatest { q ->
+            flow { emit(if (q.length < 2) 0 else channelDao.countSearchAll(q)) }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     fun setQuery(q: String) { queryFlow.value = q }
 }

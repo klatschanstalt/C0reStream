@@ -68,6 +68,8 @@ class PlaybackService : MediaSessionService() {
     private var videoHeight = 0
     private var pixelWidthHeightRatio = 1f
     private var videoDecoder = ""
+    private var colorInfoText = ""
+    private var videoSizeInfoText = ""
     private var bitrateEstimate = 0L
     private var droppedFrames = 0L
     private var framesInWindow = 0
@@ -100,6 +102,8 @@ class PlaybackService : MediaSessionService() {
                     bufferMs = activePlayer.totalBufferedDuration,
                     droppedFrames = droppedFrames,
                     audioFormat = describeAudio(lastAudioFormat),
+                    colorInfo = colorInfoText,
+                    videoSizeInfo = videoSizeInfoText,
                 )
                 currentDiagnostics = snapshot
                 session.setSessionExtras(snapshot.toBundle())
@@ -116,6 +120,9 @@ class PlaybackService : MediaSessionService() {
             decoderReuseEvaluation: androidx.media3.exoplayer.DecoderReuseEvaluation?,
         ) {
             lastVideoFormat = format
+            val info = format.colorInfo
+            colorInfoText = if (info == null) "" else
+                "CS ${info.colorSpace} TR ${info.colorTransfer} RANGE ${info.colorRange}"
         }
 
         override fun onAudioInputFormatChanged(
@@ -130,6 +137,10 @@ class PlaybackService : MediaSessionService() {
             videoWidth = videoSize.width
             videoHeight = videoSize.height
             pixelWidthHeightRatio = if (videoSize.pixelWidthHeightRatio > 0f) videoSize.pixelWidthHeightRatio else 1f
+            val dar = if (videoHeight > 0 && pixelWidthHeightRatio > 0f) {
+                videoWidth * pixelWidthHeightRatio / videoHeight.toFloat()
+            } else 0f
+            videoSizeInfoText = if (dar > 0f) String.format(java.util.Locale.ROOT, "DAR %.2f:1", dar) else ""
         }
 
         override fun onVideoDecoderInitialized(

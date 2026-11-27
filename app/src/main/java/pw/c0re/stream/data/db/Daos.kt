@@ -36,6 +36,10 @@ interface ChannelDao {
     fun byGroup(playlistId: Long, group: String): Flow<List<ChannelEntity>>
     @Query("SELECT DISTINCT `group` FROM channels WHERE playlistId = :playlistId AND `group` IS NOT NULL ORDER BY `group`")
     fun groups(playlistId: Long): Flow<List<String>>
+    @Query("SELECT COUNT(*) FROM channels WHERE playlistId = :playlistId AND (:group IS NULL OR `group` = :group) AND (:query IS NULL OR name LIKE '%' || :query || '%')")
+    suspend fun countChannels(playlistId: Long, group: String?, query: String?): Int
+    @Query("SELECT COUNT(*) FROM channels WHERE name LIKE '%' || :query || '%'")
+    suspend fun countSearchAll(query: String): Int
     @Query("SELECT * FROM channels WHERE playlistId = :playlistId ORDER BY orderIndex, id")
     suspend fun snapshot(playlistId: Long): List<ChannelEntity>
     @Query("SELECT * FROM channels WHERE id = :id") suspend fun byId(id: Long): ChannelEntity?

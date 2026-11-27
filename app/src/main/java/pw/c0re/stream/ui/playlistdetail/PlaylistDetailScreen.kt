@@ -95,6 +95,7 @@ fun PlaylistDetailScreen(
     LaunchedEffect(playlistId) { vm.init(playlistId) }
     val channels = vm.channels.collectAsLazyPagingItems()
     val groups by vm.groups.collectAsState(initial = emptyList())
+    val totalCount by vm.totalCount.collectAsState()
     val query by vm.query.collectAsState()
     val group by vm.selectedGroup.collectAsState()
     var guideChannel by remember { mutableStateOf<ChannelEntity?>(null) }
@@ -107,7 +108,7 @@ fun PlaylistDetailScreen(
             BrandTopBar(
                 title = stringResource(R.string.nav_live),
                 actions = {
-                    BrandBadge(channels.itemCount.toString())
+                    BrandBadge(totalCount.toString())
                     BrandSecondaryButton(
                         stringResource(R.string.detail_movies_series),
                         onClick = { onOpenVod(playlistId) },

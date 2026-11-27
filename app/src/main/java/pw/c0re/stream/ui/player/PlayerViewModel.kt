@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 import pw.c0re.stream.C0reStreamApp
 import pw.c0re.stream.data.ChannelKey
 import pw.c0re.stream.data.db.ChannelEntity
+import pw.c0re.stream.data.db.PlaylistEntity
 import pw.c0re.stream.data.db.HistoryEntity
 import pw.c0re.stream.data.db.ProgressEntity
 import pw.c0re.stream.data.player.PlaybackPreferences
@@ -47,6 +48,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             ),
         )
     }
+
+    /** Source-specific network settings for playback/recording of the current playlist. */
+    suspend fun sourceFor(playlistId: Long): PlaylistEntity? =
+        if (playlistId <= 0L) null else db.playlistDao().byId(playlistId)
 
     suspend fun progressFor(mediaKey: String): ProgressEntity? =
         if (mediaKey.isBlank()) null else db.progressDao().byKey(mediaKey)

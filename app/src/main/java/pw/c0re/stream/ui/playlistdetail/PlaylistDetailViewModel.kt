@@ -57,6 +57,14 @@ class PlaylistDetailViewModel(app: Application) : AndroidViewModel(app) {
             }
             .cachedIn(viewModelScope)
 
+    /** True total for the current filter; paging itemCount is bounded by maxSize. */
+    val totalCount: StateFlow<Int> =
+        combine(playlistIdFlow, queryFlow, groupFlow) { id, q, g -> Triple(id, q, g) }
+            .flatMapLatest { (id, q, g) ->
+                flow { emit(channelDao.countChannels(id, g, q.trim().takeIf { it.isNotEmpty() })) }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
     fun init(id: Long) {
         playlistIdFlow.value = id
     }

@@ -707,10 +707,19 @@ fun PlayerScreen(
                                 if (recording != null) {
                                     RecordingManager.stop()
                                 } else {
-                                    effectiveUrl?.let {
-                                        RecordingManager.start(
-                                            context, it, effectiveTitle, null,
-                                        )
+                                    effectiveUrl?.let { url ->
+                                        scope.launch {
+                                            val source = vm.sourceFor(effectivePlaylistId)
+                                            RecordingManager.start(
+                                                context,
+                                                url,
+                                                effectiveTitle,
+                                                source?.userAgent,
+                                                source?.useProxy ?: false,
+                                                source?.proxyHost,
+                                                source?.proxyPort,
+                                            )
+                                        }
                                     }
                                 }
                             },
