@@ -20,9 +20,9 @@ Open or not certified:
 
 Binding decisions: minimum Android 11 (API 30); HTTP and HTTPS IPTV sources supported without mandatory opt-in, HTTPS preferred, no HTTPS-to-HTTP redirects; no ads, tracking or bundled streams.
 
-## Aktiver Auftrag (2026-11-27): Erweiterte Streaming-Engine und Multimedia
+## Abgeschlossener Auftrag (2026-11-27): Erweiterte Streaming-Engine und Multimedia
 
-Auf Basis von v1.6.0: dauerhafte Aufhebung der APK-Größenschranke; RTSP/RTP/UDP-Multicast und Media3-Decoder-Erweiterungen prüfen und integrieren; Audio-/Video-Codec- und Container-Kompatibilität erweitern; Casting, Multiview, Timeshift und Stalker-Portale unter klaren Sicherheits- und Plattformgrenzen bewerten; Langzeit-, Performance- und Geräteverifikation nach Möglichkeit schließen; neue signierte Produktionsversion nach vollständiger CI-Verifikation. Bestehendes Design, Daten, Sicherheit und Update-Kompatibilität bleiben erhalten.
+APK-Größenschranke dauerhaft aufgehoben. RTSP/RTP-Unicast, rtspu→RTSP/TCP sowie RTSP/UDP-Validierung in Parser, Datenbank, Player und Backup integriert; FFmpeg-Extension-Modus und erweiterte codecfreie Diagnostik ergänzt. 99-Sekunden-Langzeitstream lokal verifiziert. Veröffentlicht als v1.7.0 nach CI-Lauf `46049714666`. Nicht realisiert: rohes UDP/Multicast-Playback, Casting, Multiview, Timeshift, Stalker-Portale und FFmpeg-AAR (fehlende vertrauenswürdige Distribution bzw. Receiver-ID/Zertifizierung bzw. autorisierte Testzugänge).
 
 ## Abgeschlossener Auftrag (2026-11-27): Streaming, Codecs, Performance, Sicherheit, Release
 
