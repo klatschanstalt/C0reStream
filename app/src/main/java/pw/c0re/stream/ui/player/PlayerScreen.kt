@@ -143,8 +143,9 @@ fun PlayerScreen(
     }
 
     LaunchedEffect(controller, playing, playerView) {
+        val pipActivity = activity
         if (pipSupported) {
-            activity?.setPictureInPictureParams(pipParams(playing))
+            pipActivity.setPictureInPictureParams(pipParams(playing))
         }
     }
 
@@ -360,8 +361,10 @@ fun PlayerScreen(
         }
     }
 
-    if (showTracks && controller != null) {
-        TrackDialog(controller = controller!!, onDismiss = { showTracks = false })
+    controller?.let { activeController ->
+        if (showTracks) {
+            TrackDialog(controller = activeController, onDismiss = { showTracks = false })
+        }
     }
 
     if (showSleep) {
