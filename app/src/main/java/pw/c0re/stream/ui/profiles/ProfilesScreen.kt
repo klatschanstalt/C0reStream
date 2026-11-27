@@ -2,21 +2,21 @@ package pw.c0re.stream.ui.profiles
 
 import android.app.Application
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -24,10 +24,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -35,14 +35,18 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.launch
 import pw.c0re.stream.C0reStreamApp
 import pw.c0re.stream.R
-import pw.c0re.stream.data.profiles.PinManager
 import pw.c0re.stream.data.profiles.PinVerification
 import pw.c0re.stream.data.profiles.ProfileEntity
 import pw.c0re.stream.data.profiles.ProfileSessionRepository
 import pw.c0re.stream.data.profiles.ProfileUiModel
+import pw.c0re.stream.ui.components.BrandBackdrop
+import pw.c0re.stream.ui.components.BrandBadge
+import pw.c0re.stream.ui.components.BrandCard
+import pw.c0re.stream.ui.components.BrandPrimaryButton
+import pw.c0re.stream.ui.components.BrandSecondaryButton
+import pw.c0re.stream.ui.components.BrandTopBar
 
 class ProfilesViewModel(app: Application) : AndroidViewModel(app) {
     private val dao = (app as C0reStreamApp).database.profileDao()
@@ -92,38 +96,90 @@ fun ProfilesScreen(onDone: () -> Unit, vm: ProfilesViewModel = viewModel()) {
     var error by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(stringResource(R.string.profiles_title), style = MaterialTheme.typography.headlineMedium)
-        LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(profiles.map { ProfileUiModel.from(it) }, key = { it.id }) { profile ->
-                Card(shape = RoundedCornerShape(16.dp)) {
-                    Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                        Text(profile.name, style = MaterialTheme.typography.titleMedium)
-                        if (profile.id == activeId) {
-                            Text(stringResource(R.string.profiles_active), style = MaterialTheme.typography.bodySmall)
-                        }
-                        if (profile.hasPin) {
-                            Text("PIN", style = MaterialTheme.typography.bodySmall)
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            TextButton(onClick = { pinTarget = profile }) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val horizontalPadding = if (maxWidth < 600.dp) 16.dp else 24.dp
+        BrandBackdrop(modifier = Modifier.fillMaxSize()) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = horizontalPadding, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                // The top bar back action is the former "Close" button callback.
+                BrandTopBar(
+                    title = stringResource(R.string.profiles_title),
+                    onBack = onDone,
+                    actions = {},
+                )
+
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 260.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 8.dp),
+                ) {
+                    items(profiles.map { ProfileUiModel.from(it) }, key = { it.id }) { profile ->
+                        BrandCard(modifier = Modifier.fillMaxWidth(), onClick = null) {
+                            Column(
+                                Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
                                 Text(
-                                    stringResource(
-                                        if (profile.hasPin) R.string.profiles_pin_remove else R.string.profiles_pin_set,
-                                    ),
+                                    profile.name,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
-                            }
-                            TextButton(onClick = { switchTarget = profile }) {
-                                Text(stringResource(R.string.profiles_switch))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    if (profile.id == activeId) {
+                                        BrandBadge(text = stringResource(R.string.profiles_active))
+                                    }
+                                    if (profile.hasPin) {
+                                        BrandBadge(text = "PIN")
+                                    }
+                                }
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    BrandSecondaryButton(
+                                        text = stringResource(
+                                            if (profile.hasPin) R.string.profiles_pin_remove else R.string.profiles_pin_set,
+                                        ),
+                                        onClick = { pinTarget = profile },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .heightIn(min = 48.dp),
+                                    )
+                                    BrandSecondaryButton(
+                                        text = stringResource(R.string.profiles_switch),
+                                        onClick = { switchTarget = profile },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .heightIn(min = 48.dp),
+                                    )
+                                }
                             }
                         }
                     }
                 }
+
+                if (error) {
+                    BrandCard(modifier = Modifier.fillMaxWidth(), onClick = null) {
+                        Text(
+                            stringResource(R.string.profiles_pin_wrong),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+                BrandPrimaryButton(
+                    text = stringResource(R.string.profiles_add),
+                    onClick = { addDialog = true },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
-        if (error) Text(stringResource(R.string.profiles_pin_wrong), color = MaterialTheme.colorScheme.error)
-        Button(onClick = { addDialog = true }) { Text(stringResource(R.string.profiles_add)) }
-        TextButton(onClick = onDone) { Text(stringResource(R.string.action_close)) }
     }
 
     if (addDialog) {
@@ -136,17 +192,26 @@ fun ProfilesScreen(onDone: () -> Unit, vm: ProfilesViewModel = viewModel()) {
                     value = name,
                     onValueChange = { name = it.take(64) },
                     label = { Text(stringResource(R.string.profiles_name)) },
+                    modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    vm.add(name)
-                    addDialog = false
-                }) { Text(stringResource(R.string.action_confirm)) }
+                BrandPrimaryButton(
+                    text = stringResource(R.string.action_confirm),
+                    onClick = {
+                        vm.add(name)
+                        addDialog = false
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp),
+                )
             },
             dismissButton = {
-                TextButton(onClick = { addDialog = false }) { Text(stringResource(R.string.action_cancel)) }
+                BrandSecondaryButton(
+                    text = stringResource(R.string.action_cancel),
+                    onClick = { addDialog = false },
+                    modifier = Modifier.heightIn(min = 48.dp),
+                )
             },
         )
     }
@@ -155,25 +220,36 @@ fun ProfilesScreen(onDone: () -> Unit, vm: ProfilesViewModel = viewModel()) {
         var pin by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { pinTarget = null },
-            title = { Text(stringResource(if (profile.hasPin) R.string.profiles_pin_remove else R.string.profiles_pin_set)) },
+            title = {
+                Text(stringResource(if (profile.hasPin) R.string.profiles_pin_remove else R.string.profiles_pin_set))
+            },
             text = {
                 OutlinedTextField(
                     value = pin,
                     onValueChange = { pin = it.filter(Char::isDigit).take(64) },
                     label = { Text(stringResource(R.string.profiles_pin_prompt)) },
                     visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    vm.setPin(profile.id, if (pin.length in 4..64) pin else "")
-                    pin = ""
-                    pinTarget = null
-                }) { Text(stringResource(R.string.action_confirm)) }
+                BrandPrimaryButton(
+                    text = stringResource(R.string.action_confirm),
+                    onClick = {
+                        vm.setPin(profile.id, if (pin.length in 4..64) pin else "")
+                        pin = ""
+                        pinTarget = null
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp),
+                )
             },
             dismissButton = {
-                TextButton(onClick = { pinTarget = null }) { Text(stringResource(R.string.action_cancel)) }
+                BrandSecondaryButton(
+                    text = stringResource(R.string.action_cancel),
+                    onClick = { pinTarget = null },
+                    modifier = Modifier.heightIn(min = 48.dp),
+                )
             },
         )
     }
@@ -189,19 +265,28 @@ fun ProfilesScreen(onDone: () -> Unit, vm: ProfilesViewModel = viewModel()) {
                     onValueChange = { pin = it.filter(Char::isDigit).take(64) },
                     label = { Text(stringResource(R.string.profiles_pin_prompt)) },
                     visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    val value = pin
-                    pin = ""
-                    switchTarget = null
-                    scope.launch { error = !vm.unlock(profile.id, value) }
-                }) { Text(stringResource(R.string.action_confirm)) }
+                BrandPrimaryButton(
+                    text = stringResource(R.string.action_confirm),
+                    onClick = {
+                        val value = pin
+                        pin = ""
+                        switchTarget = null
+                        scope.launch { error = !vm.unlock(profile.id, value) }
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp),
+                )
             },
             dismissButton = {
-                TextButton(onClick = { switchTarget = null }) { Text(stringResource(R.string.action_cancel)) }
+                BrandSecondaryButton(
+                    text = stringResource(R.string.action_cancel),
+                    onClick = { switchTarget = null },
+                    modifier = Modifier.heightIn(min = 48.dp),
+                )
             },
         )
     }

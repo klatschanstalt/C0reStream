@@ -5,11 +5,14 @@ import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.Rect
 import android.os.Build
 import android.util.Rational
 import android.view.WindowManager
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitPointerEventScope
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -19,12 +22,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -42,7 +49,6 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -66,10 +72,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.awaitPointerEvent
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
@@ -94,6 +105,12 @@ import pw.c0re.stream.data.RecordingManager
 import pw.c0re.stream.data.player.PerformanceProfile
 import pw.c0re.stream.data.player.PlaybackSettings
 import pw.c0re.stream.data.player.VideoMode
+import pw.c0re.stream.ui.components.BrandBackdrop
+import pw.c0re.stream.ui.components.BrandBadge
+import pw.c0re.stream.ui.components.BrandCard
+import pw.c0re.stream.ui.components.BrandPrimaryButton
+import pw.c0re.stream.ui.components.BrandSecondaryButton
+import pw.c0re.stream.ui.components.BrandTopBar
 import java.util.Locale
 
 /**
@@ -138,6 +155,23 @@ fun PlayerScreen(
     val scope = rememberCoroutineScope()
     val liveLabel = stringResource(R.string.player_live)
     val orientation = LocalConfiguration.current.orientation
+
+    // Compact chrome auto-hides during playback. No animation is used: the state change is an
+    // immediate composition change, which is also the correct behaviour under reduced motion.
+    var controlsVisible by remember { mutableStateOf(true) }
+    var controlsToken by remember { mutableIntStateOf(0) }
+
+    fun showControls() {
+        controlsVisible = true
+        controlsToken++
+    }
+
+    LaunchedEffect(playing) { showControls() }
+    LaunchedEffect(controlsVisible, controlsToken, playing) {
+        if (!controlsVisible || !playing) return@LaunchedEffect
+        delay(4_000)
+        controlsVisible = false
+    }
 
     val effectiveUrl = channel?.url ?: pending?.url ?: PlayerHub.streamUrl
     val effectiveTitle = channel?.name ?: pending?.title ?: PlayerHub.title
@@ -380,169 +414,303 @@ fun PlayerScreen(
             }
         }
 
-        if (controller == null) {
-            Text(
-                stringResource(R.string.player_connecting),
-                color = Color.White,
-                modifier = Modifier.align(Alignment.Center),
+        val error = playbackError ?: hubError
+
+        // Transparent tap-to-reveal layer sits above the Surface only while chrome is hidden.
+        if (!controlsVisible && error == null && controller != null) {
+            Box(
+                Modifier.fillMaxSize().pointerInput(Unit) {
+                    detectTapGestures(onTap = { showControls() })
+                },
             )
         }
 
-        val error = playbackError ?: hubError
-        if (error != null) {
-            Column(
-                Modifier.align(Alignment.Center)
-                    .background(Color.Black.copy(alpha = 0.85f))
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(stringResource(R.string.player_failed, error), color = Color.White)
-                TextButton(onClick = {
-                    playbackError = null
-                    retryCount = 0
-                    controller?.prepare()
-                    controller?.play()
-                }) { Text(stringResource(R.string.action_retry)) }
+        if (controller == null) {
+            BrandBackdrop(modifier = Modifier.fillMaxSize()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    BrandCard(modifier = Modifier.widthIn(max = 280.dp)) {
+                        Text(
+                            stringResource(R.string.player_connecting),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
         }
 
-        if (showDiagnostics) {
-            Column(
-                Modifier.align(Alignment.TopStart)
-                    .windowInsetsPadding(WindowInsets.systemBars)
-                    .padding(start = 64.dp, top = 4.dp)
-                    .background(Color.Black.copy(alpha = 0.62f))
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
+        if (error != null) {
+            BrandCard(
+                modifier = Modifier.align(Alignment.Center)
+                    .widthIn(max = 320.dp)
+                    .padding(16.dp),
             ) {
                 Text(
-                    stringResource(R.string.diagnostics_title),
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleSmall,
+                    stringResource(R.string.player_failed, error),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                DiagnosticLine(R.string.diagnostics_fps, String.format(Locale.ROOT, "%.1f", diagnostics.fps))
-                DiagnosticLine(R.string.diagnostics_bitrate, "${diagnostics.bitrateKbps} kbps")
-                DiagnosticLine(
-                    R.string.diagnostics_resolution,
-                    if (diagnostics.videoWidth > 0 && diagnostics.videoHeight > 0) {
-                        "${diagnostics.videoWidth}x${diagnostics.videoHeight}"
-                    } else {
-                        "—"
+                Spacer(Modifier.height(12.dp))
+                BrandPrimaryButton(
+                    text = stringResource(R.string.action_retry),
+                    onClick = {
+                        playbackError = null
+                        retryCount = 0
+                        controller?.prepare()
+                        controller?.play()
                     },
                 )
-                DiagnosticLine(R.string.diagnostics_codec, diagnostics.codec.ifBlank { "—" })
-                DiagnosticLine(R.string.diagnostics_decoder, diagnostics.decoder.ifBlank { "—" })
-                DiagnosticLine(R.string.diagnostics_buffer, "${diagnostics.bufferMs} ms")
-                DiagnosticLine(R.string.diagnostics_dropped, diagnostics.droppedFrames.toString())
-                DiagnosticLine(R.string.diagnostics_audio, diagnostics.audioFormat.ifBlank { "—" })
+            }
+        }
+
+        val overlayInsets = Modifier
+            .windowInsetsPadding(WindowInsets.systemBars)
+            .windowInsetsPadding(WindowInsets.displayCutout)
+
+        Column(
+            modifier = overlayInsets
+                .align(Alignment.TopStart)
+                .padding(start = 16.dp, top = 76.dp)
+                .widthIn(max = 280.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (showDiagnostics) {
+                BrandCard(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        stringResource(R.string.diagnostics_title),
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    DiagnosticLine(R.string.diagnostics_fps, String.format(Locale.ROOT, "%.1f", diagnostics.fps))
+                    DiagnosticLine(R.string.diagnostics_bitrate, "${diagnostics.bitrateKbps} kbps")
+                    DiagnosticLine(
+                        R.string.diagnostics_resolution,
+                        if (diagnostics.videoWidth > 0 && diagnostics.videoHeight > 0) {
+                            "${diagnostics.videoWidth}x${diagnostics.videoHeight}"
+                        } else {
+                            "—"
+                        },
+                    )
+                    DiagnosticLine(R.string.diagnostics_codec, diagnostics.codec.ifBlank { "—" })
+                    DiagnosticLine(R.string.diagnostics_decoder, diagnostics.decoder.ifBlank { "—" })
+                    DiagnosticLine(R.string.diagnostics_buffer, "${diagnostics.bufferMs} ms")
+                    DiagnosticLine(R.string.diagnostics_dropped, diagnostics.droppedFrames.toString())
+                    DiagnosticLine(R.string.diagnostics_audio, diagnostics.audioFormat.ifBlank { "—" })
+                }
+            }
+
+            recording?.let { name ->
+                BrandCard(modifier = Modifier.fillMaxWidth()) {
+                    BrandBadge(text = stringResource(R.string.player_record))
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        stringResource(R.string.player_recording, name),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
 
         resumedPosition?.let { position ->
-            Surface(
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 24.dp),
-                tonalElevation = 4.dp,
+            BrandCard(
+                modifier = overlayInsets
+                    .align(Alignment.TopCenter)
+                    .padding(top = 76.dp)
+                    .widthIn(max = 280.dp),
             ) {
                 Text(
                     stringResource(R.string.player_resumed, formatTime(position)),
-                    Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-            }
-        }
-        recording?.let { name ->
-            Surface(
-                modifier = Modifier.align(Alignment.TopStart).padding(top = 72.dp, start = 16.dp),
-                tonalElevation = 4.dp,
-            ) { Text(stringResource(R.string.player_recording, name), Modifier.padding(8.dp)) }
-        }
-
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier.padding(12.dp)
-                .windowInsetsPadding(WindowInsets.systemBars)
-                .align(Alignment.TopStart),
-        ) {
-            Icon(
-                Icons.AutoMirrored.Filled.ArrowBack,
-                stringResource(R.string.action_back),
-                tint = Color.White,
-            )
-        }
-
-        Row(
-            modifier = Modifier.align(Alignment.TopEnd)
-                .windowInsetsPadding(WindowInsets.systemBars)
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            FilledTonalIconButton(onClick = { showPlaybackOptions = true }) {
-                Icon(Icons.Filled.Settings, stringResource(R.string.video_mode))
-            }
-            FilledTonalIconButton(onClick = { showDiagnostics = !showDiagnostics }) {
-                Icon(Icons.Filled.Info, stringResource(R.string.diagnostics_title))
-            }
-            FilledTonalIconButton(onClick = { immersive = !immersive }) {
-                Icon(
-                    if (immersive) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
-                    stringResource(R.string.player_fullscreen),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
 
-        Row(
-            modifier = Modifier.align(Alignment.BottomEnd)
-                .windowInsetsPadding(WindowInsets.systemBars)
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (siblings.isNotEmpty()) {
-                FilledTonalIconButton(onClick = { zap(-1) }) {
-                    Icon(
-                        Icons.Filled.SkipPrevious,
-                        stringResource(R.string.action_previous_channel),
-                        tint = Color.White,
-                    )
-                }
-                FilledTonalIconButton(onClick = { zap(1) }) {
-                    Icon(
-                        Icons.Filled.SkipNext,
-                        stringResource(R.string.action_next_channel),
-                        tint = Color.White,
-                    )
-                }
-            }
-            FilledTonalIconButton(onClick = { showTracks = true }, enabled = controller != null) {
-                Icon(Icons.Filled.Audiotrack, stringResource(R.string.player_tracks), tint = Color.White)
-            }
-            FilledTonalIconButton(onClick = { showSleep = true }) {
-                Icon(Icons.Filled.Bedtime, stringResource(R.string.player_sleep_timer), tint = Color.White)
-            }
-            FilledTonalIconButton(enabled = effectiveUrl != null, onClick = {
-                if (recording != null) {
-                    RecordingManager.stop()
-                } else {
-                    effectiveUrl?.let { RecordingManager.start(context, it, effectiveTitle) }
-                }
-            }) {
-                Icon(
-                    if (recording != null) Icons.Filled.Stop else Icons.Filled.FiberManualRecord,
-                    stringResource(R.string.player_record),
-                    tint = Color.White,
-                )
-            }
-            FilledTonalIconButton(
-                enabled = pipSupported && controller != null,
-                onClick = { runCatching { activity?.enterPictureInPictureMode(pipParams(false)) } },
+        if (controlsVisible) {
+            val chromeColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f)
+            val chromeShape = RoundedCornerShape(16.dp)
+            val iconColor = MaterialTheme.colorScheme.onSurface
+
+            Row(
+                modifier = overlayInsets
+                    .align(Alignment.TopStart)
+                    .padding(12.dp)
+                    .revealControls { showControls() },
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    Icons.Filled.PictureInPictureAlt,
-                    stringResource(R.string.action_pip),
-                    tint = Color.White,
-                )
+                Surface(color = chromeColor, shape = chromeShape, tonalElevation = 2.dp) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                stringResource(R.string.action_back),
+                                tint = iconColor,
+                            )
+                        }
+                        if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                            if (effectiveTitle != null) {
+                                Text(
+                                    effectiveTitle.orEmpty(),
+                                    modifier = Modifier.widthIn(max = 160.dp).padding(end = 4.dp),
+                                    color = iconColor,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            if (effectiveKind == "live") {
+                                BrandBadge(text = liveLabel)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Row(
+                modifier = overlayInsets
+                    .align(Alignment.TopEnd)
+                    .padding(12.dp)
+                    .revealControls { showControls() },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(color = chromeColor, shape = chromeShape, tonalElevation = 2.dp) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        IconButton(
+                            onClick = { showPlaybackOptions = true },
+                            modifier = Modifier.size(48.dp),
+                        ) {
+                            Icon(
+                                Icons.Filled.Settings,
+                                stringResource(R.string.video_mode),
+                                tint = iconColor,
+                            )
+                        }
+                        IconButton(
+                            onClick = { showDiagnostics = !showDiagnostics },
+                            modifier = Modifier.size(48.dp),
+                        ) {
+                            Icon(
+                                Icons.Filled.Info,
+                                stringResource(R.string.diagnostics_title),
+                                tint = iconColor,
+                            )
+                        }
+                        IconButton(
+                            onClick = { immersive = !immersive },
+                            modifier = Modifier.size(48.dp),
+                        ) {
+                            Icon(
+                                if (immersive) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
+                                stringResource(R.string.player_fullscreen),
+                                tint = iconColor,
+                            )
+                        }
+                    }
+                }
+            }
+
+            Row(
+                modifier = overlayInsets
+                    .align(Alignment.BottomEnd)
+                    .padding(12.dp)
+                    .revealControls { showControls() },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(color = chromeColor, shape = chromeShape, tonalElevation = 2.dp) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (siblings.isNotEmpty()) {
+                            IconButton(onClick = { zap(-1) }, modifier = Modifier.size(48.dp)) {
+                                Icon(
+                                    Icons.Filled.SkipPrevious,
+                                    stringResource(R.string.action_previous_channel),
+                                    tint = iconColor,
+                                )
+                            }
+                            IconButton(onClick = { zap(1) }, modifier = Modifier.size(48.dp)) {
+                                Icon(
+                                    Icons.Filled.SkipNext,
+                                    stringResource(R.string.action_next_channel),
+                                    tint = iconColor,
+                                )
+                            }
+                        }
+                        IconButton(
+                            onClick = { showTracks = true },
+                            enabled = controller != null,
+                            modifier = Modifier.size(48.dp),
+                        ) {
+                            Icon(
+                                Icons.Filled.Audiotrack,
+                                stringResource(R.string.player_tracks),
+                                tint = iconColor,
+                            )
+                        }
+                        IconButton(
+                            onClick = { showSleep = true },
+                            modifier = Modifier.size(48.dp),
+                        ) {
+                            Icon(
+                                Icons.Filled.Bedtime,
+                                stringResource(R.string.player_sleep_timer),
+                                tint = iconColor,
+                            )
+                        }
+                        IconButton(
+                            enabled = effectiveUrl != null,
+                            onClick = {
+                                if (recording != null) {
+                                    RecordingManager.stop()
+                                } else {
+                                    effectiveUrl?.let { RecordingManager.start(context, it, effectiveTitle) }
+                                }
+                            },
+                            modifier = Modifier.size(48.dp),
+                        ) {
+                            Icon(
+                                if (recording != null) Icons.Filled.Stop else Icons.Filled.FiberManualRecord,
+                                stringResource(R.string.player_record),
+                                tint = if (recording != null) MaterialTheme.colorScheme.error else iconColor,
+                            )
+                        }
+                        IconButton(
+                            enabled = pipSupported && controller != null,
+                            onClick = { runCatching { activity?.enterPictureInPictureMode(pipParams(false)) } },
+                            modifier = Modifier.size(48.dp),
+                        ) {
+                            Icon(
+                                Icons.Filled.PictureInPictureAlt,
+                                stringResource(R.string.action_pip),
+                                tint = iconColor,
+                            )
+                        }
+                    }
+                }
             }
         }
     }
+
+    val error = playbackError ?: hubError
+    LaunchedEffect(error) { if (error != null) showControls() }
 
     controller?.let { activeController ->
         if (showTracks) {
@@ -591,45 +759,78 @@ fun PlayerScreen(
     if (showSleep) {
         AlertDialog(
             onDismissRequest = { showSleep = false },
-            title = { Text(stringResource(R.string.player_sleep_timer)) },
+            modifier = dialogModifier(),
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurface,
+            title = {
+                BrandTopBar(
+                    title = stringResource(R.string.player_sleep_timer),
+                    onBack = { showSleep = false },
+                )
+            },
             text = {
-                Column {
+                Column(Modifier.fillMaxWidth()) {
                     listOf(0, 15, 30, 60, 90).forEach { minutes ->
-                        TextButton(onClick = {
-                            sleepMinutes = minutes
-                            showSleep = false
-                        }) {
-                            Text(
-                                if (minutes == 0) stringResource(R.string.player_sleep_off)
-                                else pluralStringResource(R.plurals.player_sleep_minutes, minutes, minutes),
-                            )
-                        }
+                        BrandSecondaryButton(
+                            text = if (minutes == 0) {
+                                stringResource(R.string.player_sleep_off)
+                            } else {
+                                pluralStringResource(R.plurals.player_sleep_minutes, minutes, minutes)
+                            },
+                            onClick = {
+                                sleepMinutes = minutes
+                                showSleep = false
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showSleep = false }) {
-                    Text(stringResource(R.string.action_close))
-                }
+                BrandPrimaryButton(
+                    text = stringResource(R.string.action_close),
+                    onClick = { showSleep = false },
+                )
             },
         )
     }
 }
 
 @Composable
+private fun dialogModifier(): Modifier = Modifier
+    .widthIn(max = 520.dp)
+    .windowInsetsPadding(WindowInsets.systemBars)
+    .windowInsetsPadding(WindowInsets.displayCutout)
+
+private fun Modifier.revealControls(onInteraction: () -> Unit): Modifier = pointerInput(Unit) {
+    awaitPointerEventScope {
+        while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            if (event.type == PointerEventType.Press) onInteraction()
+        }
+    }
+}
+
+@Composable
 private fun DiagnosticLine(labelRes: Int, value: String) {
     // Labels are plain translations; the measured value is rendered next to the label.
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
             stringResource(labelRes),
-            color = Color.White.copy(alpha = 0.72f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
         Text(
             value,
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(start = 6.dp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -651,9 +852,18 @@ private fun PlaybackOptionsDialog(
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.video_mode)) },
+        modifier = dialogModifier(),
+        containerColor = MaterialTheme.colorScheme.surface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface,
+        title = {
+            BrandTopBar(
+                title = stringResource(R.string.video_mode),
+                onBack = onDismiss,
+            )
+        },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                 VideoMode.entries.forEach { value ->
                     val label = when (value) {
                         VideoMode.AUTO -> R.string.video_mode_auto
@@ -666,43 +876,81 @@ private fun PlaybackOptionsDialog(
                         VideoMode.RATIO_4_3 -> R.string.video_mode_4_3
                         VideoMode.RATIO_21_9 -> R.string.video_mode_21_9
                     }
-                    TextButton(onClick = { onVideoMode(value) }) {
-                        Text(
-                            stringResource(label),
-                            color = if (value == prefs.videoMode) MaterialTheme.colorScheme.primary else Color.Unspecified,
-                        )
-                    }
+                    BrandSecondaryButton(
+                        text = stringResource(label),
+                        onClick = { onVideoMode(value) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
-                TextButton(onClick = onReset) { Text(stringResource(R.string.player_reset_video)) }
+                BrandSecondaryButton(
+                    text = stringResource(R.string.player_reset_video),
+                    onClick = onReset,
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Switch(checked = prefs.hardwareDecoder, onCheckedChange = onHardwareDecoder)
-                    Text(stringResource(R.string.player_hw_decoder))
+                    Text(
+                        stringResource(R.string.player_hw_decoder),
+                        modifier = Modifier.weight(1f),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Switch(checked = prefs.decoderFallback, onCheckedChange = onDecoderFallback)
-                    Text(stringResource(R.string.player_decoder_fallback))
+                    Text(
+                        stringResource(R.string.player_decoder_fallback),
+                        modifier = Modifier.weight(1f),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 OutlinedTextField(
                     value = languageDraft,
                     onValueChange = { languageDraft = it },
                     label = { Text(stringResource(R.string.player_audio_language)) },
                     singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                TextButton(onClick = { onAudioLanguage(languageDraft) }) {
-                    Text(stringResource(R.string.action_save))
-                }
-                Text(stringResource(R.string.player_audio_offset))
+                BrandPrimaryButton(
+                    text = stringResource(R.string.action_save),
+                    onClick = { onAudioLanguage(languageDraft) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    stringResource(R.string.player_audio_offset),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    FilledTonalIconButton(onClick = { onAudioOffset(prefs.audioOffsetMs - 100) }) {
+                    IconButton(
+                        onClick = { onAudioOffset(prefs.audioOffsetMs - 100) },
+                        modifier = Modifier.size(48.dp),
+                    ) {
                         Icon(Icons.Filled.Remove, stringResource(R.string.player_audio_offset))
                     }
-                    Text("${prefs.audioOffsetMs} ms")
-                    FilledTonalIconButton(onClick = { onAudioOffset(prefs.audioOffsetMs + 100) }) {
+                    Text("${prefs.audioOffsetMs} ms", style = MaterialTheme.typography.bodyMedium)
+                    IconButton(
+                        onClick = { onAudioOffset(prefs.audioOffsetMs + 100) },
+                        modifier = Modifier.size(48.dp),
+                    ) {
                         Icon(Icons.Filled.Add, stringResource(R.string.player_audio_offset))
                     }
                 }
-                Text(stringResource(R.string.player_performance_profile))
+                Text(
+                    stringResource(R.string.player_performance_profile),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 PerformanceProfile.entries.forEach { value ->
                     val label = when (value) {
                         PerformanceProfile.AUTO -> R.string.profile_auto
@@ -712,21 +960,19 @@ private fun PlaybackOptionsDialog(
                         PerformanceProfile.STABLE -> R.string.profile_stable
                         PerformanceProfile.POWER_SAVE -> R.string.profile_power
                     }
-                    TextButton(onClick = { onPerformanceProfile(value) }) {
-                        Text(
-                            stringResource(label),
-                            color = if (value == prefs.performanceProfile) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                Color.Unspecified
-                            },
-                        )
-                    }
+                    BrandSecondaryButton(
+                        text = stringResource(label),
+                        onClick = { onPerformanceProfile(value) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
+            BrandSecondaryButton(
+                text = stringResource(R.string.action_close),
+                onClick = onDismiss,
+            )
         },
     )
 }
@@ -756,65 +1002,121 @@ private fun TrackDialog(controller: androidx.media3.session.MediaController, onD
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.player_tracks)) },
+        modifier = dialogModifier(),
+        containerColor = MaterialTheme.colorScheme.surface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface,
+        title = {
+            BrandTopBar(
+                title = stringResource(R.string.player_tracks),
+                onBack = onDismiss,
+            )
+        },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                 SectionTitle(stringResource(R.string.player_audio))
-                TextButton(onClick = { automatic(C.TRACK_TYPE_AUDIO) }) {
-                    Text(stringResource(R.string.player_auto))
+                TextButton(
+                    onClick = { automatic(C.TRACK_TYPE_AUDIO) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.player_auto),
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 if (audioGroups.isEmpty()) Text(stringResource(R.string.player_no_tracks))
                 audioGroups.forEachIndexed { index, group ->
-                    TextButton(onClick = { override(C.TRACK_TYPE_AUDIO, group) }) {
+                    TextButton(
+                        onClick = { override(C.TRACK_TYPE_AUDIO, group) },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) {
                         Text(
                             group.getTrackFormat(0).label
                                 ?: "${stringResource(R.string.player_audio)} ${index + 1}",
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
 
                 SectionTitle(stringResource(R.string.player_subtitles))
-                TextButton(onClick = {
-                    controller.trackSelectionParameters = controller.trackSelectionParameters
-                        .buildUpon()
-                        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
-                        .build()
-                }) { Text(stringResource(R.string.player_subtitles_off)) }
-                if (textGroups.isEmpty()) Text(stringResource(R.string.player_no_tracks))
-                textGroups.forEachIndexed { index, group ->
-                    TextButton(onClick = {
+                TextButton(
+                    onClick = {
                         controller.trackSelectionParameters = controller.trackSelectionParameters
                             .buildUpon()
-                            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
                             .build()
-                        override(C.TRACK_TYPE_TEXT, group)
-                    }) {
+                    },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.player_subtitles_off),
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (textGroups.isEmpty()) Text(stringResource(R.string.player_no_tracks))
+                textGroups.forEachIndexed { index, group ->
+                    TextButton(
+                        onClick = {
+                            controller.trackSelectionParameters = controller.trackSelectionParameters
+                                .buildUpon()
+                                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                                .build()
+                            override(C.TRACK_TYPE_TEXT, group)
+                        },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) {
                         Text(
                             group.getTrackFormat(0).label
                                 ?: "${stringResource(R.string.player_subtitles)} ${index + 1}",
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
 
                 SectionTitle(stringResource(R.string.player_quality))
-                TextButton(onClick = { automatic(C.TRACK_TYPE_VIDEO) }) {
-                    Text(stringResource(R.string.player_auto))
+                TextButton(
+                    onClick = { automatic(C.TRACK_TYPE_VIDEO) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.player_auto),
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 if (videoGroups.isEmpty()) Text(stringResource(R.string.player_no_tracks))
                 videoGroups.forEachIndexed { index, group ->
-                    TextButton(onClick = { override(C.TRACK_TYPE_VIDEO, group) }) {
+                    TextButton(
+                        onClick = { override(C.TRACK_TYPE_VIDEO, group) },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) {
                         val format = group.getTrackFormat(0)
                         Text(
                             format.label
                                 ?: "${format.width}x${format.height}".takeIf { format.width > 0 }
                                 ?: "${stringResource(R.string.player_quality)} ${index + 1}",
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
+            BrandPrimaryButton(
+                text = stringResource(R.string.action_close),
+                onClick = onDismiss,
+            )
         },
     )
 }
@@ -823,8 +1125,11 @@ private fun TrackDialog(controller: androidx.media3.session.MediaController, onD
 private fun SectionTitle(text: String) {
     Text(
         text,
+        color = MaterialTheme.colorScheme.primary,
         style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
     )
 }
 
