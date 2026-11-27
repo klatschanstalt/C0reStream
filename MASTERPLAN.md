@@ -20,6 +20,10 @@ Open or not certified:
 
 Binding decisions: minimum Android 11 (API 30); HTTP and HTTPS IPTV sources supported without mandatory opt-in, HTTPS preferred, no HTTPS-to-HTTP redirects; no ads, tracking or bundled streams.
 
+## Aktiver Auftrag (2026-11-27): Streaming, Codecs, Performance, Sicherheit, Release
+
+P0: DAO-Ergebnisobergrenzen und In-Memory-Filter durch Paging 3 ersetzen; absoluten 90-Sekunden-Call-Timeout für Live-Streams entfernen; Redirect-, Keystore- und Datenintegritätsrisiken beheben. P1: Player-Modi/Decodierung/Audio/Diagnostik verifizieren, Senderwechsel und Netzwerkstabilität verbessern. Danach gebündelte CI-, Emulator-, Sicherheits- und Performanceprüfung, anschließend neue signierte Produktionsversion mit konsistentem `update.json` und Ressourcenmanifest. Bestehendes Branding, Designsystem und alle Benutzerdaten bleiben erhalten. CI ist während der Implementierung pausiert.
+
 ## Abgeschlossener Auftrag (2026-11-27): Design, Branding & Responsive UI/UX
 
 Branding-Assets integriert: adaptive/monochrome Launcher-Icons, Splash-/Fenster-Theme, zentrale Design-Tokens und wiederverwendbare Brand-Komponenten. Alle Screens und die Player-Oberfläche sind darauf umgestellt; Navigation wählt je nach Breite und Höhe Bottom-Bar/Rail/Drawer. Geprüft in CI-Lauf `46022423220` (siehe Statusbericht). Nicht geräteverifiziert: echte Screenshots, physische Geräte, themed-icon alignment.

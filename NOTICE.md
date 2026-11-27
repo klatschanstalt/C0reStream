@@ -3,7 +3,9 @@
 C0reStream is released under the Apache License 2.0 (see `LICENSE`). The following components are governed by their own upstream licenses.
 Coordinates were extracted from the Gradle `releaseRuntimeClasspath` of version 1.3.0; license names come from cached Maven POM metadata. Components without declared metadata are listed as such and remain under their upstream terms.
 
-## Apache-2.0 (9)
+## Apache-2.0 (12)
+
+androidx.paging:paging-common-ktx:3.3.2, androidx.paging:paging-compose:3.3.2, androidx.paging:paging-runtime-ktx:3.3.2,
 
 org.jetbrains.kotlin:kotlin-stdlib:2.2.21, org.jetbrains.kotlin:kotlin-stdlib:2.4.21, org.jetbrains.kotlin:kotlin-stdlib-common:2.4.21, org.jetbrains.kotlinx:atomicfu:0.28.0, org.jetbrains.kotlinx:atomicfu-jvm:0.28.0, org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0, org.jetbrains.kotlinx:kotlinx-coroutines-bom:1.11.0, org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0, org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.11.0
 
