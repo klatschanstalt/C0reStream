@@ -7,8 +7,11 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import pw.c0re.stream.data.AppSettings
+import pw.c0re.stream.data.SettingsRepository
 
 private val Context.playbackPreferencesDataStore by preferencesDataStore("c0restream_playback_preferences")
 
@@ -89,34 +92,52 @@ data class PlaybackSettings(
  */
 class PlaybackPreferences(private val context: Context) {
     private val store = context.playbackPreferencesDataStore
+    private val appSettings = SettingsRepository(context)
 
-    val settings: Flow<PlaybackSettings> = store.data.map { read(it, null) }
+    /** Global values come from the categorized settings center. */
+    val settings: Flow<PlaybackSettings> = appSettings.settings.map { global(app = it) }
 
+    /** Per-channel values are sparse overrides on top of the global settings center values. */
     fun settingsFor(channelKey: String?): Flow<PlaybackSettings> =
         if (channelKey.isNullOrBlank()) settings
-        else store.data.map { read(it, safeKey(channelKey)) }
+        else combine(appSettings.settings, store.data) { global, prefs ->
+            overlay(global(global), prefs, safeKey(channelKey))
+        }
 
     suspend fun snapshot(): PlaybackSettings = settings.first()
 
     suspend fun snapshotFor(channelKey: String?): PlaybackSettings = settingsFor(channelKey).first()
 
-    suspend fun setVideoMode(value: VideoMode, channelKey: String? = null) =
-        editString(VIDEO_MODE, value.name, channelKey)
+    suspend fun setVideoMode(value: VideoMode, channelKey: String? = null) {
+        if (channelKey.isNullOrBlank()) appSettings.setVideoMode(value.name)
+        else editString(VIDEO_MODE, value.name, channelKey)
+    }
 
-    suspend fun setHardwareDecoder(enabled: Boolean, channelKey: String? = null) =
-        editBoolean(HARDWARE_DECODER, enabled, channelKey)
+    suspend fun setHardwareDecoder(enabled: Boolean, channelKey: String? = null) {
+        if (channelKey.isNullOrBlank()) appSettings.setHwDecoder(enabled)
+        else editBoolean(HARDWARE_DECODER, enabled, channelKey)
+    }
 
-    suspend fun setDecoderFallback(enabled: Boolean, channelKey: String? = null) =
-        editBoolean(DECODER_FALLBACK, enabled, channelKey)
+    suspend fun setDecoderFallback(enabled: Boolean, channelKey: String? = null) {
+        if (channelKey.isNullOrBlank()) appSettings.setDecoderFallback(enabled)
+        else editBoolean(DECODER_FALLBACK, enabled, channelKey)
+    }
 
-    suspend fun setPreferredAudioLanguage(language: String, channelKey: String? = null) =
-        editString(AUDIO_LANGUAGE, language, channelKey)
+    suspend fun setPreferredAudioLanguage(language: String, channelKey: String? = null) {
+        if (channelKey.isNullOrBlank()) appSettings.setAudioLanguage(language)
+        else editString(AUDIO_LANGUAGE, language, channelKey)
+    }
 
-    suspend fun setAudioOffsetMs(offsetMs: Long, channelKey: String? = null) =
-        editLong(AUDIO_OFFSET_MS, offsetMs, channelKey)
+    suspend fun setAudioOffsetMs(offsetMs: Long, channelKey: String? = null) {
+        if (channelKey.isNullOrBlank()) appSettings.setAudioOffsetMs(offsetMs.toInt())
+        else editLong(AUDIO_OFFSET_MS, offsetMs, channelKey)
+    }
 
-    suspend fun setPerformanceProfile(value: PerformanceProfile, channelKey: String? = null) =
-        editString(PERFORMANCE_PROFILE, value.name, channelKey)
+    suspend fun setPerformanceProfile(value: PerformanceProfile, channelKey: String? = null) {
+        val stored = if (value == PerformanceProfile.POWER_SAVE) "POWER" else value.name
+        if (channelKey.isNullOrBlank()) appSettings.setPerformanceProfile(stored)
+        else editString(PERFORMANCE_PROFILE, value.name, channelKey)
+    }
 
     /** Removes all per-channel overrides so this channel inherits the global settings again. */
     suspend fun clearChannel(channelKey: String) {
@@ -146,27 +167,35 @@ class PlaybackPreferences(private val context: Context) {
         store.edit { it[longKey(field, channelKey)] = value }
     }
 
-    private fun read(prefs: androidx.datastore.preferences.core.Preferences, channelKey: String?): PlaybackSettings {
-        fun string(field: String, fallback: String): String =
-            prefs[stringKey(field, channelKey)] ?: prefs[stringKey(field, null)] ?: fallback
+    private fun global(app: AppSettings): PlaybackSettings = PlaybackSettings(
+        videoMode = VideoMode.fromName(app.videoMode),
+        hardwareDecoder = app.hwDecoder,
+        decoderFallback = app.decoderFallback,
+        preferredAudioLanguage = app.audioLanguage.takeIf { it != "auto" }.orEmpty(),
+        audioOffsetMs = app.audioOffsetMs.toLong(),
+        performanceProfile = when (app.performanceProfile) {
+            "PERFORMANCE" -> PerformanceProfile.PERFORMANCE
+            "QUALITY" -> PerformanceProfile.QUALITY
+            "LOW_LATENCY" -> PerformanceProfile.LOW_LATENCY
+            "STABLE" -> PerformanceProfile.STABLE
+            "POWER", "POWER_SAVE" -> PerformanceProfile.POWER_SAVE
+            else -> PerformanceProfile.AUTO
+        },
+    ).normalized()
 
-        fun boolean(field: String, fallback: Boolean): Boolean =
-            prefs[booleanKey(field, channelKey)] ?: prefs[booleanKey(field, null)] ?: fallback
-
-        fun long(field: String, fallback: Long): Long =
-            prefs[longKey(field, channelKey)] ?: prefs[longKey(field, null)] ?: fallback
-
-        return PlaybackSettings(
-            videoMode = VideoMode.fromName(string(VIDEO_MODE, VideoMode.AUTO.name)),
-            hardwareDecoder = boolean(HARDWARE_DECODER, true),
-            decoderFallback = boolean(DECODER_FALLBACK, true),
-            preferredAudioLanguage = string(AUDIO_LANGUAGE, ""),
-            audioOffsetMs = long(AUDIO_OFFSET_MS, 0L),
-            performanceProfile = PerformanceProfile.fromName(
-                string(PERFORMANCE_PROFILE, PerformanceProfile.AUTO.name),
-            ),
-        ).normalized()
-    }
+    private fun overlay(
+        base: PlaybackSettings,
+        prefs: androidx.datastore.preferences.core.Preferences,
+        channelKey: String,
+    ): PlaybackSettings = base.copy(
+        videoMode = prefs[stringKey(VIDEO_MODE, channelKey)]?.let(VideoMode::fromName) ?: base.videoMode,
+        hardwareDecoder = prefs[booleanKey(HARDWARE_DECODER, channelKey)] ?: base.hardwareDecoder,
+        decoderFallback = prefs[booleanKey(DECODER_FALLBACK, channelKey)] ?: base.decoderFallback,
+        preferredAudioLanguage = prefs[stringKey(AUDIO_LANGUAGE, channelKey)] ?: base.preferredAudioLanguage,
+        audioOffsetMs = prefs[longKey(AUDIO_OFFSET_MS, channelKey)] ?: base.audioOffsetMs,
+        performanceProfile = prefs[stringKey(PERFORMANCE_PROFILE, channelKey)]
+            ?.let(PerformanceProfile::fromName) ?: base.performanceProfile,
+    ).normalized()
 
     private fun fieldKey(field: String, channelKey: String?): String =
         if (channelKey.isNullOrBlank()) "global.$field" else "channel.${safeKey(channelKey)}.$field"
