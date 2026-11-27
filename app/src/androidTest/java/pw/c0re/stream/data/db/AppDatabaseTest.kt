@@ -182,8 +182,8 @@ class AppDatabaseTest {
             ),
         ) as androidx.paging.PagingSource.LoadResult.Page
         assertEquals(6_000, result.data.size)
-        assertEquals(0, result.data.first().orderIndex)
-        assertEquals(5_999, result.data.last().orderIndex)
+        assertEquals(1, result.data.first().orderIndex)
+        assertEquals(6_000, result.data.last().orderIndex)
     }
 
     @Test
