@@ -369,9 +369,13 @@ fun PlayerScreen(
     }
 
     val mode = prefs.videoMode
+    // Media3 AspectRatioFrameLayout exposes FIT (contain, no crop), FILL (stretch, distorted),
+    // ZOOM (cover, cropped) and fixed-width/height. There is no "cover without cropping" mode:
+    // FILL therefore uses FIT (letterbox/pillarbox) as the closest undistorted behaviour, while
+    // ZOOM is the only mode that crops. STRETCH is the only mode that deliberately distorts.
     val resizeMode = when (mode) {
-        VideoMode.FILL, VideoMode.ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
         VideoMode.STRETCH -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+        VideoMode.ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
         else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
     }
 
@@ -385,10 +389,15 @@ fun PlayerScreen(
                 containerRatio
             }
             val frameRatio = mode.forcedAspectRatio ?: when (mode) {
-                VideoMode.AUTO, VideoMode.ORIGINAL -> naturalRatio
+                VideoMode.ORIGINAL -> naturalRatio
                 else -> containerRatio
             }
-            val frameModifier = if (mode.forcedAspectRatio != null) {
+            // ORIGINAL and forced-ratio modes get a centred frame bounded by BoxWithConstraints;
+            // all other modes use the full edge-to-edge surface. System bars and cutouts pad only
+            // the overlay chrome (overlayInsets below), never this video surface, so immersive
+            // mode, landscape and external sizing constraints cannot change the resize mapping.
+            val sizedFrame = mode.forcedAspectRatio != null || mode == VideoMode.ORIGINAL
+            val frameModifier = if (sizedFrame && frameRatio > 0f) {
                 val width = minOf(maxWidth, maxHeight * frameRatio)
                 Modifier.size(width, width / frameRatio).align(Alignment.Center)
             } else {
@@ -497,7 +506,19 @@ fun PlayerScreen(
                     DiagnosticLine(
                         R.string.diagnostics_resolution,
                         if (diagnostics.videoWidth > 0 && diagnostics.videoHeight > 0) {
-                            "${diagnostics.videoWidth}x${diagnostics.videoHeight}"
+                            buildString {
+                                append(diagnostics.videoWidth).append('x').append(diagnostics.videoHeight)
+                                // Existing label only: decoded size, display aspect ratio and HDR
+                                // description are all measured values, never stream locations.
+                                val sizeInfo = diagnostics.videoSizeInfo.ifBlank {
+                                    diagnostics.displayAspectRatio
+                                        .takeIf { it > 0f }
+                                        ?.let { String.format(Locale.ROOT, "%.2f:1", it) }
+                                        .orEmpty()
+                                }
+                                if (sizeInfo.isNotBlank()) append(' ').append(sizeInfo)
+                                if (diagnostics.colorInfo.isNotBlank()) append(' ').append(diagnostics.colorInfo)
+                            }
                         } else {
                             "—"
                         },
@@ -686,7 +707,11 @@ fun PlayerScreen(
                                 if (recording != null) {
                                     RecordingManager.stop()
                                 } else {
-                                    effectiveUrl?.let { RecordingManager.start(context, it, effectiveTitle) }
+                                    effectiveUrl?.let {
+                                        RecordingManager.start(
+                                            context, it, effectiveTitle, null,
+                                        )
+                                    }
                                 }
                             },
                             modifier = Modifier.size(48.dp),
@@ -724,6 +749,11 @@ fun PlayerScreen(
     }
 
     if (showPlaybackOptions) {
+        // Every field uses the same scope as the settings flow above: a channel key stores a
+        // sparse override, null writes the global value. Video mode and audio language apply
+        // through this screen; decoder/buffering values are read by the service when it creates
+        // its player. No restart or artificial delay is introduced here, so changing a setting
+        // never interrupts the active stream or loses its position.
         PlaybackOptionsDialog(
             prefs = prefs,
             onDismiss = { showPlaybackOptions = false },
@@ -731,10 +761,10 @@ fun PlayerScreen(
                 scope.launch { vm.playbackPrefs.setVideoMode(value, preferenceKey) }
             },
             onHardwareDecoder = { value ->
-                scope.launch { vm.playbackPrefs.setHardwareDecoder(value) }
+                scope.launch { vm.playbackPrefs.setHardwareDecoder(value, preferenceKey) }
             },
             onDecoderFallback = { value ->
-                scope.launch { vm.playbackPrefs.setDecoderFallback(value) }
+                scope.launch { vm.playbackPrefs.setDecoderFallback(value, preferenceKey) }
             },
             onAudioLanguage = { value ->
                 scope.launch { vm.playbackPrefs.setPreferredAudioLanguage(value, preferenceKey) }
@@ -747,10 +777,10 @@ fun PlayerScreen(
                 }
             },
             onAudioOffset = { value ->
-                scope.launch { vm.playbackPrefs.setAudioOffsetMs(value) }
+                scope.launch { vm.playbackPrefs.setAudioOffsetMs(value, preferenceKey) }
             },
             onPerformanceProfile = { value ->
-                scope.launch { vm.playbackPrefs.setPerformanceProfile(value) }
+                scope.launch { vm.playbackPrefs.setPerformanceProfile(value, preferenceKey) }
             },
             onReset = {
                 scope.launch {

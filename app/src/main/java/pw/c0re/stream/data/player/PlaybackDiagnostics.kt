@@ -5,6 +5,9 @@ import android.os.Bundle
 /**
  * Snapshot of publicly safe playback telemetry. Values come from Media3 player state and
  * analytics events only: no stream URL, header, token or credential is included.
+ *
+ * The optional [colorInfo] and [videoSizeInfo] fields carry Format.colorInfo and VideoSize
+ * details when the service publishes them; empty values are safe for older session extras.
  */
 data class PlaybackDiagnostics(
     val fps: Float = 0f,
@@ -17,7 +20,19 @@ data class PlaybackDiagnostics(
     val bufferMs: Long = 0L,
     val droppedFrames: Long = 0L,
     val audioFormat: String = "",
+    /** HDR/color description derived from Format.colorInfo, e.g. "BT.2020 PQ HDR". */
+    val colorInfo: String = "",
+    /** Decoded-frame detail derived from VideoSize, e.g. "DAR 1.78:1". */
+    val videoSizeInfo: String = "",
 ) {
+    /** Display aspect ratio from decoded size and pixel aspect ratio; 0 when unknown. */
+    val displayAspectRatio: Float
+        get() = if (videoWidth > 0 && videoHeight > 0 && pixelWidthHeightRatio > 0f) {
+            videoWidth * pixelWidthHeightRatio / videoHeight
+        } else {
+            0f
+        }
+
     /** Serialised into MediaSession extras so the UI can read service-side analytics. */
     fun toBundle(): Bundle = Bundle().apply {
         putFloat(KEY_FPS, fps.coerceIn(0f, 240f))
@@ -30,6 +45,8 @@ data class PlaybackDiagnostics(
         putLong(KEY_BUFFER, bufferMs.coerceIn(0L, 3_600_000L))
         putLong(KEY_DROPPED, droppedFrames.coerceIn(0L, Long.MAX_VALUE / 4))
         putString(KEY_AUDIO, cap(audioFormat))
+        putString(KEY_COLOR, cap(colorInfo))
+        putString(KEY_VIDEO_SIZE, cap(videoSizeInfo))
     }
 
     companion object {
@@ -43,6 +60,8 @@ data class PlaybackDiagnostics(
         private const val KEY_BUFFER = "buffer_ms"
         private const val KEY_DROPPED = "dropped_frames"
         private const val KEY_AUDIO = "audio_format"
+        private const val KEY_COLOR = "color_info"
+        private const val KEY_VIDEO_SIZE = "video_size_info"
         private const val MAX_TEXT = 160
 
         fun fromBundle(bundle: Bundle?): PlaybackDiagnostics {
@@ -61,6 +80,8 @@ data class PlaybackDiagnostics(
                 bufferMs = runCatching { bundle.getLong(KEY_BUFFER, 0L) }.getOrDefault(0L).coerceIn(0L, 3_600_000L),
                 droppedFrames = runCatching { bundle.getLong(KEY_DROPPED, 0L) }.getOrDefault(0L).coerceIn(0L, Long.MAX_VALUE / 4),
                 audioFormat = text(KEY_AUDIO),
+                colorInfo = text(KEY_COLOR),
+                videoSizeInfo = text(KEY_VIDEO_SIZE),
             )
         }
 

@@ -15,7 +15,18 @@ import pw.c0re.stream.data.SettingsRepository
 
 private val Context.playbackPreferencesDataStore by preferencesDataStore("c0restream_playback_preferences")
 
-/** How video is fitted into the player surface. AUTO and FIT never crop the decoded image. */
+/**
+ * How video is fitted into the player surface. Names are persisted verbatim, so entries must
+ * never be renamed or removed.
+ *
+ * AUTO, ORIGINAL and FIT show the whole decoded image with its pixel aspect ratio and letterbox
+ * as needed (never crop). ORIGINAL sizes its frame to the decoded image; AUTO/FIT use the whole
+ * available surface. FILL is the undistorted "fill" request: Media3 has no cover-without-crop
+ * resize mode, so the closest safe behaviour is FIT (letterbox/pillarbox); it is deliberately not
+ * mapped to ZOOM and never stretches. ZOOM is the only mode allowed to crop and uses a forced
+ * 16:9 frame. STRETCH deliberately ignores the image aspect ratio. RATIO_* force an output frame
+ * and letterbox the whole image inside it.
+ */
 enum class VideoMode {
     AUTO,
     ORIGINAL,
@@ -27,7 +38,11 @@ enum class VideoMode {
     RATIO_4_3,
     RATIO_21_9;
 
-    /** A forced output frame ratio, or null to derive the frame from the decoded video. */
+    /**
+     * A forced output frame ratio, or null to derive the frame from the container or decoded
+     * image. Only ZOOM and the RATIO_* modes force a frame; the other modes keep the native or
+     * container frame.
+     */
     val forcedAspectRatio: Float?
         get() = when (this) {
             RATIO_16_9 -> 16f / 9f
