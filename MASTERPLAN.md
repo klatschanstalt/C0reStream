@@ -14,7 +14,8 @@ Delivered:
 Open or not certified:
 
 - Physical-device validation beyond the API 30/36 emulator matrix; Android 17 and 18 compatibility are not certified.
-- Optional features not implemented: casting, multiview, authorized recording, profiles, PIN and QR import.
+- Casting and multiview are not implemented: Chromecast requires a registered receiver application ID and Google Play services certification, and simultaneous multi-player decoding has not been validated on target devices. No DRM circumvention is attempted.
+- The APK-size target of <5 MB is not met with the requested feature set; see `PROJECT_STATUS_REPORT.md` for measured sizes and justified trade-offs.
 
 Binding decisions: minimum Android 11 (API 30); HTTP and HTTPS IPTV sources supported without mandatory opt-in, HTTPS preferred, no HTTPS-to-HTTP redirects; no ads, tracking or bundled streams.
 

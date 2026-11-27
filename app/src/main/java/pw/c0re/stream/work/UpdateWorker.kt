@@ -7,7 +7,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -67,6 +69,11 @@ class UpdateWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                 .build()
             WorkManager.getInstance(context.applicationContext)
                 .enqueueUniquePeriodicWork(workName, ExistingPeriodicWorkPolicy.KEEP, request)
+            val immediate = OneTimeWorkRequestBuilder<UpdateWorker>()
+                .setConstraints(constraints)
+                .build()
+            WorkManager.getInstance(context.applicationContext)
+                .enqueueUniqueWork("${workName}_now", ExistingWorkPolicy.KEEP, immediate)
         }
     }
 }
