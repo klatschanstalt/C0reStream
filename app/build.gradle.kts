@@ -120,6 +120,8 @@ dependencies {
     implementation(libs.media3.ui)
     implementation(libs.media3.session)
 
+    implementation(libs.paging.runtime)
+    implementation(libs.paging.compose)
     implementation(libs.work.runtime.ktx)
 
     implementation(libs.room.runtime)
