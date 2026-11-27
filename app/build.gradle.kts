@@ -1,3 +1,6 @@
+import java.security.KeyStore
+import java.security.PrivateKey
+import java.security.Signature
 import java.util.Properties
 
 plugins {
@@ -77,7 +80,16 @@ android {
         includeInApk = false
         includeInBundle = false
     }
-    packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+    packaging {
+        resources.excludes += setOf(
+            "/META-INF/{AL2.0,LGPL2.1}",
+            "/META-INF/*.version",
+            // No cookie jar is used; OkHttp's public-suffix table is unnecessary.
+            "assets/PublicSuffixDatabase.list",
+            // CI and modern emulators use x86_64; 32-bit x86 devices are unsupported.
+            "lib/x86/**",
+        )
+    }
     lint {
         abortOnError = true
         checkReleaseBuilds = true
@@ -115,6 +127,7 @@ dependencies {
     implementation(libs.datastore.preferences)
 
     implementation(libs.okhttp)
+    implementation(libs.zxing)
     implementation(libs.kotlinx.coroutines.android)
 
     debugImplementation(libs.compose.ui.tooling)
@@ -131,4 +144,29 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.room.testing)
     androidTestImplementation(libs.kotlinx.coroutines.test)
+}
+
+// Signs the non-executable resource manifest with the existing production key. No new key is
+// created and the signature file is published only together with a signed APK.
+tasks.register("signResourceManifest") {
+    doLast {
+        val storeFile = releaseStoreFile ?: error("Release keystore is not configured")
+        val storePassword = releaseStorePassword ?: error("Release store password is not configured")
+        val alias = releaseKeyAlias ?: error("Release key alias is not configured")
+        val keyPassword = releaseKeyPassword ?: error("Release key password is not configured")
+        val keystore = KeyStore.getInstance("PKCS12").apply {
+            file(storeFile).inputStream().use { load(it, storePassword.toCharArray()) }
+        }
+        val privateKey = keystore.getKey(alias, keyPassword.toCharArray()) as? PrivateKey
+            ?: error("Release private key unavailable")
+        val manifestBytes = rootProject.file("resources/manifest.json").readBytes()
+        val signature = Signature.getInstance("SHA256withRSA").run {
+            initSign(privateKey)
+            update(manifestBytes)
+            sign()
+        }
+        rootProject.file("resources/manifest.sig").writeText(
+            signature.joinToString("") { "%02x".format(it) },
+        )
+    }
 }

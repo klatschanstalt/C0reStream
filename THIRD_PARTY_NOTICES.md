@@ -1,17 +1,7 @@
 # Third-party notices
 
-C0reStream does not bundle IPTV content or subscriptions. The project owner has not selected a project license; no `LICENSE` file is included. The components below remain under their own upstream licenses.
+C0reStream is released under the Apache License 2.0 (see `LICENSE`). The owner has approved this license; no other project license is asserted.
 
-License names were read from the POM metadata cached by Gradle for the direct dependencies of version 1.3.0.
+The complete coordinate-level overview of the shipped `releaseRuntimeClasspath` and the licenses declared in cached dependency metadata is in `NOTICE.md`. Components whose metadata does not declare a license remain under their respective upstream terms; build-time-only tooling is not shipped in the APK.
 
-| Component group | License declared in dependency metadata |
-| --- | --- |
-| AndroidX (Activity, Compose, DataStore, Lifecycle, Navigation, Room, Test, WorkManager) | Apache License 2.0 |
-| AndroidX Media3 (ExoPlayer, HLS, DASH, OkHttp data source, UI, MediaSession) | Apache License 2.0 |
-| OkHttp and MockWebServer | Apache License 2.0 |
-| kotlinx-coroutines (android, test) | Apache License 2.0 |
-| JUnit 4 | Eclipse Public License 1.0 |
-| org.json | Public Domain |
-| kxml2 | Not declared in cached POM metadata; refer to the upstream project |
-
-Build-time tooling (Android Gradle Plugin, Kotlin Compose plugin, KSP, Gradle wrapper, Android SDK, JDK) is not shipped in the APK and remains under the respective upstream licenses. Transitive dependencies are governed by their own upstream metadata in the published POM files.
+No IPTV content, subscriptions or bundled streams are included.

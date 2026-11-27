@@ -141,6 +141,14 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew --no-daemon :app:assembleRelease --stacktrace
+      - name: Sign resource manifest
+        if: steps.signing.outputs.available == 'true'
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/release.p12
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon :app:signResourceManifest --stacktrace
       - name: Verify signature and publish
         if: steps.signing.outputs.available == 'true'
         env:
@@ -164,6 +172,8 @@ jobs:
           fi
           cp "$APK" C0reStream.apk
           sha256sum C0reStream.apk > SHA256SUMS
+          cp ../../../../../resources/manifest.json resources.json
+          cp ../../../../../resources/manifest.sig resources.sig
           TAG="v$(grep '^versionName=' ../../../../../version.properties | cut -d= -f2)"
           BUILD_SHA256="$(sha256sum C0reStream.apk | cut -d' ' -f1)"
           MANIFEST_VERSION="$(python3 -c 'import json; print(json.load(open("../../../../../update.json"))["latestVersion"])')"
@@ -178,5 +188,5 @@ jobs:
             echo "Release $TAG already exists; preserving immutable assets. Bump version.properties for a new release."
             exit 0
           fi
-          gh release create "$TAG" C0reStream.apk SHA256SUMS --target "$BUILD_SHA" \
+          gh release create "$TAG" C0reStream.apk SHA256SUMS resources.json resources.sig --target "$BUILD_SHA" \
             --title "C0reStream $TAG" --notes "Signed production APK. Verify SHA256SUMS and the signing certificate before installation."
