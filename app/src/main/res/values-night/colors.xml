@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Night-mode system integration. Compose MaterialTheme still owns in-app colors. -->
+<resources>
+    <color name="window_gradient_start">#0A1830</color>
+    <color name="window_gradient_middle">#03060F</color>
+    <color name="window_gradient_end">#160A28</color>
+
+    <color name="system_bar_color">#03060F</color>
+    <color name="splash_background_color">#03060F</color>
+    <color name="splash_icon_background_color">#050B20</color>
+</resources>

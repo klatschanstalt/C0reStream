@@ -105,6 +105,7 @@ dependencies {
     implementation(composeBom)
     implementation(libs.compose.ui)
     implementation(libs.material3)
+    implementation(libs.material3.window.size.class)
     implementation(libs.material.icons.extended)
     implementation(libs.activity.compose)
     implementation(libs.navigation.compose)

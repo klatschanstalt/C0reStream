@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vector conversion of assets/branding/feature-streaming.svg (viewport 100 -> 256dp). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="256dp"
+    android:height="256dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <path
+        android:pathData="M 24,30 H 76 A 8,8 0 0,1 84,38 V 70 A 8,8 0 0,1 76,78 H 24 A 8,8 0 0,1 16,70 V 38 A 8,8 0 0,1 24,30 Z
+            M 36,15 L 50,30 L 64,15
+            M 44,42 L 62,54 L 44,66 Z"
+        android:strokeColor="@color/blue_500"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

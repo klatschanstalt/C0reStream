@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Palette sampled from assets/branding/*.svg. These are for system bars, splash and
+     window integration only; Compose MaterialTheme remains authoritative for app UI. -->
+<resources>
+    <!-- Background / deep navy family (bg gradient: #102c51 -> #050b20 -> #210c40) -->
+    <color name="navy_950">#050B20</color>
+    <color name="navy_900">#0B0E14</color>
+    <color name="navy_800">#102C51</color>
+    <color name="violet_950">#210C40</color>
+
+    <!-- Brand gradient stops (g gradient) -->
+    <color name="cyan_300">#52FAFF</color>
+    <color name="blue_500">#008CFF</color>
+    <color name="violet_500">#6434FF</color>
+    <color name="magenta_500">#FF36CF</color>
+    <color name="orange_300">#FFB34E</color>
+
+    <!-- Warm accent (hot gradient) -->
+    <color name="yellow_300">#FFDA72</color>
+    <color name="pink_500">#FF36AD</color>
+
+    <!-- Light / night text tokens from logo-transparent.svg and splashscreen.svg -->
+    <color name="text_primary">#F3F7FF</color>
+    <color name="text_secondary">#B9D5F5</color>
+    <color name="surface_light">#F3F7FF</color>
+
+    <!-- Window gradient tokens (overridden in values-night/colors.xml) -->
+    <color name="window_gradient_start">@color/navy_800</color>
+    <color name="window_gradient_middle">@color/navy_950</color>
+    <color name="window_gradient_end">@color/violet_950</color>
+
+    <!-- System integration tokens -->
+    <color name="system_bar_color">@color/navy_900</color>
+    <color name="splash_background_color">@color/navy_950</color>
+    <color name="splash_icon_background_color">@color/navy_900</color>
+</resources>

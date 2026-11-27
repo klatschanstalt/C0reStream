@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vector conversion of assets/branding/feature-open-source.svg (viewport 100 -> 256dp). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="256dp"
+    android:height="256dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <path
+        android:pathData="M 34,30 L 13,50 L 34,70 M 66,30 L 87,50 L 66,70 M 57,20 L 43,80"
+        android:strokeColor="@color/blue_500"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

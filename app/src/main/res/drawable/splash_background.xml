@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed window background derived from the brand gradient (top-left #102c51,
+     centre #050b20, bottom-right #210c40). Distortion-free at any window size. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="315"
+                android:startColor="@color/window_gradient_start"
+                android:centerColor="@color/window_gradient_middle"
+                android:endColor="@color/window_gradient_end" />
+        </shape>
+    </item>
+</layer-list>

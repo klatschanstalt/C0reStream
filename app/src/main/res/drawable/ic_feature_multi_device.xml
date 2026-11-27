@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vector conversion of assets/branding/feature-multi-device.svg (viewport 100 -> 256dp). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="256dp"
+    android:height="256dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <path
+        android:pathData="M 15,20 H 70 A 5,5 0 0,1 75,25 V 63 A 5,5 0 0,1 70,68 H 15 A 5,5 0 0,1 10,63 V 25 A 5,5 0 0,1 15,20 Z
+            M 42,68 V 82 M 26,82 H 56
+            M 74,48 H 86 A 4,4 0 0,1 90,52 V 82 A 4,4 0 0,1 86,86 H 74 A 4,4 0 0,1 70,82 V 52 A 4,4 0 0,1 74,48 Z"
+        android:strokeColor="@color/blue_500"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>
