@@ -90,7 +90,8 @@ data class M3uParseResult(
 
 /**
  * Extended M3U/M3U8 parser with bounded input, quoted or unquoted attributes, catch-up metadata,
- * BOM/CRLF handling and gzip payload support. Only HTTP(S) stream URLs are accepted.
+ * BOM/CRLF handling and gzip payload support. HTTP(S), rtsp://, rtspu:// and udp:// stream URLs
+ * are accepted; logos and catch-up sources remain HTTP(S)-only.
  *
  * Provider order is never changed and stream variants are never merged here; duplicates are
  * accounted for by [PlaylistRepository.planImport] so a merge is always visible in [ImportStats].
@@ -194,7 +195,7 @@ object M3UParser {
                 line.startsWith("#") -> Unit
                 line.isNotEmpty() -> {
                     builder.received++
-                    if (NetworkPolicy.parse(line) == null) {
+                    if (NetworkPolicy.parseStreamUrl(line) == null) {
                         builder.reject(ImportRejectionCode.INVALID_STREAM_URL, lineNumber)
                         pending = null
                         pendingGroup = null

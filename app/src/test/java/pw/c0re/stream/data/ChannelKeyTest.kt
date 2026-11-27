@@ -55,6 +55,40 @@ class ChannelKeyTest {
     }
 
     @Test
+    fun `rtsp urls have stable normalized keys`() {
+        assertEquals("rtsp://host/live", ChannelKey.normalizeUrl("RTSP://Host:554/live/"))
+        val first = ChannelKey.stableKey("rtsp://Host:554/live/", null, name = "Camera")
+        val rewritten = ChannelKey.stableKey("rtsp://host/live", null, name = "Camera")
+        assertEquals(first, rewritten)
+        assertEquals(48, first.length)
+        assertTrue(first.all { it in '0'..'9' || it in 'a'..'f' })
+        assertNotEquals(first, ChannelKey.stableKey("rtsp://host/other", null, name = "Camera"))
+    }
+
+    @Test
+    fun `udp urls have stable keys and rtsp variants survive token refresh`() {
+        assertEquals("udp://239.0.0.1:5000/", ChannelKey.normalizeUrl("udp://@239.0.0.1:5000"))
+        val withToken = ChannelKey.stableKey("udp://239.0.0.1:5000?token=aaa", null, name = "Cam")
+        val refreshed = ChannelKey.stableKey("udp://239.0.0.1:5000?token=bbb", null, name = "Cam")
+        assertEquals(withToken, refreshed)
+
+        val hd = ChannelKey.variantKey("rtsp://host/live?token=1&quality=hd")
+        val sd = ChannelKey.variantKey("rtsp://host/live?token=2&quality=sd")
+        assertNotEquals(hd, sd)
+        assertEquals(hd, ChannelKey.variantKey("rtsp://host/live?token=zzz&quality=hd"))
+        val hdKey = ChannelKey.stableKey("rtsp://host/live?token=1&quality=hd", "cam", variantKey = hd)
+        val sdKey = ChannelKey.stableKey("rtsp://host/live?token=2&quality=sd", "cam", variantKey = sd)
+        assertNotEquals(hdKey, sdKey)
+    }
+
+    @Test
+    fun `normalization still rejects file and credentialed stream urls`() {
+        assertNull(ChannelKey.normalizeUrl("file:///etc/passwd"))
+        assertNull(ChannelKey.normalizeUrl("rtsp://user:secret@host/live"))
+        assertNull(ChannelKey.variantKey("udp://user:pass@239.0.0.1:5000"))
+    }
+
+    @Test
     fun `same tvg id but different variant urls stay distinct`() {
         val variantA = ChannelKey.variantKey("https://example.com/live/news/hd.ts?token=aaa")
         val variantB = ChannelKey.variantKey("https://example.com/live/news/sd.ts?token=bbb")

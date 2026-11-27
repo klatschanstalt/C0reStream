@@ -180,6 +180,9 @@ fun PlayerScreen(
     val effectiveMediaKey = if (channel != null) null else pending?.mediaKey ?: PlayerHub.mediaKey
     val effectiveKind = if (channel != null) "live" else pending?.kind ?: PlayerHub.kind
     val effectivePlaylistId = channel?.playlistId ?: pending?.playlistId ?: PlayerHub.playlistId
+    // RTSP/RTP/UDP sources are playable but cannot be recorded by the OkHttp-based recorder.
+    val effectiveStream = effectiveUrl?.let(NetworkPolicy::parseStreamUrl)
+    val canRecord = effectiveStream?.isHttp == true
 
     val currentMediaKey by rememberUpdatedState(effectiveMediaKey)
     val currentTitle by rememberUpdatedState(effectiveTitle)
@@ -260,7 +263,7 @@ fun PlayerScreen(
     LaunchedEffect(controller, channel?.id, pending?.url, currentId) {
         val player = controller ?: return@LaunchedEffect
         val url = effectiveUrl
-        if (url == null || NetworkPolicy.parse(url) == null) {
+        if (url == null || NetworkPolicy.parseStreamUrl(url) == null) {
             playbackError = "Invalid stream URL"
             return@LaunchedEffect
         }
@@ -702,12 +705,13 @@ fun PlayerScreen(
                             )
                         }
                         IconButton(
-                            enabled = effectiveUrl != null,
+                            enabled = recording != null || canRecord,
                             onClick = {
                                 if (recording != null) {
                                     RecordingManager.stop()
-                                } else {
+                                } else if (canRecord) {
                                     effectiveUrl?.let { url ->
+                                        if (!NetworkPolicy.isRecordableStream(url)) return@let
                                         scope.launch {
                                             val source = vm.sourceFor(effectivePlaylistId)
                                             RecordingManager.start(

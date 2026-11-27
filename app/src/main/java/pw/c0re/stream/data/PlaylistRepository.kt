@@ -69,10 +69,27 @@ class PlaylistRepository(private val db: AppDatabase) {
         existingId: Long? = null,
         guard: ShrinkGuard = ShrinkGuard(),
     ): ImportResult = withContext(Dispatchers.IO) {
-        val client = NetworkPolicy.importClient(userAgent, useProxy, proxyHost, proxyPort)
-        val bytes = client.newCall(Request.Builder().url(NetworkPolicy.requireUrl(url)).build())
-            .execute().use { response -> response.readBytes() }
-        val parsed = M3UParser.parseWithStats(bytes)
+        // A single RTSP/UDP feed supplied as the playlist source is stored as one channel. It is
+        // never fetched with OkHttp, so HTTP redirect and public-suffix rules do not apply to it.
+        val parsed = if (isDirectStreamUrl(url)) {
+            M3uParseResult(
+                channels = listOf(
+                    RawChannel(
+                        name = displayName.trim().take(512).ifBlank { "Unknown" },
+                        logo = null,
+                        group = null,
+                        tvgId = null,
+                        url = url,
+                    ),
+                ),
+                stats = ImportStats(received = 1, accepted = 1),
+            )
+        } else {
+            val client = NetworkPolicy.importClient(userAgent, useProxy, proxyHost, proxyPort)
+            val bytes = client.newCall(Request.Builder().url(NetworkPolicy.requireUrl(url)).build())
+                .execute().use { response -> response.readBytes() }
+            M3UParser.parseWithStats(bytes)
+        }
         val plan = planImport(parsed.channels, parsed.stats)
         if (plan.ordered.isEmpty()) {
             throw ImportGuardException("No channels found", plan.stats)
@@ -335,6 +352,13 @@ class PlaylistRepository(private val db: AppDatabase) {
 
     companion object {
         const val DEFAULT_MIN_KEEP_RATIO = 0.5f
+
+        /**
+         * True when [url] is a direct rtsp://, rtspu:// or udp:// playback source rather than an
+         * HTTP(S) playlist document. Such sources are stored/refreshable without an HTTP fetch.
+         */
+        fun isDirectStreamUrl(url: String): Boolean =
+            NetworkPolicy.parseStreamUrl(url)?.let { !it.isHttp } ?: false
 
         /** True when a refresh would drop more than the configured share of existing channels. */
         fun shouldBlockShrink(oldSize: Int, newSize: Int, guard: ShrinkGuard = ShrinkGuard()): Boolean =

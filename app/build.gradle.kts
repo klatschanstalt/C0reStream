@@ -2,6 +2,7 @@ import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.Signature
 import java.util.Properties
+import org.gradle.api.tasks.testing.Test
 
 plugins {
     alias(libs.plugins.android.application)
@@ -120,7 +121,6 @@ dependencies {
     implementation(libs.media3.ui)
     implementation(libs.media3.session)
     implementation(libs.media3.rtsp)
-    implementation(libs.media3.ffmpeg)
 
     implementation(libs.paging.runtime)
     implementation(libs.paging.compose)
@@ -150,6 +150,10 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.room.testing)
     androidTestImplementation(libs.kotlinx.coroutines.test)
+}
+
+tasks.withType<Test>().configureEach {
+    System.getProperty("c0re.longstream")?.let { systemProperty("c0re.longstream", it) }
 }
 
 // Signs the non-executable resource manifest with the existing production key. No new key is

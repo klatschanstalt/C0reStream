@@ -189,6 +189,97 @@ class NetworkPolicyTest {
     }
 
     @Test
+    fun `parseStreamUrl accepts http and https playback urls`() {
+        val https = NetworkPolicy.parseStreamUrl("https://cdn.example/live/index.m3u8")!!
+        assertTrue(https.isHttp)
+        assertFalse(https.isRtsp)
+        assertEquals("cdn.example", https.host)
+        assertEquals(443, https.port)
+        assertNotNull(NetworkPolicy.parseStreamUrl("http://example.com:8080/live.ts"))
+    }
+
+    @Test
+    fun `parseStreamUrl accepts rtsp and rtspu with and without ports`() {
+        val plain = NetworkPolicy.parseStreamUrl("rtsp://192.168.1.10/live/channel")!!
+        assertEquals("rtsp", plain.scheme)
+        assertTrue(plain.isRtsp)
+        assertFalse(plain.isUdp)
+        assertEquals("192.168.1.10", plain.host)
+        assertNull(plain.port)
+
+        val withPort = NetworkPolicy.parseStreamUrl("RTSPU://media.example:554/live?token=abc")!!
+        assertEquals("rtspu", withPort.scheme)
+        assertTrue(withPort.isRtsp)
+        assertEquals("media.example", withPort.host)
+        assertEquals(554, withPort.port)
+        assertEquals("token=abc", withPort.query)
+    }
+
+    @Test
+    fun `parseStreamUrl accepts udp multicast groups and listen forms`() {
+        listOf(
+            "udp://239.255.1.1:5000",
+            "udp://@239.255.1.1:5000",
+            "udp://239.255.1.1",
+            "udp://:5000",
+            "udp://@:5000",
+            "udp://[ff02::1]:5000",
+        ).forEach { url -> assertNotNull(NetworkPolicy.parseStreamUrl(url)) }
+
+        val group = NetworkPolicy.parseStreamUrl("udp://@239.255.1.1:5000")!!
+        assertEquals("udp", group.scheme)
+        assertTrue(group.isUdp)
+        assertFalse(group.isRtsp)
+        assertEquals("239.255.1.1", group.host)
+        assertEquals(5000, group.port)
+        val listen = NetworkPolicy.parseStreamUrl("udp://:5000")!!
+        assertNull(listen.host)
+        assertEquals(5000, listen.port)
+    }
+
+    @Test
+    fun `parseStreamUrl rejects credentials unsafe schemes and malformed authorities`() {
+        assertNull(NetworkPolicy.parseStreamUrl("rtsp://user:secret@example.com/live"))
+        assertNull(NetworkPolicy.parseStreamUrl("udp://user:pass@239.0.0.1:5000"))
+        assertNull(NetworkPolicy.parseStreamUrl("rtsp://user@example.com/live"))
+        assertNull(NetworkPolicy.parseStreamUrl("file:///etc/passwd"))
+        assertNull(NetworkPolicy.parseStreamUrl("ftp://example.com/file"))
+        assertNull(NetworkPolicy.parseStreamUrl("rtsps://example.com/live"))
+        assertNull(NetworkPolicy.parseStreamUrl("rtsp://"))
+        assertNull(NetworkPolicy.parseStreamUrl("rtsp://host:70000/live"))
+        assertNull(NetworkPolicy.parseStreamUrl("rtsp://host/a b"))
+        assertNull(NetworkPolicy.parseStreamUrl("rtsp://host/a\\b"))
+        assertNull(NetworkPolicy.parseStreamUrl("rtsp://host/\u0000"))
+        assertNull(NetworkPolicy.parseStreamUrl("rtsp://" + "a".repeat(20_000)))
+    }
+
+    @Test
+    fun `playback helpers keep http policy intact`() {
+        assertNull(NetworkPolicy.parse("rtsp://example.com/live"))
+        assertNull(NetworkPolicy.parse("udp://239.0.0.1:5000"))
+        assertFalse(NetworkPolicy.isRtsp("https://example.com/live"))
+        assertFalse(NetworkPolicy.isUdp("https://example.com/live"))
+        assertTrue(NetworkPolicy.isRtsp("rtspu://example.com/live"))
+        assertTrue(NetworkPolicy.isUdp("udp://239.0.0.1:5000"))
+        assertTrue(NetworkPolicy.isRecordableStream("https://example.com/live"))
+        assertFalse(NetworkPolicy.isRecordableStream("rtsp://example.com/live"))
+        assertFalse(NetworkPolicy.isRecordableStream("rtspu://example.com/live"))
+        assertFalse(NetworkPolicy.isRecordableStream("udp://239.0.0.1:5000"))
+    }
+
+    @Test
+    fun `canonical stream url drops default ports trailing slashes and fragments`() {
+        assertEquals(
+            "rtsp://host/live",
+            NetworkPolicy.parseStreamUrl("RTSP://Host:554/live/#fragment")!!.canonical,
+        )
+        assertEquals(
+            "udp://239.0.0.1:5000/",
+            NetworkPolicy.parseStreamUrl("udp://@239.0.0.1:5000")!!.canonical,
+        )
+    }
+
+    @Test
     fun `redirect guard blocks credential query parameters on cross origin hops`() {
         val withToken = NetworkPolicy.requireUrl("http://example.com:8080/live?token=secret")
         assertTrue(runCatching {

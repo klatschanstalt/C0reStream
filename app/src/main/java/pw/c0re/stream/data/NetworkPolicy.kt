@@ -21,6 +21,10 @@ import java.util.concurrent.TimeUnit
  * URL must be a well-formed HTTP(S) URL without embedded credentials. Redirects are allowed
  * only within the same transport class: an HTTPS request can never be redirected to HTTP.
  *
+ * [parse] is deliberately HTTP-only and remains the gate for API/import/EPG/download calls.
+ * Playback sources are validated separately by [parseStreamUrl], which additionally accepts
+ * rtsp://, rtspu:// and udp:// URLs; it never weakens the HTTP redirect guard.
+ *
  * Two classes of client profiles exist:
  *  - bounded request/response profiles ([apiClient], [importClient], [epgClient],
  *    [downloadClient] and the compatibility [client]) keep an absolute 90 s call deadline;
@@ -68,6 +72,142 @@ object NetworkPolicy {
     fun requireUrl(value: String): HttpUrl = requireNotNull(parse(value)) { "Invalid network URL" }
 
     fun isHttps(value: String): Boolean = parse(value)?.isHttps == true
+
+    /**
+     * A validated playback source. HTTP(S) entries are parsed with [parse], so all existing HTTP
+     * semantics (including host canonicalisation) are preserved. RTSP/RTP/UDP entries are parsed
+     * structurally because OkHttp's URL parser only understands HTTP(S).
+     */
+    data class StreamUrl(
+        val raw: String,
+        val scheme: String,
+        val host: String?,
+        val port: Int?,
+        val path: String?,
+        val query: String?,
+    ) {
+        val isHttp: Boolean get() = scheme == "http" || scheme == "https"
+        val isRtsp: Boolean get() = scheme == "rtsp" || scheme == "rtspu"
+        val isUdp: Boolean get() = scheme == "udp"
+
+        /** Fragment-free canonical form used for stable channel keys. */
+        val canonical: String
+            get() {
+                val defaultPort = when (scheme) {
+                    "http" -> 80
+                    "https" -> 443
+                    "rtsp", "rtspu" -> 554
+                    else -> null
+                }
+                val effectivePort = port?.takeIf { it != defaultPort }
+                val authority = buildString {
+                    append(scheme).append("://")
+                    host?.let { append(it.lowercase(Locale.ROOT)) }
+                    effectivePort?.let { append(':').append(it) }
+                }
+                val normalizedPath = path.orEmpty().substringBefore("?").trimEnd('/').ifEmpty { "/" }
+                return authority + normalizedPath + (query?.let { "?$it" }.orEmpty())
+            }
+    }
+
+    /**
+     * Validates a URL used only as a playback source. Accepts http, https, rtsp, rtspu and udp;
+     * rejects embedded credentials, control characters, whitespace, backslashes, overlong URLs
+     * and unsafe schemes. HTTP(S) still goes through [parse], so API/import/EPG/download calls
+     * and the per-hop redirect guard keep their HTTP-only policy.
+     */
+    fun parseStreamUrl(value: String): StreamUrl? {
+        if (value.length !in 7..maxUrlLength) return null
+        if (value.any { it.isISOControl() || it.isWhitespace() || it == '\\' }) return null
+        val separator = value.indexOf("://")
+        if (separator <= 0) return null
+        val scheme = value.substring(0, separator).lowercase(Locale.ROOT)
+        when (scheme) {
+            "http", "https" -> {
+                val url = parse(value) ?: return null
+                return StreamUrl(value, scheme, url.host, url.port, url.encodedPath, url.encodedQuery)
+            }
+            "rtsp", "rtspu", "udp" -> return parseCustomStreamUrl(value, scheme)
+            else -> return null
+        }
+    }
+
+    /** True when [value] is an RTSP (including rtspu) playback source. */
+    fun isRtsp(value: String): Boolean = parseStreamUrl(value)?.isRtsp == true
+
+    /** True when [value] is a raw UDP playback source. */
+    fun isUdp(value: String): Boolean = parseStreamUrl(value)?.isUdp == true
+
+    /** Only HTTP(S) sources may be handed to the OkHttp-based RecordingManager. */
+    fun isRecordableStream(value: String): Boolean = parseStreamUrl(value)?.isHttp == true
+
+    private fun parseCustomStreamUrl(value: String, scheme: String): StreamUrl? {
+        val rest = value.substring(scheme.length + 3)
+        val authorityEnd = rest.indexOfFirst { it == '/' || it == '?' || it == '#' }
+            .let { if (it < 0) rest.length else it }
+        var authority = rest.substring(0, authorityEnd)
+        val tail = rest.substring(authorityEnd)
+        // VLC-style udp://@group:port denotes a bare multicast group, not a credential.
+        if (scheme == "udp" && authority.startsWith("@")) authority = authority.substring(1)
+        if (authority.any { it == '@' }) return null
+        val (host, port) = splitStreamAuthority(authority, scheme) ?: return null
+        val path = tail.substringBefore("?").substringBefore("#").takeIf { it.isNotEmpty() }
+        val query = tail.indexOf('?').takeIf { it >= 0 }?.let { index ->
+            tail.substring(index + 1).substringBefore("#").takeIf { it.isNotEmpty() }
+        }
+        return StreamUrl(value, scheme, host, port, path, query)
+    }
+
+    private fun splitStreamAuthority(authority: String, scheme: String): Pair<String?, Int?>? {
+        if (authority.length > 512) return null
+        val host: String
+        val portText: String?
+        if (authority.startsWith("[")) {
+            val close = authority.indexOf(']')
+            if (close < 0) return null
+            host = authority.substring(0, close + 1)
+            val remainder = authority.substring(close + 1)
+            when {
+                remainder.isEmpty() -> portText = null
+                remainder.startsWith(":") -> portText = remainder.substring(1)
+                else -> return null
+            }
+        } else {
+            val firstColon = authority.indexOf(':')
+            if (firstColon < 0) {
+                host = authority
+                portText = null
+            } else {
+                // Unbracketed IPv6 is ambiguous; require [::1] form.
+                if (authority.indexOf(':', firstColon + 1) >= 0) return null
+                host = authority.substring(0, firstColon)
+                portText = authority.substring(firstColon + 1)
+            }
+        }
+        val port = portText?.let { text ->
+            text.toIntOrNull()?.takeIf { it in 1..65535 } ?: return null
+        }
+        if (host.isEmpty()) {
+            // udp://:5000 means "listen on port"; RTSP always needs a server.
+            if (scheme != "udp" || port == null) return null
+            return null to port
+        }
+        if (!isValidStreamHost(host)) return null
+        return host to port
+    }
+
+    private fun isValidStreamHost(host: String): Boolean {
+        if (host.isBlank() || host.length > 253) return false
+        val inner = if (host.startsWith("[") && host.endsWith("]")) {
+            host.substring(1, host.length - 1)
+        } else {
+            host
+        }
+        if (inner.isEmpty()) return false
+        return inner.all { c ->
+            c.isLetterOrDigit() || c == '.' || c == '-' || c == '_' || c == ':' || c == '%'
+        }
+    }
 
     /**
      * Catch-up sources are URL templates containing ${start}, {utc}, {duration} and similar

@@ -65,6 +65,69 @@ class M3UParserTest {
     }
 
     @Test
+    fun `accepts rtsp rtspu and udp channels with full metadata`() {
+        val text = """
+            #EXTM3U
+            #EXTINF:-1 tvg-id="cam1" tvg-name="Camera One" tvg-logo="https://img.example/cam.png" group-title="Cams",Camera 1
+            rtsp://192.168.1.10:554/cam1
+            #EXTINF:-1 tvg-id="cam2" group-title="Cams",Camera 2
+            rtspu://media.example/live/cam2
+            #EXTINF:-1 tvg-id="cam3" group-title="Cams",Camera 3
+            udp://@239.255.1.1:5000
+        """.trimIndent()
+        val parsed = M3UParser.parseWithStats(text)
+        assertEquals(3, parsed.channels.size)
+        assertEquals(3, parsed.stats.received)
+        assertEquals(3, parsed.stats.accepted)
+        assertEquals(0, parsed.stats.rejected)
+        assertFalse(parsed.stats.truncated)
+        assertEquals("rtsp://192.168.1.10:554/cam1", parsed.channels[0].url)
+        assertEquals("cam1", parsed.channels[0].tvgId)
+        assertEquals("Camera One", parsed.channels[0].tvgName)
+        assertEquals("Cams", parsed.channels[0].group)
+        assertEquals("https://img.example/cam.png", parsed.channels[0].logo)
+        assertEquals("rtspu://media.example/live/cam2", parsed.channels[1].url)
+        assertEquals("udp://@239.255.1.1:5000", parsed.channels[2].url)
+    }
+
+    @Test
+    fun `rejects credentialed and unsafe stream lines but keeps valid rtsp`() {
+        val text = """
+            #EXTM3U
+            rtsp://user:pass@example.com/live
+            file:///tmp/movie.mp4
+            rtsps://example.com/live
+            rtsp://example.com/live
+        """.trimIndent()
+        val parsed = M3UParser.parseWithStats(text)
+        assertEquals(1, parsed.channels.size)
+        assertEquals("rtsp://example.com/live", parsed.channels.single().url)
+        assertEquals(4, parsed.stats.received)
+        assertEquals(3, parsed.stats.rejectedCount(ImportRejectionCode.INVALID_STREAM_URL))
+    }
+
+    @Test
+    fun `large playlist with rtsp entries is parsed completely without truncation`() {
+        val count = 50_000
+        val text = buildString(count * 80) {
+            append("#EXTM3U\n")
+            for (index in 1..count) {
+                append("#EXTINF:-1 tvg-id=\"rtsp-$index\" group-title=\"Cameras\",Camera $index\n")
+                append("rtsp://camera.example/$index/live\n")
+            }
+        }
+        val result = M3UParser.parseWithStats(text)
+        assertEquals(count, result.channels.size)
+        assertEquals(count, result.stats.received)
+        assertEquals(count, result.stats.accepted)
+        assertEquals(0, result.stats.rejected)
+        assertFalse(result.stats.truncated)
+        assertEquals("rtsp://camera.example/$count/live", result.channels.last().url)
+        assertEquals("Camera $count", result.channels.last().name)
+        assertEquals("Cameras", result.channels.first().group)
+    }
+
+    @Test
     fun `keeps catchup templates and validates logos`() {
         val text = """
             #EXTM3U

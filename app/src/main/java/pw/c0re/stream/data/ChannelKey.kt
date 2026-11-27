@@ -20,13 +20,17 @@ object ChannelKey {
     private val whitespace = Regex("\\s+")
 
     fun normalizeUrl(raw: String): String? {
-        val url = NetworkPolicy.parse(raw) ?: return null
-        val scheme = url.scheme.lowercase(Locale.ROOT)
-        val defaultPort = (scheme == "http" && url.port == 80) || (scheme == "https" && url.port == 443)
-        val port = if (defaultPort) "" else ":${url.port}"
-        val path = url.encodedPath.trimEnd('/').ifEmpty { "/" }
-        val query = url.encodedQuery?.let { "?$it" }.orEmpty()
-        return "$scheme://${url.host.lowercase(Locale.ROOT)}$port$path$query"
+        val url = NetworkPolicy.parse(raw)
+        if (url != null) {
+            val scheme = url.scheme.lowercase(Locale.ROOT)
+            val defaultPort = (scheme == "http" && url.port == 80) || (scheme == "https" && url.port == 443)
+            val port = if (defaultPort) "" else ":${url.port}"
+            val path = url.encodedPath.trimEnd('/').ifEmpty { "/" }
+            val query = url.encodedQuery?.let { "?$it" }.orEmpty()
+            return "$scheme://${url.host.lowercase(Locale.ROOT)}$port$path$query"
+        }
+        // RTSP/UDP playback sources have no HttpUrl representation; keep their canonical form.
+        return NetworkPolicy.parseStreamUrl(raw)?.takeUnless { it.isHttp }?.canonical
     }
 
     /**
@@ -114,7 +118,7 @@ object ChannelKey {
     }
 
     private fun canonicalVariantUrl(raw: String): String? {
-        val url: HttpUrl = NetworkPolicy.parse(raw) ?: return null
+        val url: HttpUrl = NetworkPolicy.parse(raw) ?: return canonicalStreamVariantUrl(raw)
         val result = url.newBuilder().query(null).fragment(null)
         val kept = url.queryParameterNames
             .filter { name -> name.lowercase(Locale.ROOT) !in volatileQueryNames }
@@ -123,6 +127,20 @@ object ChannelKey {
             for (value in url.queryParameterValues(name)) result.addQueryParameter(name, value)
         }
         return result.build().toString()
+    }
+
+    /** Query-token stripping for rtsp://, rtspu:// and udp:// variants. */
+    private fun canonicalStreamVariantUrl(raw: String): String? {
+        val stream = NetworkPolicy.parseStreamUrl(raw)?.takeUnless { it.isHttp } ?: return null
+        val base = stream.canonical.substringBefore('?')
+        val query = stream.query ?: return base
+        val kept = query.split('&')
+            .filter { part ->
+                part.isNotEmpty() &&
+                    part.substringBefore('=').lowercase(Locale.ROOT) !in volatileQueryNames
+            }
+            .sortedBy { it.substringBefore('=').lowercase(Locale.ROOT) }
+        return if (kept.isEmpty()) base else "$base?${kept.joinToString("&")}"
     }
 
     private fun sha256(value: String): String =

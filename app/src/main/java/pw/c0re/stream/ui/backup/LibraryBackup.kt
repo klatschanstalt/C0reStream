@@ -155,10 +155,10 @@ object LibraryBackup {
 
         // Validate every URL and identity before opening the transaction.
         playlists.forEach { validatePlaylist(it) }
-        channels.forEach { require(NetworkPolicy.parse(it.getString("url")) != null) }
-        progress.forEach { require(NetworkPolicy.parse(it.getString("url")) != null) }
+        channels.forEach { require(NetworkPolicy.parseStreamUrl(it.getString("url")) != null) }
+        progress.forEach { require(NetworkPolicy.parseStreamUrl(it.getString("url")) != null) }
         watchlist.forEach { item ->
-            item.optional("url")?.let { require(NetworkPolicy.parse(it) != null) }
+            item.optional("url")?.let { require(NetworkPolicy.parseStreamUrl(it) != null) }
             item.optional("poster")?.let { require(NetworkPolicy.parse(it) != null) }
         }
         require(playlists.map { it.getLong("id") }.toSet().size == playlists.size) { "Duplicate playlist IDs" }
@@ -326,7 +326,7 @@ object LibraryBackup {
             val credentials = requireNotNull(XtreamApi.parseSyntheticUrl(url)) { "Invalid Xtream URL" }
             require(NetworkPolicy.parse(credentials.host) != null)
         } else {
-            require(NetworkPolicy.parse(url) != null) { "Invalid playlist URL" }
+            require(NetworkPolicy.parseStreamUrl(url) != null) { "Invalid playlist URL" }
         }
         item.optional("epg")?.let { require(NetworkPolicy.parse(it) != null) { "Invalid EPG URL" } }
     }

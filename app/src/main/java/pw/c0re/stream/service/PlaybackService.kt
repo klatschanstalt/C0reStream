@@ -7,7 +7,9 @@ import android.os.Looper
 import android.os.SystemClock
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.ColorInfo
 import androidx.media3.common.Format
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.BaseAudioProcessor
 import androidx.media3.common.util.UnstableApi
@@ -20,8 +22,11 @@ import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.mediacodec.MediaCodecRenderer.DecoderInitializationException
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.rtsp.RtspMediaSource
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.session.MediaSession
@@ -34,6 +39,8 @@ import pw.c0re.stream.BuildConfig
 import pw.c0re.stream.C0reStreamApp
 import pw.c0re.stream.data.AppSettings
 import pw.c0re.stream.data.NetworkPolicy
+import pw.c0re.stream.data.player.DecoderFailureClass
+import pw.c0re.stream.data.player.DecoderFailurePolicy
 import pw.c0re.stream.data.player.PerformanceProfile
 import pw.c0re.stream.data.player.PlaybackDiagnostics
 import pw.c0re.stream.data.player.PlaybackPreferences
@@ -49,7 +56,9 @@ import kotlin.math.min
  *
  * HTTPS-to-HTTP redirects stay blocked by [NetworkPolicy.playbackClient], which also disables
  * the absolute call deadline so a continuous live stream survives beyond 90 s. No DRM bypass is
- * implemented: decoder selection is delegated to MediaCodec capabilities reported by the device.
+ * implemented: decoder selection is delegated to MediaCodec capabilities reported by the device,
+ * with the packaged ffmpeg decoder extension available only as a fallback for formats it was
+ * built to support.
  */
 @UnstableApi
 class PlaybackService : MediaSessionService() {
@@ -68,6 +77,12 @@ class PlaybackService : MediaSessionService() {
     private var videoHeight = 0
     private var pixelWidthHeightRatio = 1f
     private var videoDecoder = ""
+    private var audioDecoder = ""
+    private var videoMime = ""
+    private var audioMime = ""
+    private var audioSampleRate = 0
+    private var audioChannelCount = 0
+    private var videoFrameRate = 0f
     private var colorInfoText = ""
     private var videoSizeInfoText = ""
     private var bitrateEstimate = 0L
@@ -75,6 +90,16 @@ class PlaybackService : MediaSessionService() {
     private var framesInWindow = 0
     private var lastPublishAtMs = 0L
     private var currentDiagnostics = PlaybackDiagnostics()
+
+    // Per-item (playback session) decoder-init counters. Media3's fallback already walks a
+    // finite decoder list; these counters only classify repeated failures and are saturated,
+    // so no retry/fallback loop is ever started by this service.
+    private var audioInitFailures = 0
+    private var videoInitFailures = 0
+    private var audioFailureClass = DecoderFailureClass.NONE
+    private var videoFailureClass = DecoderFailureClass.NONE
+    private var lastAudioFailureAtMs = 0L
+    private var lastVideoFailureAtMs = 0L
 
     private val diagnosticsHandler = Handler(Looper.getMainLooper())
     private val publishDiagnostics = object : Runnable {
@@ -97,13 +122,19 @@ class PlaybackService : MediaSessionService() {
                     videoWidth = videoWidth,
                     videoHeight = videoHeight,
                     pixelWidthHeightRatio = pixelWidthHeightRatio,
-                    codec = lastVideoFormat?.codecs.orEmpty(),
-                    decoder = videoDecoder,
+                    codec = lastVideoFormat?.codecs?.takeIf { it.isNotBlank() } ?: videoMime,
+                    decoder = videoFailureClass.decorate(videoDecoder),
                     bufferMs = activePlayer.totalBufferedDuration,
                     droppedFrames = droppedFrames,
-                    audioFormat = describeAudio(lastAudioFormat),
+                    audioFormat = audioFailureClass.decorate(describeAudio(lastAudioFormat)),
                     colorInfo = colorInfoText,
                     videoSizeInfo = videoSizeInfoText,
+                    audioMime = audioMime,
+                    videoMime = videoMime,
+                    audioDecoder = audioFailureClass.decorate(audioDecoder),
+                    audioSampleRate = audioSampleRate,
+                    audioChannelCount = audioChannelCount,
+                    videoFrameRate = videoFrameRate,
                 )
                 currentDiagnostics = snapshot
                 session.setSessionExtras(snapshot.toBundle())
@@ -120,9 +151,9 @@ class PlaybackService : MediaSessionService() {
             decoderReuseEvaluation: androidx.media3.exoplayer.DecoderReuseEvaluation?,
         ) {
             lastVideoFormat = format
-            val info = format.colorInfo
-            colorInfoText = if (info == null) "" else
-                "CS ${info.colorSpace} TR ${info.colorTransfer} RANGE ${info.colorRange}"
+            videoMime = format.sampleMimeType.orEmpty()
+            videoFrameRate = format.frameRate.takeIf { it.isFinite() && it > 0f } ?: 0f
+            colorInfoText = describeColor(format.colorInfo)
         }
 
         override fun onAudioInputFormatChanged(
@@ -131,6 +162,9 @@ class PlaybackService : MediaSessionService() {
             decoderReuseEvaluation: androidx.media3.exoplayer.DecoderReuseEvaluation?,
         ) {
             lastAudioFormat = format
+            audioMime = format.sampleMimeType.orEmpty()
+            audioSampleRate = format.sampleRate.coerceAtLeast(0)
+            audioChannelCount = format.channelCount.coerceAtLeast(0)
         }
 
         override fun onVideoSizeChanged(eventTime: EventTime, videoSize: androidx.media3.common.VideoSize) {
@@ -152,8 +186,39 @@ class PlaybackService : MediaSessionService() {
             videoDecoder = describeDecoder(decoderName, lastVideoFormat?.sampleMimeType.orEmpty())
         }
 
+        override fun onAudioDecoderInitialized(
+            eventTime: EventTime,
+            decoderName: String,
+            initializedTimestampMs: Long,
+            initializationDurationMs: Long,
+        ) {
+            // The same extension renderer selection applies to audio: system decoder first,
+            // FFmpeg fallback only for formats the built extension actually supports.
+            audioDecoder = describeDecoder(decoderName, lastAudioFormat?.sampleMimeType.orEmpty())
+        }
+
         override fun onVideoDecoderReleased(eventTime: EventTime, decoderName: String) {
             if (videoDecoder.startsWith(decoderName.take(120))) videoDecoder = ""
+        }
+
+        override fun onAudioDecoderReleased(eventTime: EventTime, decoderName: String) {
+            if (audioDecoder.startsWith(decoderName.take(120))) audioDecoder = ""
+        }
+
+        override fun onAudioCodecError(eventTime: EventTime, audioCodecError: Exception) {
+            if (audioCodecError is DecoderInitializationException) recordFailure(audio = true)
+        }
+
+        override fun onVideoCodecError(eventTime: EventTime, videoCodecError: Exception) {
+            if (videoCodecError is DecoderInitializationException) recordFailure(audio = false)
+        }
+
+        override fun onPlayerError(eventTime: EventTime, error: PlaybackException) {
+            if (error.errorCode != PlaybackException.ERROR_CODE_DECODER_INIT_FAILED) return
+            // Codec errors above attribute recoverable failures to the right renderer; a fatal
+            // init failure without a prior codec error is attributed from the active formats.
+            val audioOnly = lastAudioFormat != null && lastVideoFormat == null
+            recordFailure(audio = audioOnly)
         }
 
         override fun onDroppedVideoFrames(eventTime: EventTime, droppedFrames: Int, elapsedMs: Long) {
@@ -191,6 +256,20 @@ class PlaybackService : MediaSessionService() {
             videoWidth = 0
             videoHeight = 0
             videoDecoder = ""
+            audioDecoder = ""
+            videoMime = ""
+            audioMime = ""
+            audioSampleRate = 0
+            audioChannelCount = 0
+            videoFrameRate = 0f
+            colorInfoText = ""
+            videoSizeInfoText = ""
+            audioInitFailures = 0
+            videoInitFailures = 0
+            audioFailureClass = DecoderFailureClass.NONE
+            videoFailureClass = DecoderFailureClass.NONE
+            lastAudioFailureAtMs = 0L
+            lastVideoFailureAtMs = 0L
             bitrateEstimate = 0L
             droppedFrames = 0L
             framesInWindow = 0
@@ -218,11 +297,45 @@ class PlaybackService : MediaSessionService() {
             override fun createDataSource(): DataSource =
                 OkHttpDataSource.Factory(playbackClient()).createDataSource()
         }
-        val mediaSourceFactory = DefaultMediaSourceFactory(
+        val defaultMediaSourceFactory = DefaultMediaSourceFactory(
             dataSourceFactory,
             DefaultExtractorsFactory(),
         ).apply {
             if (prefs.performanceProfile == PerformanceProfile.LOW_LATENCY) setLiveTargetOffsetMs(0)
+        }
+        val rtspFactory = RtspMediaSource.Factory().setUserAgent(defaultUserAgent)
+        val rtspOverTcpFactory = RtspMediaSource.Factory()
+            .setUserAgent(defaultUserAgent)
+            .setForceUseRtpTcp(true)
+        val mediaSourceFactory = object : MediaSource.Factory {
+            override fun createMediaSource(mediaItem: androidx.media3.common.MediaItem): MediaSource =
+                when (mediaItem.localConfiguration?.uri?.scheme?.lowercase()) {
+                    "rtsp" -> rtspFactory.createMediaSource(mediaItem)
+                    "rtspu" -> rtspOverTcpFactory.createMediaSource(mediaItem)
+                    else -> defaultMediaSourceFactory.createMediaSource(mediaItem)
+                }
+
+            override fun getSupportedTypes(): IntArray =
+                (defaultMediaSourceFactory.supportedTypes + rtspFactory.supportedTypes)
+                    .distinct().toIntArray()
+
+            override fun setDrmSessionManagerProvider(
+                provider: androidx.media3.exoplayer.drm.DrmSessionManagerProvider,
+            ): MediaSource.Factory {
+                defaultMediaSourceFactory.setDrmSessionManagerProvider(provider)
+                rtspFactory.setDrmSessionManagerProvider(provider)
+                rtspOverTcpFactory.setDrmSessionManagerProvider(provider)
+                return this
+            }
+
+            override fun setLoadErrorHandlingPolicy(
+                policy: androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy,
+            ): MediaSource.Factory {
+                defaultMediaSourceFactory.setLoadErrorHandlingPolicy(policy)
+                rtspFactory.setLoadErrorHandlingPolicy(policy)
+                rtspOverTcpFactory.setLoadErrorHandlingPolicy(policy)
+                return this
+            }
         }
         val renderersFactory = PlaybackRenderersFactory(
             this,
@@ -341,13 +454,73 @@ class PlaybackService : MediaSessionService() {
 
     private fun describeAudio(format: Format?): String {
         if (format == null) return ""
-        val codec = format.codecs.orEmpty().take(80)
-        val details = if (format.sampleRate > 0 && format.channelCount > 0) {
-            " ${format.sampleRate}Hz ${format.channelCount}ch"
-        } else {
-            ""
+        val codec = (format.codecs?.takeIf { it.isNotBlank() } ?: format.sampleMimeType).orEmpty().take(60)
+        val details = buildString {
+            if (format.sampleRate > 0) append(' ').append(format.sampleRate).append("Hz")
+            if (format.channelCount > 0) append(' ').append(format.channelCount).append("ch")
+            if (format.bitrate > 0) append(' ').append(format.bitrate / 1_000L).append("kbps")
         }
         return (codec + details).take(160)
+    }
+
+    /** Human-readable color/HDR description from measured Format.colorInfo values only. */
+    private fun describeColor(info: ColorInfo?): String {
+        if (info == null || (
+            info.colorSpace == Format.NO_VALUE &&
+                info.colorTransfer == Format.NO_VALUE &&
+                info.colorRange == Format.NO_VALUE
+            )
+        ) return ""
+        val parts = mutableListOf(
+            when (info.colorSpace) {
+                C.COLOR_SPACE_BT2020 -> "BT.2020"
+                C.COLOR_SPACE_BT709 -> "BT.709"
+                C.COLOR_SPACE_BT601 -> "BT.601"
+                else -> "CS ${info.colorSpace}"
+            },
+        )
+        if (ColorInfo.isTransferHdr(info)) {
+            parts += when (info.colorTransfer) {
+                C.COLOR_TRANSFER_ST2084 -> "PQ HDR"
+                C.COLOR_TRANSFER_HLG -> "HLG HDR"
+                else -> "HDR"
+            }
+        }
+        when (info.colorRange) {
+            C.COLOR_RANGE_FULL -> parts += "full range"
+            C.COLOR_RANGE_LIMITED -> parts += "limited range"
+            Format.NO_VALUE -> Unit
+            else -> Unit
+        }
+        return parts.joinToString(" ").take(120)
+    }
+
+    /**
+     * Counts one decoder-init failure for the current media item and keeps the class bounded.
+     * The timestamp guard avoids counting the same failure twice when Media3 reports it both as
+     * a codec error and as a fatal player error. No retry is triggered here.
+     */
+    private fun recordFailure(audio: Boolean) {
+        val now = SystemClock.elapsedRealtime()
+        if (audio) {
+            if (lastAudioFailureAtMs != 0L && now - lastAudioFailureAtMs < 500L) return
+            lastAudioFailureAtMs = now
+            audioInitFailures = DecoderFailurePolicy.nextCount(audioInitFailures)
+            audioFailureClass = DecoderFailurePolicy.classify(
+                audioInitFailures,
+                isInitFailure = true,
+                isAudioRenderer = true,
+            )
+        } else {
+            if (lastVideoFailureAtMs != 0L && now - lastVideoFailureAtMs < 500L) return
+            lastVideoFailureAtMs = now
+            videoInitFailures = DecoderFailurePolicy.nextCount(videoInitFailures)
+            videoFailureClass = DecoderFailurePolicy.classify(
+                videoInitFailures,
+                isInitFailure = true,
+                isAudioRenderer = false,
+            )
+        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
@@ -381,6 +554,13 @@ class PlaybackService : MediaSessionService() {
         floatOutput: Boolean,
     ) : DefaultRenderersFactory(context) {
         init {
+            // ON indexes extension renderers after the core MediaCodec renderers: system
+            // decoders stay preferred and the ffmpeg fallback is used only when no system
+            // decoder supports the input format. This can only decode formats that the ffmpeg
+            // build actually includes (audio via FfmpegAudioRenderer; an optional experimental
+            // video renderer in this Media3 build), never an unsupported codec. Extensions must
+            // be present in the APK to have any effect; none are assumed here.
+            setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
             setMediaCodecSelector(
                 if (hardwareDecoder) MediaCodecSelector.DEFAULT else MediaCodecSelector.PREFER_SOFTWARE,
             )
