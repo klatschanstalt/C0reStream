@@ -2,5 +2,5 @@
     "latestVersion": "1.4.0",
     "notes": "C0reStream 1.4.0: signierte Ressourcen-Updates, PackageInstaller, Profile mit PIN, QR-Import, Aufnahmen und Speicherbereinigung. Apache-2.0.",
     "apkUrl": "https://github.com/klatschanstalt/C0reStream/releases/download/v1.4.0/C0reStream.apk",
-    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    "sha256": "69048c17214ea307425f98a1cf3b0aca159a9c27f0d2f0134c8c4e115b66a20f"
 }

@@ -32,19 +32,19 @@ HTTP sources remain supported by owner decision; HTTPS is preferred and plaintex
 
 ## Install and verify
 
-1. Download the current signed APK: [C0reStream.apk (latest)](https://github.com/klatschanstalt/C0reStream/releases/latest/download/C0reStream.apk) or the [version-bound v1.3.0 APK](https://github.com/klatschanstalt/C0reStream/releases/download/v1.3.0/C0reStream.apk).
+1. Download the current signed APK: [C0reStream.apk (latest)](https://github.com/klatschanstalt/C0reStream/releases/latest/download/C0reStream.apk) or the [version-bound v1.4.0 APK](https://github.com/klatschanstalt/C0reStream/releases/download/v1.4.0/C0reStream.apk).
 2. Verify the checksum with [SHA256SUMS](https://github.com/klatschanstalt/C0reStream/releases/latest/download/SHA256SUMS):
 
    ```bash
    sha256sum --check SHA256SUMS
    ```
 
-   Version 1.3.0 SHA-256: `e3a98be25e6abdd32f5cefc08bf7dfb7379f5ace8da1c5e158d073e0be4b5bad` (5,786,466 bytes).
+   Version 1.4.0 SHA-256: `69048c17214ea307425f98a1cf3b0aca159a9c27f0d2f0134c8c4e115b66a20f` (6,027,029 bytes).
 3. Install the APK (Android may require allowing installation from unknown sources). The signing certificate fingerprint is `65FB26B0F617583228EA8813080FA7E2F8F6421022D8D279F928C726EA6E8543`.
 
 ## Updates
 
-The app reads the public `update.json` from `main` without any GitHub token. If a newer version is available, it downloads the version-bound APK over HTTPS and installs it only after SHA-256, package-name and signing-certificate checks plus your confirmation. You can always use the [permanent latest-release link](https://github.com/klatschanstalt/C0reStream/releases/latest) manually.
+The app reads the public `update.json` from `main` without any GitHub token. Non-executable resources use separately signed `resources.json`/`resources.sig` release assets with checksums, ETags, resumable downloads and rollback. If a newer APK is available, it downloads the version-bound APK over HTTPS and installs it only after SHA-256, package-name and signing-certificate checks plus your confirmation. You can always use the [permanent latest-release link](https://github.com/klatschanstalt/C0reStream/releases/latest) manually.
 
 ## Build
 
