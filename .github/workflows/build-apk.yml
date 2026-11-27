@@ -1,10 +1,17 @@
-name: Build C0reStream APK
+name: Build C0reStream
+
 on:
   workflow_dispatch:
+
 permissions:
   contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  build:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -15,27 +22,17 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v6
-        with:
-          gradle-version: '9.6.0'
       - uses: android-actions/setup-android@v4
         with:
-          packages: ''
-      - name: Install Android SDK packages
-        shell: bash
-        run: |
-          sdkmanager --list --channel=3 > /tmp/sdk-packages.txt
-          PLATFORM=$(awk -F '|' '{gsub(/^[ \t]+|[ \t]+$/, "", $1); if ($1 == "platforms;android-37.1") print $1}' /tmp/sdk-packages.txt | sort -u | tail -1)
-          if [[ -z "$PLATFORM" ]]; then
-            grep -iE '37|cinnamon' /tmp/sdk-packages.txt || true
-            exit 1
-          fi
-          sdkmanager --install --channel=3 "$PLATFORM" 'build-tools;37.0.0'
-      - run: gradle --warning-mode all :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --stacktrace
-      - name: Validate release compilation
-        run: gradle :app:assembleRelease --stacktrace
+          packages: 'platforms;android-37.1 build-tools;37.0.0 platform-tools'
+      - name: Unit tests, lint and builds
+        run: ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease --stacktrace
       - name: Generate APK checksum
         if: success()
-        run: cd app/build/outputs/apk/debug && mv app-debug.apk C0reStream-debug.apk && sha256sum *.apk > SHA256SUMS
+        run: |
+          cd app/build/outputs/apk/debug
+          mv app-debug.apk C0reStream-debug.apk
+          sha256sum C0reStream-debug.apk > SHA256SUMS
       - name: Upload database schemas
         if: always()
         uses: actions/upload-artifact@v7.0.2
@@ -43,17 +40,15 @@ jobs:
           name: room-schemas
           path: app/schemas/
           if-no-files-found: warn
-      - name: Upload lint reports
+      - name: Upload test and lint reports
         if: always()
         uses: actions/upload-artifact@v7.0.2
         with:
-          name: lint-reports
-          path: app/build/reports/lint-results-debug.*
+          name: verification-reports
+          path: |
+            app/build/reports/tests/
+            app/build/reports/lint-results-debug.*
           if-no-files-found: ignore
-      - name: Print lint diagnostics
-        if: always()
-        run: |
-          if test -f app/build/reports/lint-results-debug.txt; then cat app/build/reports/lint-results-debug.txt; fi
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: C0reStream-debug
@@ -63,8 +58,51 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  instrumented:
+    needs: verify
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Android 11 (API 30) and Android 16 (API 36). Add newer API levels once
+        # the emulator runner publishes matching system images.
+        api-level: [30, 36]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platforms;android-37.1 build-tools;37.0.0 platform-tools'
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Instrumented tests (API ${{ matrix.api-level }})
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: ./gradlew --no-daemon :app:connectedDebugAndroidTest --stacktrace
+      - name: Upload instrumented reports
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: instrumented-reports-api${{ matrix.api-level }}
+          path: app/build/reports/androidTests/
+          if-no-files-found: ignore
+
   publish-preview:
-    needs: build
+    needs: verify
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -95,3 +133,75 @@ jobs:
           else
             gh release create "$TAG" C0reStream-debug.apk SHA256SUMS --target "$BUILD_SHA" --prerelease --latest=false --title "C0reStream development preview ${BUILD_SHA:0:12}" --notes "CI-built debug APK for testing only. Not a production release. Debug signing keys may change between builds; uninstalling can erase app data. Do not enter sensitive credentials until security findings are resolved."
           fi
+
+  publish-production:
+    needs: [verify, instrumented]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: production-release-${{ github.sha }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platforms;android-37.1 build-tools;37.0.0 platform-tools'
+      - name: Check signing secrets
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.C0RE_KEYSTORE_BASE64 }}
+        run: |
+          if [[ -n "${KEYSTORE_BASE64:-}" ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Production signing secrets are not configured; skipping signed release."
+          fi
+      - name: Decode durable signing key
+        if: steps.signing.outputs.available == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.C0RE_KEYSTORE_BASE64 }}
+        run: |
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+      - name: Build signed release
+        if: steps.signing.outputs.available == 'true'
+        env:
+          C0RE_KEYSTORE_FILE: ${{ runner.temp }}/release.keystore
+          C0RE_KEYSTORE_PASSWORD: ${{ secrets.C0RE_KEYSTORE_PASSWORD }}
+          C0RE_KEY_ALIAS: ${{ secrets.C0RE_KEY_ALIAS }}
+          C0RE_KEY_PASSWORD: ${{ secrets.C0RE_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon :app:assembleRelease --stacktrace
+      - name: Verify signature and publish
+        if: steps.signing.outputs.available == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BUILD_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd app/build/outputs/apk/release
+          APK=app-release.apk
+          test -s "$APK"
+          APKSIGNER="$ANDROID_HOME/build-tools/37.0.0/apksigner"
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+          cp "$APK" C0reStream.apk
+          sha256sum C0reStream.apk > SHA256SUMS
+          TAG="v$(grep '^versionName=' ../../../../../version.properties | cut -d= -f2)"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; refusing to overwrite immutable assets."
+            exit 1
+          fi
+          gh release create "$TAG" C0reStream.apk SHA256SUMS --target "$BUILD_SHA" \
+            --title "C0reStream $TAG" --notes "Signed production APK. Verify SHA256SUMS and the signing certificate before installation."

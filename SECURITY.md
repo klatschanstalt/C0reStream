@@ -1,11 +1,22 @@
 # Security policy
-Report vulnerabilities privately to the repository owner. Do not include real IPTV credentials or stream URLs.
 
-## Open findings (2026-11-26 source review)
-- High: Xtream credentials and credential-bearing stream URLs persisted without application-level encryption; plan Keystore-backed migration without data loss.
-- Accepted transport risk: HTTP remains supported without mandatory opt-in by explicit owner decision. Prevent unintended HTTPS downgrades; disclose plaintext transport risks.
-- High: private repository update endpoint is not publicly accessible; design signed, authenticated distribution without embedding tokens.
-- Medium: review external intents, parser limits, XML processing, export URI scope, playlist refresh transactionality, media lifecycle and dependency advisories.
-- Release gate: resolve high-risk findings, verify migration, test malformed inputs, test Android 11–17 runtime and signed APK. Android 18 readiness is not a compatibility certification.
+Report vulnerabilities privately to the repository owner. Never include real IPTV credentials or stream URLs.
 
-Binding owner decision: HTTP and HTTPS IPTV sources remain supported without mandatory opt-in. Prefer HTTPS where available; prevent unintended HTTPS-to-HTTP redirects and retain URL validation, credential encryption and transport-risk disclosure. HTTP support alone is not a release blocker.
+## Implemented controls (source review, 2026-11-27)
+
+- Playlist, EPG and stream URLs are encrypted at rest with an AES key held by the Android Keystore; Room schema v4 migrates legacy plaintext rows transactionally.
+- Backup envelopes use PBKDF2-HMAC-SHA256 (600,000 iterations) and AES-256-GCM with a versioned header and authenticated metadata.
+- Only HTTP(S) URLs are accepted. Embedded credentials, control characters and overlong URLs are rejected; HTTPS-to-HTTP redirects are blocked at the OkHttp interceptor.
+- M3U, XMLTV and Xtream parsers enforce record, depth, line and text limits; DTDs and external entities are rejected.
+- Room writes that replace a playlist run in a transaction; a failed refresh keeps the previous channel list.
+- Update metadata must use HTTPS, and an APK is installed only after SHA-256, package-name and signing-certificate verification.
+- App logs redact URLs and credential parameters; Android backup is disabled; exported M3U files are shared read-only through FileProvider.
+- CI permissions are read-only except for release jobs, and no credentials are logged.
+
+## Accepted risk
+
+HTTP IPTV sources remain supported without mandatory opt-in by explicit owner decision. Prefer HTTPS where available; transport-risk disclosure stays visible in settings. HTTP support alone is not a release blocker.
+
+## Release gate
+
+Production release requires passing unit and instrumented tests, zero lint errors, an independent review of the changed code for security, cancellation, lifecycle and data-loss regressions, durable signing-key custody and a verified update path. Android 18 readiness is not a compatibility certification.
