@@ -4,7 +4,7 @@ Letzter vollständig verifizierter Gesamtstand, 2026-11-27.
 
 ## Verifikation
 
-CI-Lauf `46022423220` (Commit `9057db7`) vollständig grün:
+CI-Lauf `46022423220` (Commit `9057db7`) vollständig grün; der reaktivierte Push-Lauf `46025325554` (Commit `43218e4`) ebenfalls vollständig grün.
 
 - 91 Unit-Tests ohne Fehler; `:app:lintDebug` mit 0 Fehlern und 0 Warnungen.
 - 10 instrumentierte Tests je API 30 und API 36 ohne Fehler.
