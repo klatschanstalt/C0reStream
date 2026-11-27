@@ -1,6 +1,6 @@
 {
-    "latestVersion": "1.7.0",
-    "notes": "C0reStream 1.7.0: RTSP/RTP-Unterstützung, erweiterte Codec-Diagnostik, FFmpeg-Fallback-Vorbereitung und verifizierte Langzeitwiedergabe.",
-    "apkUrl": "https://github.com/klatschanstalt/C0reStream/releases/download/v1.7.0/C0reStream.apk",
-    "sha256": "2b2a6ad95f0aded905d9118b7843138643ff3ab6aa7e306faee699691d509dcf"
+    "latestVersion": "1.7.1",
+    "notes": "C0reStream 1.7.1: modernisierte Toolchain und Abhängigkeiten, gehärtete CI/Signaturprüfung, behobene Ressourcen-, Update- und Aufnahmefehler.",
+    "apkUrl": "https://github.com/klatschanstalt/C0reStream/releases/download/v1.7.1/C0reStream.apk",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
 }
