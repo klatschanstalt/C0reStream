@@ -159,6 +159,34 @@ class AppDatabaseTest {
     }
 
     @Test
+    fun pagedGroupQueryReachesBeyondOldFiveThousandCap() = runTest {
+        val playlistId = db.playlistDao().upsert(PlaylistEntity(name = "P", url = "https://example.com/a.m3u"))
+        val channels = (1..6_000).map { index ->
+            pw.c0re.stream.data.db.ChannelEntity(
+                playlistId = playlistId,
+                name = "Channel $index",
+                logoUrl = null,
+                group = "News",
+                url = "https://example.com/$index.ts",
+                tvgId = "id-$index",
+                stableKey = "key-$index",
+                orderIndex = index,
+            )
+        }
+        db.channelDao().insertAll(channels)
+        val result = db.channelDao().channelsPaged(playlistId, "News", null).load(
+            androidx.paging.PagingSource.LoadParams.Refresh(
+                key = null,
+                loadSize = 6_500,
+                placeholdersEnabled = false,
+            ),
+        ) as androidx.paging.PagingSource.LoadResult.Page
+        assertEquals(6_000, result.data.size)
+        assertEquals(0, result.data.first().orderIndex)
+        assertEquals(5_999, result.data.last().orderIndex)
+    }
+
+    @Test
     fun profilesRoundTrip() = runTest {
         val id = db.profileDao().upsert(
             pw.c0re.stream.data.profiles.ProfileEntity(

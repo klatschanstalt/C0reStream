@@ -92,6 +92,26 @@ class M3UParserTest {
     }
 
     @Test
+    fun `large playlist is parsed completely without silent truncation`() {
+        val count = 50_000
+        val text = buildString(count * 80) {
+            append("#EXTM3U\n")
+            for (index in 1..count) {
+                append("#EXTINF:-1 tvg-id=\"id-$index\" group-title=\"News\",Channel $index\n")
+                append("https://example.com/$index.ts\n")
+            }
+        }
+        val result = M3UParser.parseWithStats(text)
+        assertEquals(count, result.channels.size)
+        assertEquals(count, result.stats.received)
+        assertEquals(count, result.stats.accepted)
+        assertEquals(0, result.stats.merged)
+        assertFalse(result.stats.truncated)
+        assertEquals("News", result.channels.first().group)
+        assertEquals("Channel $count", result.channels.last().name)
+    }
+
+    @Test
     fun `oversized playlist is reported instead of silently truncated`() {
         val text = "x".repeat(1_000)
         val result = M3UParser.parseWithStats(text, ImportLimits(maxTextLength = 100))
