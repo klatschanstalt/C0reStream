@@ -101,6 +101,31 @@ class ResourceCatalogTest {
     }
 
     @Test
+    fun `published manifest bytes verify without canonical re-serialization`() {
+        val keys = keys()
+        val published = manifestJson()
+        val signature = ResourceCatalog.sign(published, keys.private)
+        val fingerprint = ResourceCatalog.fingerprint(keys.public)
+
+        assertTrue(ResourceCatalog.verifySignedBytes(published, signature, keys.public, fingerprint))
+        assertFalse(ResourceCatalog.verifySignedBytes(published, signature, keys().public, fingerprint))
+        val tampered = published.copyOf()
+        tampered[tampered.lastIndex] = (tampered[tampered.lastIndex].toInt() xor 1).toByte()
+        assertFalse(ResourceCatalog.verifySignedBytes(tampered, signature, keys.public, fingerprint))
+
+        // The published file format differs from the canonical form; verifying the latter would
+        // reject every release manifest.
+        assertFalse(
+            ResourceCatalog.verifySignedBytes(
+                ResourceCatalog.serialize(ResourceCatalog.parse(published)),
+                signature,
+                keys.public,
+                fingerprint,
+            ),
+        )
+    }
+
+    @Test
     fun `envelope round trip verifies canonical manifest bytes`() {
         val keys = keys()
         val manifest = singleManifest()

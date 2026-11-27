@@ -36,12 +36,11 @@ object ResourceManager {
             val signatureHex = client.newCall(Request.Builder().url(NetworkPolicy.requireUrl(signatureUrl)).build())
                 .execute().use { response -> response.readBytes(8 * 1024).toString(Charsets.US_ASCII).trim() }
             val manifest = ResourceCatalog.parse(manifestBytes)
-            val envelope = SignedResourceEnvelope(manifest, signatureHex, fingerprint)
-            if (!ResourceCatalog.verifyEnvelope(envelope, publicKey, fingerprint)) {
+            if (!ResourceCatalog.verifySignedBytes(manifestBytes, signatureHex, publicKey, fingerprint)) {
                 AppLog.log("Resources", "Manifest signature rejected")
                 return@withContext false
             }
-            val current = readAppliedVersion(directory) ?: 0L
+            val current = ResourceCatalog.activeVersion(directory) ?: 0L
             if (manifest.configVersion <= current) return@withContext true
             for (entry in manifest.entries) {
                 when (val result = ResourceCatalog.download(manifest.baseUrl, entry, directory)) {
@@ -53,7 +52,6 @@ object ResourceManager {
                 }
             }
             if (!ResourceCatalog.activate(directory, manifest.configVersion)) return@withContext false
-            writeAppliedVersion(directory, manifest.configVersion)
             ResourceCatalog.cleanup(directory)
             true
         } catch (error: kotlinx.coroutines.CancellationException) {
@@ -78,16 +76,4 @@ object ResourceManager {
         return certificate?.publicKey
     }
 
-    private fun readAppliedVersion(directory: File): Long? =
-        runCatching { File(directory, "applied.version").readText().trim().toLongOrNull() }.getOrNull()
-
-    private fun writeAppliedVersion(directory: File, version: Long) {
-        val target = File(directory, "applied.version")
-        val temp = File(directory, "applied.version.tmp")
-        temp.writeText(version.toString())
-        if (!temp.renameTo(target)) {
-            temp.delete()
-            target.writeText(version.toString())
-        }
-    }
 }

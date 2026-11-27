@@ -619,7 +619,7 @@ class PlaybackService : MediaSessionService() {
         @Suppress("DEPRECATION")
         override fun isActive(): Boolean = direction != 0 || super.isActive()
 
-        override fun onFlush() {
+        override fun onFlush(streamMetadata: AudioProcessor.StreamMetadata) {
             framesRemaining = totalFrames
         }
 

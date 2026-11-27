@@ -710,8 +710,8 @@ fun PlayerScreen(
                                 if (recording != null) {
                                     RecordingManager.stop()
                                 } else if (canRecord) {
-                                    effectiveUrl?.let { url ->
-                                        if (!NetworkPolicy.isRecordableStream(url)) return@let
+                                    val url = effectiveUrl
+                                    if (NetworkPolicy.isRecordableStream(url)) {
                                         scope.launch {
                                             val source = vm.sourceFor(effectivePlaylistId)
                                             RecordingManager.start(

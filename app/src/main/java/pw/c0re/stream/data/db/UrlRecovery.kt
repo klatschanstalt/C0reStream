@@ -33,10 +33,4 @@ object UrlRecovery {
     /** Recognises the read-failure placeholder without inspecting exception state. */
     fun isPlaceholder(value: String?): Boolean = value == ProtectedUrl.UNAVAILABLE_VALUE
 
-    /**
-     * Encrypts a freshly entered credential for the existing repository/DAO update flow.
-     * Strict by design: throws if the Keystore is unusable, so a failed write cannot silently
-     * persist plaintext. The previous value is neither read nor returned here.
-     */
-    fun prepareReplacement(raw: String): ProtectedUrl = ProtectedUrl(UrlCipher.encrypt(raw))
 }

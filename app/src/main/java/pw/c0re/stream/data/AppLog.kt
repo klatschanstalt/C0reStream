@@ -14,6 +14,7 @@ object AppLog {
     private val httpUrl = Regex("https?://\\S+", RegexOption.IGNORE_CASE)
     private val xtreamUrl = Regex("xtream://\\S+", RegexOption.IGNORE_CASE)
     private val credentialPair = Regex("(?i)(password|username|token|secret)=([^&\\s]+)")
+    private val userInfoPair = Regex("[A-Za-z0-9._%+-]+:[^@/\\s]+@[A-Za-z0-9.-]+")
 
     val lines: List<String>
         get() = synchronized(buffer) { buffer.toList() }
@@ -22,6 +23,7 @@ object AppLog {
         val safe = message
             .replace(xtreamUrl, "[xtream]")
             .replace(httpUrl, "[url]")
+            .replace(userInfoPair, "[redacted]")
             .replace(credentialPair, "$1=[redacted]")
             .take(1_024)
         val timestamp = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())

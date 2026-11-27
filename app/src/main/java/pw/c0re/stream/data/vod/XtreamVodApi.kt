@@ -95,33 +95,4 @@ class XtreamVodApi(private val api: XtreamApi) {
         creds.streamUrl("series", id.toString(), container)
 
     fun mediaKey(kind: String, playlistId: Long, id: Int): String = "$kind:$playlistId:$id"
-
-    companion object {
-        fun parseEpisodeMap(value: JSONObject?): Map<Int, List<Episode>> {
-            val episodes = value?.optJSONObject("episodes") ?: return emptyMap()
-            val result = sortedMapOf<Int, List<Episode>>()
-            val keys = episodes.keys()
-            while (keys.hasNext()) {
-                val seasonKey = keys.next()
-                val array = episodes.optJSONArray(seasonKey) ?: continue
-                val season = seasonKey.toIntOrNull() ?: 1
-                val parsed = ArrayList<Episode>(array.length())
-                for (index in 0 until array.length()) {
-                    val item = array.optJSONObject(index) ?: continue
-                    val id = item.optInt("id")
-                    if (id <= 0) continue
-                    parsed += Episode(
-                        id = id,
-                        season = season,
-                        episodeNum = item.optInt("episode_num"),
-                        title = item.optString("title").ifBlank { "Episode" }.take(512),
-                        container = item.optString("container_extension", "mp4")
-                            .takeIf { it.matches(Regex("[a-zA-Z0-9]{1,10}")) } ?: "mp4",
-                    )
-                }
-                result[season] = parsed.sortedBy { it.episodeNum }
-            }
-            return result
-        }
-    }
 }

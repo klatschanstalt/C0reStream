@@ -30,7 +30,12 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.byValue
+import androidx.compose.foundation.text.input.maxLengthReject
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.material3.OutlinedSecureTextField
 import androidx.compose.material3.PermanentDrawerSheet
 import androidx.compose.material3.PermanentNavigationDrawer
 import androidx.compose.material3.Scaffold
@@ -50,7 +55,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -317,7 +321,7 @@ fun C0reStreamRoot(sharedM3uUrl: String?) {
 
 @Composable
 private fun PinGate(profile: ProfileEntity, onUnlocked: () -> Unit) {
-    var pin by remember { mutableStateOf("") }
+    val pinState = rememberTextFieldState()
     var error by remember { mutableStateOf(false) }
     BrandBackdrop(Modifier.fillMaxSize()) {
         Column(
@@ -330,20 +334,19 @@ private fun PinGate(profile: ProfileEntity, onUnlocked: () -> Unit) {
         ) {
             Text(stringResource(R.string.profiles_pin_prompt), style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(16.dp))
-            OutlinedTextField(
-                value = pin,
-                onValueChange = { pin = it.filter(Char::isDigit).take(64) },
+            OutlinedSecureTextField(
+                state = pinState,
+                inputTransformation = InputTransformation.maxLengthReject(64)
+                    .byValue { input, _ -> input.filter(Char::isDigit) },
                 label = { Text(profile.name) },
-                visualTransformation = PasswordVisualTransformation(),
-                singleLine = true,
             )
             if (error) {
                 Text(stringResource(R.string.profiles_pin_wrong), color = MaterialTheme.colorScheme.error)
             }
             Spacer(Modifier.height(16.dp))
             BrandPrimaryButton(stringResource(R.string.action_confirm), onClick = {
-                val value = pin
-                pin = ""
+                val value = pinState.text.toString()
+                pinState.clearText()
                 val chars = value.toCharArray()
                 val result = ProfileSessionRepository.pinManager.verify(profile.pinHash, chars, profile.id)
                 chars.fill('\u0000')

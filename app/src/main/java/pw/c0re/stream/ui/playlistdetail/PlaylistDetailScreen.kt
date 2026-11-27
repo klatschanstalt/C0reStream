@@ -333,11 +333,21 @@ private fun GuideDialog(
     onPlayUrl: (String, String) -> Unit,
 ) {
     var refreshKey by remember { mutableIntStateOf(0) }
+    var refreshRequest by remember { mutableIntStateOf(0) }
     var refreshing by remember { mutableStateOf(false) }
     val entries by produceState(initialValue = emptyList<EpgEntry>(), channel.id, refreshKey) {
         value = vm.guideFor(playlistId, channel).first()
     }
-    LaunchedEffect(entries) { refreshing = false }
+    LaunchedEffect(refreshRequest) {
+        if (refreshRequest == 0) return@LaunchedEffect
+        refreshing = true
+        try {
+            vm.refreshGuide(playlistId)
+        } finally {
+            refreshKey++
+            refreshing = false
+        }
+    }
     val formatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
     val now = remember(entries) { System.currentTimeMillis() }
 
@@ -351,11 +361,7 @@ private fun GuideDialog(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                IconButton(onClick = {
-                    refreshing = true
-                    vm.refreshGuide(playlistId)
-                    refreshKey++
-                }) {
+                IconButton(onClick = { refreshRequest++ }) {
                     Icon(Icons.Filled.Refresh, stringResource(R.string.action_refresh))
                 }
             }

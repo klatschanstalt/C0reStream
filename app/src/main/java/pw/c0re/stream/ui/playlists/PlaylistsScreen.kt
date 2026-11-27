@@ -18,6 +18,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.maxLengthReject
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -30,16 +33,19 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedSecureTextField
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,10 +53,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import pw.c0re.stream.R
 import pw.c0re.stream.data.ImportStats
 import pw.c0re.stream.data.db.PlaylistEntity
@@ -82,6 +90,7 @@ fun PlaylistsScreen(
     var showAdd by remember { mutableStateOf(sharedUrl != null) }
     var deleteId by remember { mutableStateOf<Long?>(null) }
     var qrError by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val qrPlaylistName = stringResource(R.string.playlist_qr_name)
     val horizontalPadding = rememberResponsivePadding()
@@ -96,14 +105,18 @@ fun PlaylistsScreen(
     val importQr = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         qrError = false
         if (uri == null) return@rememberLauncherForActivityResult
-        val bitmap = runCatching {
-            ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri))
-        }.getOrNull()
-        val url = bitmap?.let { QrPlaylistParser.parse(it) }
-        if (url == null) {
-            qrError = true
-        } else {
-            vm.add(qrPlaylistName, url, null, null, false, null, null, null, onAddNew)
+        scope.launch {
+            val url = withContext(Dispatchers.Default) {
+                val bitmap = runCatching {
+                    ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri))
+                }.getOrNull()
+                bitmap?.let { QrPlaylistParser.parse(it) }
+            }
+            if (url == null) {
+                qrError = true
+            } else {
+                vm.add(qrPlaylistName, url, null, null, false, null, null, null, onAddNew)
+            }
         }
     }
 
@@ -321,7 +334,8 @@ private fun AddPlaylistDialog(
     var useXtream by remember { mutableStateOf(false) }
     var xtreamHost by remember { mutableStateOf("") }
     var xtreamUser by remember { mutableStateOf("") }
-    var xtreamPass by remember { mutableStateOf("") }
+    val passwordState = rememberTextFieldState()
+    val xtreamPass by remember { derivedStateOf { passwordState.text.toString() } }
 
     val canConfirm = name.isNotBlank() && if (useXtream) {
         xtreamHost.isNotBlank() && xtreamUser.isNotBlank() && xtreamPass.isNotEmpty()
@@ -364,13 +378,11 @@ private fun AddPlaylistDialog(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                     )
-                    OutlinedTextField(
-                        value = xtreamPass,
-                        onValueChange = { xtreamPass = it.take(512) },
+                    OutlinedSecureTextField(
+                        state = passwordState,
+                        inputTransformation = InputTransformation.maxLengthReject(512),
                         label = { Text(stringResource(R.string.field_password)) },
-                        visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
                     )
                 } else {
                     OutlinedTextField(

@@ -11,9 +11,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.maxLengthReject
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.material3.OutlinedSecureTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,7 +28,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
@@ -44,7 +48,8 @@ fun BackupControls() {
     val scope = rememberCoroutineScope()
     var operation by remember { mutableStateOf<String?>(null) }
     var selected by remember { mutableStateOf<Uri?>(null) }
-    var password by remember { mutableStateOf("") }
+    val passwordState = rememberTextFieldState()
+    val password by remember { derivedStateOf { passwordState.text.toString() } }
     var busy by remember { mutableStateOf(false) }
     var statusRes by remember { mutableStateOf<Int?>(null) }
     var restoredCount by remember { mutableStateOf<Int?>(null) }
@@ -108,7 +113,7 @@ fun BackupControls() {
             onDismissRequest = {
                 operation = null
                 selected = null
-                password = ""
+                passwordState.clearText()
             },
             title = {
                 Text(
@@ -126,12 +131,10 @@ fun BackupControls() {
                         stringResource(R.string.backup_import_merge_note),
                         style = MaterialTheme.typography.bodySmall,
                     )
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { if (it.length <= 1_024) password = it },
+                    OutlinedSecureTextField(
+                        state = passwordState,
+                        inputTransformation = InputTransformation.maxLengthReject(1_024),
                         label = { Text(stringResource(R.string.backup_password)) },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -143,7 +146,7 @@ fun BackupControls() {
                     onClick = {
                         val uri = selected ?: return@BrandPrimaryButton
                         val secret = password.toCharArray()
-                        password = ""
+                        passwordState.clearText()
                         selected = null
                         operation = null
                         busy = true
@@ -194,7 +197,7 @@ fun BackupControls() {
                     onClick = {
                         operation = null
                         selected = null
-                        password = ""
+                        passwordState.clearText()
                     },
                     modifier = Modifier.heightIn(min = 48.dp),
                 )

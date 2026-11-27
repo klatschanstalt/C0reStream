@@ -78,8 +78,6 @@ class XtreamApi(
     }
 
     companion object {
-        const val MAX_JSON_RECORDS = 100_000
-
         /** Synthetic, encrypted-at-rest playlist identity: xtream://user:pass@host */
         fun parseSyntheticUrl(url: String): Credentials? {
             if (!url.startsWith("xtream://")) return null

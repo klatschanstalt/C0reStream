@@ -10,6 +10,7 @@ import android.util.Rational
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import pw.c0re.stream.data.NetworkPolicy
@@ -19,6 +20,9 @@ import pw.c0re.stream.ui.theme.C0reStreamThemeFromPrefs
 
 class MainActivity : ComponentActivity() {
     private val sharedM3u = mutableStateOf<String?>(null)
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { /* Playback remains available when notifications are denied. */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,6 +73,6 @@ class MainActivity : ComponentActivity() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
         ) return
-        requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1001)
+        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }

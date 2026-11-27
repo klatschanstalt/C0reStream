@@ -102,8 +102,6 @@ object ChannelKey {
     fun disambiguate(key: String, discriminator: String): String =
         sha256("$key|dup:${canonical(discriminator, 512) ?: ""}").take(KEY_LENGTH)
 
-    fun deduplicateByKey(url: String, tvgId: String?): String = stableKey(url, tvgId)
-
     private fun canonical(value: String?, limit: Int = 256): String? =
         value?.trim()?.lowercase(Locale.ROOT)?.replace(whitespace, " ")?.take(limit)
             ?.takeIf { it.isNotBlank() }

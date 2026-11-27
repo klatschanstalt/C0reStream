@@ -256,6 +256,26 @@ object ResourceCatalog {
         }
     }
 
+    /**
+     * Verifies the exact bytes downloaded from the release, after validating the manifest shape.
+     * The release manifest is signed as a file, so canonical re-serialization must never be used
+     * here: formatting differences would make every refresh fail.
+     */
+    fun verifySignedBytes(
+        manifestBytes: ByteArray,
+        signatureHex: String,
+        publicKey: PublicKey,
+        expectedFingerprint: String? = null,
+    ): Boolean {
+        if (manifestBytes.isEmpty() || manifestBytes.size > MAX_MANIFEST_BYTES) return false
+        return try {
+            parse(manifestBytes)
+            verify(manifestBytes, signatureHex, publicKey, expectedFingerprint)
+        } catch (error: IllegalArgumentException) {
+            false
+        }
+    }
+
     /** Verifies an envelope: pins its declared fingerprint, then checks its signature. */
     fun verifyEnvelope(
         envelope: SignedResourceEnvelope,

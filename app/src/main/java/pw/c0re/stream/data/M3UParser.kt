@@ -1,6 +1,5 @@
 package pw.c0re.stream.data
 
-import pw.c0re.stream.data.model.Channel
 import java.util.Locale
 
 /** Machine-readable reason codes exposed to callers instead of silent truncation/omission. */
@@ -253,19 +252,6 @@ object M3UParser {
                 )
             },
         )
-
-    fun toChannels(playlistId: Long, raw: List<RawChannel>): List<Channel> =
-        raw.map { channel ->
-            Channel(
-                playlistId = playlistId,
-                name = channel.name,
-                logoUrl = channel.logo,
-                group = channel.group,
-                url = channel.url,
-                tvgId = channel.tvgId,
-                catchupSource = channel.catchupSource,
-            )
-        }
 
     private data class Pending(
         val attributes: Map<String, String>,

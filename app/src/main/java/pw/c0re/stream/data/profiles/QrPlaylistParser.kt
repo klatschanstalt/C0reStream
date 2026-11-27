@@ -20,8 +20,8 @@ import java.util.EnumMap
  * oversized text) is rejected. Bitmap dimensions and pixel count are capped before decoding so
  * a hostile image cannot force an unbounded allocation.
  *
- * Requires `com.google.zxing:core:3.5.3`, which is not yet a project dependency. Decoding a
- * supplied [Bitmap] needs no Android permission.
+ * Uses `com.google.zxing:core` from the version catalog. Decoding a supplied [Bitmap] needs no
+ * Android permission.
  */
 object QrPlaylistParser {
     const val MAX_BITMAP_DIMENSION: Int = 2_048

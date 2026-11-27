@@ -33,7 +33,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import pw.c0re.stream.BuildConfig
 import pw.c0re.stream.R
 import pw.c0re.stream.data.AppLog
@@ -156,18 +158,24 @@ fun SettingsScreen(onExportBackup: () -> Unit = {}, onOpenProfiles: () -> Unit =
                                         scope.launch {
                                             updateBusy = true
                                             updateStatus = null
-                                            when (val result = UpdateInstaller.downloadAndVerify(context, update)) {
-                                                is UpdateInstaller.Result.Ready -> {
-                                                    updateStatus = updateInstallHint
-                                                    runCatching { UpdateInstaller.install(context, result.file) }
-                                                        .onFailure { updateStatus = updateVerifyFailed }
+                                            try {
+                                                when (val result = UpdateInstaller.downloadAndVerify(context, update)) {
+                                                    is UpdateInstaller.Result.Ready -> {
+                                                        updateStatus = updateInstallHint
+                                                        runCatching {
+                                                            withContext(Dispatchers.IO) {
+                                                                UpdateInstaller.install(context, result.file)
+                                                            }
+                                                        }.onFailure { updateStatus = updateVerifyFailed }
+                                                    }
+                                                    is UpdateInstaller.Result.Failure -> {
+                                                        updateStatus = updateVerifyFailed
+                                                        AppLog.log("Update", result.reason)
+                                                    }
                                                 }
-                                                is UpdateInstaller.Result.Failure -> {
-                                                    updateStatus = updateVerifyFailed
-                                                    AppLog.log("Update", result.reason)
-                                                }
+                                            } finally {
+                                                updateBusy = false
                                             }
-                                            updateBusy = false
                                         }
                                     },
                                     modifier = Modifier.fillMaxWidth(),

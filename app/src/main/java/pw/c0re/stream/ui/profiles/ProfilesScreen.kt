@@ -15,6 +15,12 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.byValue
+import androidx.compose.foundation.text.input.maxLengthReject
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.material3.OutlinedSecureTextField
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,7 +32,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
@@ -218,28 +223,28 @@ fun ProfilesScreen(onDone: () -> Unit, vm: ProfilesViewModel = viewModel()) {
     }
 
     pinTarget?.let { profile ->
-        var pin by remember { mutableStateOf("") }
+        val pinState = rememberTextFieldState()
         AlertDialog(
             onDismissRequest = { pinTarget = null },
             title = {
                 Text(stringResource(if (profile.hasPin) R.string.profiles_pin_remove else R.string.profiles_pin_set))
             },
             text = {
-                OutlinedTextField(
-                    value = pin,
-                    onValueChange = { pin = it.filter(Char::isDigit).take(64) },
+                OutlinedSecureTextField(
+                    state = pinState,
+                    inputTransformation = InputTransformation.maxLengthReject(64)
+                        .byValue { input, _ -> input.filter(Char::isDigit) },
                     label = { Text(stringResource(R.string.profiles_pin_prompt)) },
-                    visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
                 )
             },
             confirmButton = {
                 BrandPrimaryButton(
                     text = stringResource(R.string.action_confirm),
                     onClick = {
-                        vm.setPin(profile.id, if (pin.length in 4..64) pin else "")
-                        pin = ""
+                        val value = pinState.text.toString()
+                        vm.setPin(profile.id, if (value.length in 4..64) value else "")
+                        pinState.clearText()
                         pinTarget = null
                     },
                     modifier = Modifier.heightIn(min = 48.dp),
@@ -256,26 +261,25 @@ fun ProfilesScreen(onDone: () -> Unit, vm: ProfilesViewModel = viewModel()) {
     }
 
     switchTarget?.let { profile ->
-        var pin by remember { mutableStateOf("") }
+        val pinState = rememberTextFieldState()
         AlertDialog(
             onDismissRequest = { switchTarget = null },
             title = { Text(stringResource(R.string.profiles_switch)) },
             text = {
-                OutlinedTextField(
-                    value = pin,
-                    onValueChange = { pin = it.filter(Char::isDigit).take(64) },
+                OutlinedSecureTextField(
+                    state = pinState,
+                    inputTransformation = InputTransformation.maxLengthReject(64)
+                        .byValue { input, _ -> input.filter(Char::isDigit) },
                     label = { Text(stringResource(R.string.profiles_pin_prompt)) },
-                    visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
                 )
             },
             confirmButton = {
                 BrandPrimaryButton(
                     text = stringResource(R.string.action_confirm),
                     onClick = {
-                        val value = pin
-                        pin = ""
+                        val value = pinState.text.toString()
+                        pinState.clearText()
                         switchTarget = null
                         scope.launch { error = !vm.unlock(profile.id, value) }
                     },

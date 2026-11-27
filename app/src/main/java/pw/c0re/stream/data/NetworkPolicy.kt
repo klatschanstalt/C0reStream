@@ -217,7 +217,7 @@ object NetworkPolicy {
     fun isTemplateUrl(value: String): Boolean {
         if (value.length !in 8..maxUrlLength) return false
         if (value.any { it.isISOControl() || it == '\\' || it == ' ' }) return false
-        val lower = value.lowercase()
+        val lower = value.lowercase(Locale.ROOT)
         if (!lower.startsWith("http://") && !lower.startsWith("https://")) return false
         val authority = value.substringAfter("://").substringBefore("/")
         if (authority.isBlank() || authority.contains("@")) return false
@@ -243,12 +243,15 @@ object NetworkPolicy {
         "x-secret", "x-session-token", "x-amz-security-token",
     )
 
+    private val sensitiveHeaderMarkers = listOf(
+        "authorization", "token", "secret", "cookie", "credential", "api-key", "apikey", "signature",
+    )
+
     /** Credential-like headers, including custom "X-..." ones, must never cross an origin. */
     private fun isSensitiveHeader(name: String): Boolean {
         val lower = name.lowercase(Locale.ROOT)
         if (lower in sensitiveHeaderNames) return true
-        return listOf("authorization", "token", "secret", "cookie", "credential", "api-key", "apikey", "signature")
-            .any { lower.contains(it) }
+        return sensitiveHeaderMarkers.any { lower.contains(it) }
     }
 
     private val sensitiveQueryNames = setOf(

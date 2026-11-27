@@ -129,7 +129,7 @@ class PlaylistDetailViewModel(app: Application) : AndroidViewModel(app) {
         ReminderScheduler.schedule(getApplication(), reminder.copy(id = id))
     }
 
-    fun refreshGuide(playlistId: Long) = viewModelScope.launch {
+    suspend fun refreshGuide(playlistId: Long) {
         epgStore.refresh(playlistId)
     }
 

@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.coroutines.coroutineContext
 import okhttp3.Request
 import java.io.File
 import java.text.SimpleDateFormat
@@ -24,7 +25,6 @@ object RecordingManager {
     private const val maxBytes = 2L * 1024 * 1024 * 1024
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var job: Job? = null
-    private var output: File? = null
 
     private val _active = MutableStateFlow<String?>(null)
     val active: StateFlow<String?> = _active
@@ -52,9 +52,9 @@ object RecordingManager {
         val safeTitle = title.orEmpty().replace(Regex("[^A-Za-z0-9 _-]"), "").take(64)
             .ifBlank { "recording" }
         val file = File(directory, "$safeTitle-$stamp.ts")
-        output = file
         _active.value = file.name
         job = scope.launch {
+            val currentJob = coroutineContext[Job]
             var succeeded = false
             try {
                 NetworkPolicy.recordingClient(userAgent, useProxy, proxyHost, proxyPort)
@@ -84,8 +84,9 @@ object RecordingManager {
                 AppLog.log("Record", error.message ?: "?")
             } finally {
                 if (!succeeded) runCatching { file.delete() }
-                output = null
-                _active.value = null
+                // A fast stop/start sequence must not let the old job clear the new recording's
+                // active state when its finally block finally runs.
+                if (job == null || job === currentJob) _active.value = null
             }
         }
         return true
