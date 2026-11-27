@@ -102,7 +102,8 @@ class AppDatabaseTest {
         assertEquals("Now", db.epgDao().current(1, "c", now)?.title)
         assertEquals("Next", db.epgDao().next(1, "c", now)?.title)
         assertEquals(2, db.epgDao().countForPlaylist(1))
-        db.epgDao().deleteOld(now)
+        // Retention removes programmes that ended before the cutoff, not the upcoming one.
+        db.epgDao().deleteOld(now + 15_000)
         assertEquals(1, db.epgDao().countForPlaylist(1))
     }
 
