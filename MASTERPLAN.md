@@ -20,9 +20,9 @@ Open or not certified:
 
 Binding decisions: minimum Android 11 (API 30); HTTP and HTTPS IPTV sources supported without mandatory opt-in, HTTPS preferred, no HTTPS-to-HTTP redirects; no ads, tracking or bundled streams.
 
-## Aktiver Auftrag (2026-11-27): Design, Branding & Responsive UI/UX
+## Abgeschlossener Auftrag (2026-11-27): Design, Branding & Responsive UI/UX
 
-Verbindlich: vollständige visuelle Überarbeitung auf Grundlage der Branding-Assets unter `assets/branding/`. Zentrale Design-Tokens, konsistente Komponenten, responsive Layouts (Smartphone/Tablet/Foldable/TV, Hoch-/Querformat, Multi-Window, Insets, große Schrift), einheitliche Player-Oberfläche, launcher/adaptive/monochrome Icons, native Splashscreen-Integration, Light/Dark/System/AMOLED, kontrollierte Animationen und Barrierefreiheit. Bestehende Funktionen, Nutzerdaten, Signatur und Updates bleiben erhalten. CI bleibt während der Implementierung pausiert; nach gebündelter Prüfung wird der Stand synchronisiert.
+Branding-Assets integriert: adaptive/monochrome Launcher-Icons, Splash-/Fenster-Theme, zentrale Design-Tokens und wiederverwendbare Brand-Komponenten. Alle Screens und die Player-Oberfläche sind darauf umgestellt; Navigation wählt je nach Breite und Höhe Bottom-Bar/Rail/Drawer. Geprüft in CI-Lauf `46022423220` (siehe Statusbericht). Nicht geräteverifiziert: echte Screenshots, physische Geräte, themed-icon alignment.
 
 ## Abgeschlossener Prioritätsauftrag (2026-11-27): Import, Player, Performance
 

@@ -4,29 +4,30 @@ Letzter vollständig verifizierter Gesamtstand, 2026-11-27.
 
 ## Verifikation
 
-CI-Lauf `46011852896` (Commit `733ee83`, Push-Trigger aktiv) vollständig grün:
+CI-Lauf `46022423220` (Commit `9057db7`) vollständig grün:
 
 - 91 Unit-Tests ohne Fehler; `:app:lintDebug` mit 0 Fehlern und 0 Warnungen.
-- 10 instrumentierte Tests je API 30 und API 36 ohne Fehler; Release-Build mit R8, `signResourceManifest` und signierte Veröffentlichung erfolgreich.
+- 10 instrumentierte Tests je API 30 und API 36 ohne Fehler.
+- Release-Build mit R8, `signResourceManifest` und Signaturprüfung erfolgreich; Checksumme geprüft.
 
-## Produktionsrelease
+## Design- und Branding-Stand
 
-- [C0reStream v1.5.0](https://github.com/klatschanstalt/C0reStream/releases/tag/v1.5.0), [direkte APK](https://github.com/klatschanstalt/C0reStream/releases/latest/download/C0reStream.apk), [SHA256SUMS](https://github.com/klatschanstalt/C0reStream/releases/latest/download/SHA256SUMS).
-- `pw.c0re.stream`, versionCode 6, versionName 1.5.0, minSdk 30, targetSdk 37.
-- 6.200.405 Bytes; SHA-256 `f34f18e63880add27e9baeab8ec79ff07d129ab7299a74bc843698283f78f0ad`.
-- Zertifikat-Fingerabdruck `65FB26B0F617583228EA8813080FA7E2F8F6421022D8D279F928C726EA6E8543`, RSA 4096, APK-Signatur v2. APK ohne Authentifizierung geladen; `sha256sum --check` und `apksigner` bestanden.
-- `update.json`, `resources.json` und `resources.sig` öffentlich per HTTPS erreichbar; signierte Ressourcen und APK-Updates benötigen keinen GitHub-Token. v1.3.0 und v1.4.0 bleiben verfügbar; keine Pre-Releases.
+- `assets/branding/` bleibt Designquelle; APK enthält nur die benötigten Launcher-/Splash-/Systemressourcen. GitHub-, Social- und Promo-Grafiken sind nicht im APK.
+- Adaptive, runde und monochrome Icons liegen unter `res/mipmap/` und `res/drawable/`; Splash- und Fenster-Theme nutzen die native Android-Splashscreen-API (API 31+) und eine kompatible Variante für ältere Versionen. Kein zweiter, künstlich verzögerter Splash.
+- Zentrale Design-Tokens (Palette aus den Assets, Typografie, Shapes, Motion, Gradienten, Abstände) und wiederverwendbare `Brand*`-Komponenten sind in Compose verankert. Dark ist Referenz; Light, System und AMOLED bleiben markenkonform.
+- Alle vorhandenen Ansichten (Navigation, Playlists, Senderdetails, Favoriten, Verlauf, Suche, VOD, Einstellungen, Profile, Backup, Player) nutzen dieselben Komponenten. Responsive Auswahl erfolgt über Window Size Classes mit Höhen-Fallback; WindowInsets und IME werden berücksichtigt.
+- Barrierefreiheit: lokalisierte Content-Descriptions, 48-dp-Zielgrößen, Fokus-/Semantikrollen, skalierbare `sp`-Typografie ohne zusätzliche Breiten-Skalierung, reduzierte Bewegung beachtet.
+- QA-Agent prüfte den Diff; festgestellte Defekte (englische Fehlertexte, nicht zugängliche Player-Overlay, PIN-Gate-Insets, Button-Zentrierung, Gradienten-Parameter, TV-Bannerfarben, ungenutzte Ressourcen) wurden behoben und erneut verifiziert.
 
-## Umgesetzt und geprüft
+## Artefakte
 
-- Senderimport: M3U/M3U8/Xtream mit BOM/CRLF/gzip, Sendernummern, tvg-id/tvg-name, Gruppen und Streamvarianten; stabile IDs über Tokenwechsel; keine Zusammenführung unterschiedlicher Sender bei identischer URL; Anzeige von empfangen/importiert/zusammengeführt/abgelehnt samt Grundcodes; Shrink-Guard und transaktionale Aktualisierung.
-- Room v6 speichert Anbieterreihenfolge sowie tvg-Name, Sendernummer und Qualität; bestehende Favoriten, Verlauf und IDs bleiben erhalten.
-- Vollbild: Auto/Original/Fit/Fill/Zoom/Stretch/16:9/4:3/21:9, Pixel-Seitenverhältnis und immersive Insets; globale und senderspezifische Einstellungen wirken über das Einstellungscenter.
-- Media3: Hardwaredecoder mit Fallback, profilabhängiges Buffering, Audiofokus, A/V-Offset, echte Codec-/Decoder-Diagnose ohne Zugangsdaten; begrenzter Logo-Cache für große Listen.
+- Lokaler Release-Build: `app/build/outputs/apk/release/app-release-unsigned.apk`, 6.430.253 Bytes.
+- Signierte Verifikations-APK aus CI-Artefakt `C0reStream-signed-verification`: `C0reStream.apk`, 6.434.349 Bytes, SHA-256 `1d3da403fc32262633f8209df08d9f35592d6d381730cee514ab0d71e8984a9e` (`sha256sum --check` OK).
+- `pw.c0re.stream`, versionCode 6, versionName 1.5.0, minSdk 30, targetSdk 37; Signatur v2 mit Fingerprint `65FB26B0F617583228EA8813080FA7E2F8F6421022D8D279F928C726EA6E8543`.
+- Keine neue öffentliche Version veröffentlicht: `v1.5.0` bleibt aktuell, da sich die Versionsnummer nicht änderte und der Release-Job vorhandene Releases schützt.
 
-## Nicht zertifiziert
+## Nicht verifiziert
 
-- Physische Geräte jenseits der API-30/36-Emulatoren; Android 17 und 18 nicht gerätezertifiziert.
-- Casting benötigt registrierte Receiver-ID/Play-Services-Zertifizierung; Multiview nicht implementiert; keine DRM-Umgehung.
-- Echte Geräte-Screenshots und extern generierte Grafiken nicht verfügbar; Branding liegt unter `docs/`.
-- APK-Größe 6.200.405 B über dem <5-MB-Ziel; gemessene Begründung im vorherigen Statusbericht und MASTERPLAN unverändert gültig.
+- Echte Geräte-Screenshots und physische Gerätetests; Emulatorläufe nur auf API 30/36.
+- Visuelle Ausrichtung des themed monochrome Icons auf allen Launcher-Masken; Player-Steuerzeilen bei Display-Cutouts/Split-Screen; Foldable- und TV-Geräteverhalten.
+- APK-Größe weiter über dem <5-MB-Ziel (gemessene Begründung unverändert).
