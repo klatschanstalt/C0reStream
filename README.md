@@ -12,7 +12,7 @@ C0reStream is an Android media client for user-provided, authorized IPTV playlis
 
 ## Features
 
-- **Playlists** — M3U/M3U8, Xtream Codes, local file import, stable channel IDs, deduplication, groups, favourites, automatic refresh and transparent import statistics.
+- **Playlists** — M3U/M3U8, Xtream Codes, local file import, stable channel IDs, deduplication, groups, favourites, automatic refresh, transparent import statistics and paged access to every channel.
 - **Player** — Media3 HLS/DASH/MPEG-TS, mini-player, background playback, PiP, immersive fullscreen with nine scaling modes, audio/subtitle/video-track selection, sleep timer, reconnect, catch-up and VOD resume.
 - **EPG** — XMLTV (plain or gzip), programme guide, cache, reminders and catch-up links.
 - **VOD** — movies, series and episodes with search, watchlist and resume positions.
@@ -33,14 +33,14 @@ HTTP sources remain supported by owner decision; HTTPS is preferred and plaintex
 
 ## Install and verify
 
-1. Download the current signed APK: [C0reStream.apk (latest)](https://github.com/klatschanstalt/C0reStream/releases/latest/download/C0reStream.apk) or the [version-bound v1.5.0 APK](https://github.com/klatschanstalt/C0reStream/releases/download/v1.5.0/C0reStream.apk).
+1. Download the current signed APK: [C0reStream.apk (latest)](https://github.com/klatschanstalt/C0reStream/releases/latest/download/C0reStream.apk) or the [version-bound v1.6.0 APK](https://github.com/klatschanstalt/C0reStream/releases/download/v1.6.0/C0reStream.apk).
 2. Verify the checksum with [SHA256SUMS](https://github.com/klatschanstalt/C0reStream/releases/latest/download/SHA256SUMS):
 
    ```bash
    sha256sum --check SHA256SUMS
    ```
 
-   Version 1.5.0 SHA-256: `f34f18e63880add27e9baeab8ec79ff07d129ab7299a74bc843698283f78f0ad` (6,200,405 bytes).
+   Version 1.6.0 SHA-256: `4787f7ff5766b8db548aabbff527f710167dd1ba28b06767971f0e38c51a97ee` (6,552,789 bytes).
 3. Install the APK (Android may require allowing installation from unknown sources). The signing certificate fingerprint is `65FB26B0F617583228EA8813080FA7E2F8F6421022D8D279F928C726EA6E8543`.
 
 ## Updates

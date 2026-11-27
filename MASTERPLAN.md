@@ -20,9 +20,9 @@ Open or not certified:
 
 Binding decisions: minimum Android 11 (API 30); HTTP and HTTPS IPTV sources supported without mandatory opt-in, HTTPS preferred, no HTTPS-to-HTTP redirects; no ads, tracking or bundled streams.
 
-## Aktiver Auftrag (2026-11-27): Streaming, Codecs, Performance, Sicherheit, Release
+## Abgeschlossener Auftrag (2026-11-27): Streaming, Codecs, Performance, Sicherheit, Release
 
-P0: DAO-Ergebnisobergrenzen und In-Memory-Filter durch Paging 3 ersetzen; absoluten 90-Sekunden-Call-Timeout für Live-Streams entfernen; Redirect-, Keystore- und Datenintegritätsrisiken beheben. P1: Player-Modi/Decodierung/Audio/Diagnostik verifizieren, Senderwechsel und Netzwerkstabilität verbessern. Danach gebündelte CI-, Emulator-, Sicherheits- und Performanceprüfung, anschließend neue signierte Produktionsversion mit konsistentem `update.json` und Ressourcenmanifest. Bestehendes Branding, Designsystem und alle Benutzerdaten bleiben erhalten. CI ist während der Implementierung pausiert.
+P0 behoben: Room-Paging ohne Ergebnisobergrenzen (DAO-Limits und In-Memory-Filter entfernt), getrennte Netzwerkprofile ohne absoluten Call-Timeout für Live-Streams, gehärtete Redirect-Prüfung und kontrollierte Keystore-Fehlerpfade. P1: FILL/ZOOM unterscheidbar, senderspezifische Einstellungen konsistent, Diagnostik erweitert, quellenspezifische Aufnahme-Parameter. Verifiziert in CI-Lauf `46035485381` und Release-Lauf `46037771079`. Nicht implementiert: RTSP/Multicast, Casting, Multiview, Timeshift und Stalker-Portale (Plattform-, Zertifizierungs- oder Ressourcengrenzen).
 
 ## Abgeschlossener Auftrag (2026-11-27): Design, Branding & Responsive UI/UX
 
