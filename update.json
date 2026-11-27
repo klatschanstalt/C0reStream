@@ -1,6 +1,6 @@
 {
-    "latestVersion": "1.6.0",
-    "notes": "C0reStream 1.6.0: vollständiger Senderzugriff ohne Ergebnislimits, keine Live-Stream-Timeouts, sicherere Redirects und Keystore-Fehlerbehandlung.",
-    "apkUrl": "https://github.com/klatschanstalt/C0reStream/releases/download/v1.6.0/C0reStream.apk",
-    "sha256": "4787f7ff5766b8db548aabbff527f710167dd1ba28b06767971f0e38c51a97ee"
+    "latestVersion": "1.7.0",
+    "notes": "C0reStream 1.7.0: RTSP/RTP-Unterstützung, erweiterte Codec-Diagnostik, FFmpeg-Fallback-Vorbereitung und verifizierte Langzeitwiedergabe.",
+    "apkUrl": "https://github.com/klatschanstalt/C0reStream/releases/download/v1.7.0/C0reStream.apk",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
 }
