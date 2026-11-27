@@ -20,6 +20,7 @@ import pw.c0re.stream.data.PlaylistRepository
 import pw.c0re.stream.data.XtreamApi
 
 class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
+    private companion object { const val MAX_IMPORT_BYTES = 32L * 1024 * 1024 }
     private val db = (app as C0reStreamApp).database
     private val repo = PlaylistRepository(db)
 
@@ -93,22 +94,24 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun importFile(uri: android.net.Uri, onDone: (Long) -> Unit) = viewModelScope.launch {
         try {
-            val raw = withContext(Dispatchers.IO) {
-                val resolver = getApplication<C0reStreamApp>().contentResolver
-                requireNotNull(resolver.openInputStream(uri)).use { input ->
-                    val out = java.io.ByteArrayOutputStream()
-                    val buffer = ByteArray(8_192)
-                    while (true) {
-                        val read = input.read(buffer)
-                        if (read < 0) break
-                        require(out.size() + read <= 32 * 1024 * 1024) { "File too large" }
-                        out.write(buffer, 0, read)
-                    }
-                    M3UParser.parseWithStats(out.toByteArray())
-                }
+            val resolver = getApplication<C0reStreamApp>().contentResolver
+            // Best-effort persistable read access; not required for immediate use and not all
+            // providers support it. Failure here must not abort an otherwise readable import.
+            runCatching {
+                resolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
             }
+            val raw = withContext(Dispatchers.IO) {
+                val bytes = readBounded(resolver, uri)
+                M3UParser.parseWithStats(bytes)
+            }
+            check(raw.channels.isNotEmpty()) { "No channels found" }
+            val displayName = withContext(Dispatchers.IO) { queryDisplayName(resolver, uri) }
+            val name = suggestedPlaylistName(uri, displayName)
             val result = repo.storeChannelsWithStats(
-                name = "Local playlist",
+                name = name,
                 url = null,
                 epg = null,
                 userAgent = null,
@@ -123,8 +126,50 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
-            lastError.value = error.message
+            lastError.value = error.message ?: "Import failed"
         }
+    }
+
+    private suspend fun readBounded(resolver: android.content.ContentResolver, uri: android.net.Uri): ByteArray =
+        withContext(Dispatchers.IO) {
+            val input = resolver.openInputStream(uri)
+                ?: throw java.io.FileNotFoundException("Cannot open ${uri.scheme ?: "content"} source")
+            input.use { stream ->
+                val out = java.io.ByteArrayOutputStream()
+                val buffer = ByteArray(16_384)
+                var total = 0L
+                while (true) {
+                    val read = stream.read(buffer)
+                    if (read < 0) break
+                    if (read == 0) continue
+                    total += read
+                    if (total > MAX_IMPORT_BYTES) throw IllegalStateException("File too large")
+                    out.write(buffer, 0, read)
+                }
+                out.toByteArray()
+            }
+        }
+
+    private fun queryDisplayName(resolver: android.content.ContentResolver, uri: android.net.Uri): String? =
+        runCatching {
+            resolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val index = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (index >= 0 && !cursor.isNull(index)) cursor.getString(index) else null
+                } else {
+                    null
+                }
+            }
+        }.getOrNull()
+
+    private fun suggestedPlaylistName(uri: android.net.Uri, displayName: String?): String {
+        val raw = displayName?.takeIf { it.isNotBlank() }
+            ?: uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
+        val withoutExtension = raw
+            ?.substringBeforeLast('.')
+            ?.substringBeforeLast(".gz")
+            ?.takeIf { it.isNotBlank() }
+        return withoutExtension ?: "Local playlist"
     }
 
     fun refresh(id: Long) = viewModelScope.launch {

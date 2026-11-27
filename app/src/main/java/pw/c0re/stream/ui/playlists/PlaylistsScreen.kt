@@ -149,7 +149,15 @@ fun PlaylistsScreen(
                         }
                         BrandSecondaryButton(
                             stringResource(R.string.action_import_file),
-                            onClick = { importFile.launch(arrayOf("*/*")) },
+                            onClick = {
+                                importFile.launch(
+                                    arrayOf(
+                                        "audio/x-mpegurl", "audio/mpegurl", "application/x-mpegurl",
+                                        "application/vnd.apple.mpegurl", "application/octet-stream",
+                                        "text/plain", "application/gzip", "application/x-gzip", "*/*",
+                                    ),
+                                )
+                            },
                         )
                     },
                 )
