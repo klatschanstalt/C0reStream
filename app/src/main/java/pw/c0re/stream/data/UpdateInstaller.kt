@@ -36,7 +36,7 @@ object UpdateInstaller {
         val directory = File(context.cacheDir, updateDir).apply { mkdirs() }
         val target = File(directory, "C0reStream-${info.latestVersion.take(32)}.apk")
         runCatching {
-            NetworkPolicy.client().newCall(Request.Builder().url(NetworkPolicy.requireUrl(url)).build())
+            NetworkPolicy.downloadClient().newCall(Request.Builder().url(NetworkPolicy.requireUrl(url)).build())
                 .execute().use { response ->
                     check(response.isSuccessful) { "HTTP ${response.code}" }
                     val body = response.body

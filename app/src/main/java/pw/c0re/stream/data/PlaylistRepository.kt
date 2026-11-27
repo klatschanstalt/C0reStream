@@ -69,7 +69,7 @@ class PlaylistRepository(private val db: AppDatabase) {
         existingId: Long? = null,
         guard: ShrinkGuard = ShrinkGuard(),
     ): ImportResult = withContext(Dispatchers.IO) {
-        val client = NetworkPolicy.client(userAgent, useProxy, proxyHost, proxyPort)
+        val client = NetworkPolicy.importClient(userAgent, useProxy, proxyHost, proxyPort)
         val bytes = client.newCall(Request.Builder().url(NetworkPolicy.requireUrl(url)).build())
             .execute().use { response -> response.readBytes() }
         val parsed = M3UParser.parseWithStats(bytes)
@@ -93,7 +93,7 @@ class PlaylistRepository(private val db: AppDatabase) {
         return if (url.startsWith("xtream://")) {
             runCatching {
                 val credentials = requireNotNull(XtreamApi.parseSyntheticUrl(url)) { "Invalid Xtream credentials" }
-                val client = NetworkPolicy.client(
+                val client = NetworkPolicy.importClient(
                     playlist.userAgent, playlist.useProxy, playlist.proxyHost, playlist.proxyPort,
                 )
                 val report = XtreamApi(client).fetchLiveChannelsWithReport(credentials)
@@ -315,7 +315,7 @@ class PlaylistRepository(private val db: AppDatabase) {
         val playlist = db.playlistDao().byId(playlistId) ?: return@withContext emptyMap()
         val epgUrl = playlist.epgUrl ?: return@withContext emptyMap()
         try {
-            val client = NetworkPolicy.client(
+            val client = NetworkPolicy.epgClient(
                 playlist.userAgent, playlist.useProxy, playlist.proxyHost, playlist.proxyPort,
             )
             val text = client.newCall(Request.Builder().url(NetworkPolicy.requireUrl(epgUrl)).build())

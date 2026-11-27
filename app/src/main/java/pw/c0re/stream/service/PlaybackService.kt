@@ -11,6 +11,7 @@ import androidx.media3.common.Format
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.BaseAudioProcessor
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -28,6 +29,7 @@ import androidx.media3.session.MediaSessionService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
+import okhttp3.OkHttpClient
 import pw.c0re.stream.BuildConfig
 import pw.c0re.stream.C0reStreamApp
 import pw.c0re.stream.data.AppSettings
@@ -36,6 +38,7 @@ import pw.c0re.stream.data.player.PerformanceProfile
 import pw.c0re.stream.data.player.PlaybackDiagnostics
 import pw.c0re.stream.data.player.PlaybackPreferences
 import pw.c0re.stream.data.player.PlaybackSettings
+import pw.c0re.stream.ui.player.PlayerHub
 import java.nio.ByteBuffer
 import kotlin.math.abs
 import kotlin.math.min
@@ -44,14 +47,20 @@ import kotlin.math.min
  * Foreground playback service: MediaSession (lock screen, headphones, TV remotes),
  * notification, Media3-managed wake lock, decoder selection and buffering.
  *
- * HTTPS-to-HTTP redirects stay blocked by [NetworkPolicy.client]. No DRM bypass is implemented:
- * decoder selection is delegated to MediaCodec capabilities reported by the device.
+ * HTTPS-to-HTTP redirects stay blocked by [NetworkPolicy.playbackClient], which also disables
+ * the absolute call deadline so a continuous live stream survives beyond 90 s. No DRM bypass is
+ * implemented: decoder selection is delegated to MediaCodec capabilities reported by the device.
  */
 @UnstableApi
 class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
     private var player: ExoPlayer? = null
+
+    private val defaultUserAgent = "C0reStream/${BuildConfig.VERSION_NAME}"
+    private val sourceLock = Any()
+    private var cachedSourcePlaylistId = Long.MIN_VALUE
+    private var cachedPlaybackClient: OkHttpClient? = null
 
     private var lastVideoFormat: Format? = null
     private var lastAudioFormat: Format? = null
@@ -192,9 +201,12 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun buildPlayer(prefs: PlaybackSettings, appSettings: AppSettings) {
-        val dataSourceFactory = OkHttpDataSource.Factory(
-            NetworkPolicy.client("C0reStream/${BuildConfig.VERSION_NAME}"),
-        )
+        // A fresh OkHttpDataSource is created per load; the underlying client is cached and
+        // carries the active source's sanitized User-Agent and proxy into every datasource call.
+        val dataSourceFactory = object : DataSource.Factory {
+            override fun createDataSource(): DataSource =
+                OkHttpDataSource.Factory(playbackClient()).createDataSource()
+        }
         val mediaSourceFactory = DefaultMediaSourceFactory(
             dataSourceFactory,
             DefaultExtractorsFactory(),
@@ -241,6 +253,37 @@ class PlaybackService : MediaSessionService() {
         val session = MediaSession.Builder(this, newPlayer).build()
         mediaSession = session
         addSession(session)
+    }
+
+    /**
+     * Resolves the continuous-stream client for the active source. PlaylistEntity owns the
+     * source-specific User-Agent and proxy; AppSettings has no such fields, so no new ones are
+     * invented. The playlist id is read-only from PlayerHub state already published by the
+     * player screen, and the bounded lookup keeps player construction responsive.
+     */
+    private fun playbackClient(): OkHttpClient {
+        val playlistId = runCatching { PlayerHub.playlistId }.getOrDefault(0L)
+        synchronized(sourceLock) {
+            val cached = cachedPlaybackClient
+            if (cached != null && cachedSourcePlaylistId == playlistId) return cached
+            val app = application as C0reStreamApp
+            val playlist = if (playlistId > 0L) {
+                runBlocking(Dispatchers.IO) {
+                    withTimeoutOrNull(1_000L) { app.database.playlistDao().byId(playlistId) }
+                }
+            } else {
+                null
+            }
+            val client = NetworkPolicy.playbackClient(
+                userAgent = NetworkPolicy.userAgent(playlist?.userAgent) ?: defaultUserAgent,
+                useProxy = playlist?.useProxy == true,
+                proxyHost = playlist?.proxyHost,
+                proxyPort = playlist?.proxyPort,
+            )
+            cachedSourcePlaylistId = playlistId
+            cachedPlaybackClient = client
+            return client
+        }
     }
 
     private fun configure(

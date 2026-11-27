@@ -31,7 +31,20 @@ object RecordingManager {
 
     fun isRecording(): Boolean = job?.isActive == true
 
-    fun start(context: Context, url: String, title: String?): Boolean {
+    /**
+     * Source-specific values from PlaylistEntity may be supplied by the caller; the defaults keep
+     * existing three-argument callers unchanged. They are applied to every request made by the
+     * continuous-stream [NetworkPolicy.recordingClient].
+     */
+    fun start(
+        context: Context,
+        url: String,
+        title: String?,
+        userAgent: String? = null,
+        useProxy: Boolean = false,
+        proxyHost: String? = null,
+        proxyPort: Int? = null,
+    ): Boolean {
         if (NetworkPolicy.parse(url) == null || job?.isActive == true) return false
         val directory = File(context.getExternalFilesDir("recordings") ?: context.filesDir, "recordings")
             .apply { mkdirs() }
@@ -44,7 +57,8 @@ object RecordingManager {
         job = scope.launch {
             var succeeded = false
             try {
-                NetworkPolicy.client().newCall(Request.Builder().url(NetworkPolicy.requireUrl(url)).build())
+                NetworkPolicy.recordingClient(userAgent, useProxy, proxyHost, proxyPort)
+                    .newCall(Request.Builder().url(NetworkPolicy.requireUrl(url)).build())
                     .execute().use { response ->
                         check(response.isSuccessful) { "HTTP ${response.code}" }
                         val body = response.body

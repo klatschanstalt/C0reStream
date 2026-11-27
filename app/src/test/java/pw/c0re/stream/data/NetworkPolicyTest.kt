@@ -1,9 +1,14 @@
 package pw.c0re.stream.data
 
+import okhttp3.Request
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
@@ -105,5 +110,101 @@ class NetworkPolicyTest {
         assertTrue(runCatching {
             NetworkPolicy.redirectTarget(http, "ftp://example.com/live", originalHttps = false)
         }.exceptionOrNull() is IOException)
+    }
+
+    /**
+     * No unit test waits 90 s: the fix is asserted through [okhttp3.OkHttpClient.callTimeoutMillis].
+     * A real >90 s live-stream verification needs a controlled local server that keeps serving
+     * past the old deadline (or manual on-device verification) and is intentionally not a JVM test.
+     */
+    @Test
+    fun `continuous profiles have no absolute call deadline`() {
+        listOf(NetworkPolicy.playbackClient(), NetworkPolicy.recordingClient()).forEach { client ->
+            assertEquals(0, client.callTimeoutMillis)
+            assertEquals(20_000, client.connectTimeoutMillis)
+            assertEquals(30_000, client.readTimeoutMillis)
+            assertFalse(client.followRedirects)
+        }
+    }
+
+    @Test
+    fun `bounded profiles keep an absolute call deadline`() {
+        listOf(
+            NetworkPolicy.client(),
+            NetworkPolicy.apiClient(),
+            NetworkPolicy.importClient(),
+            NetworkPolicy.epgClient(),
+            NetworkPolicy.downloadClient(),
+        ).forEach { client ->
+            assertTrue(client.callTimeoutMillis > 0)
+            assertEquals(20_000, client.connectTimeoutMillis)
+            assertEquals(30_000, client.readTimeoutMillis)
+        }
+    }
+
+    @Test
+    fun `profiles share pool and dispatcher and are cached`() {
+        assertSame(NetworkPolicy.sharedConnectionPool, NetworkPolicy.apiClient().connectionPool)
+        assertSame(NetworkPolicy.sharedConnectionPool, NetworkPolicy.playbackClient().connectionPool)
+        assertSame(NetworkPolicy.sharedDispatcher, NetworkPolicy.apiClient().dispatcher)
+        assertSame(NetworkPolicy.sharedDispatcher, NetworkPolicy.recordingClient().dispatcher)
+
+        // client() remains the API profile, but profiles are distinct instances.
+        assertSame(NetworkPolicy.apiClient(), NetworkPolicy.client())
+        assertNotSame(NetworkPolicy.apiClient(), NetworkPolicy.playbackClient())
+        assertNotSame(NetworkPolicy.playbackClient(), NetworkPolicy.recordingClient())
+        // Repeated calls with the same settings reuse one client.
+        assertSame(NetworkPolicy.playbackClient("VLC/3.0"), NetworkPolicy.playbackClient("VLC/3.0"))
+        assertNotSame(NetworkPolicy.playbackClient("VLC/3.0"), NetworkPolicy.playbackClient("VLC/4.0"))
+        assertNotNull(NetworkPolicy.playbackClient(useProxy = true, proxyHost = "127.0.0.1", proxyPort = 8080).proxy)
+    }
+
+    @Test
+    fun `playback profile applies user agent and preserves range and etag across hops`() {
+        val first = MockWebServer()
+        val second = MockWebServer()
+        try {
+            first.enqueue(
+                MockResponse().setResponseCode(302).setHeader("Location", second.url("/final").toString()),
+            )
+            second.enqueue(MockResponse().setBody("ok"))
+            val client = NetworkPolicy.playbackClient("VLC/3.0")
+            val request = Request.Builder().url(first.url("/start"))
+                .header("Range", "bytes=0-1023")
+                .header("If-None-Match", "\"etag-1\"")
+                .build()
+            client.newCall(request).execute().use { response ->
+                assertEquals(200, response.code)
+                assertEquals("ok", response.body.string())
+            }
+            listOf(first.takeRequest(), second.takeRequest()).forEach { recorded ->
+                assertEquals("VLC/3.0", recorded.getHeader("User-Agent"))
+                assertEquals("bytes=0-1023", recorded.getHeader("Range"))
+                assertEquals("\"etag-1\"", recorded.getHeader("If-None-Match"))
+            }
+        } finally {
+            first.shutdown()
+            second.shutdown()
+        }
+    }
+
+    @Test
+    fun `redirect guard blocks credential query parameters on cross origin hops`() {
+        val withToken = NetworkPolicy.requireUrl("http://example.com:8080/live?token=secret")
+        assertTrue(runCatching {
+            NetworkPolicy.redirectTarget(withToken, "http://example.com:9090/live", originalHttps = false)
+        }.exceptionOrNull() is IOException)
+        assertTrue(runCatching {
+            NetworkPolicy.redirectTarget(
+                NetworkPolicy.requireUrl("http://example.com:8080/live"),
+                "http://cdn.example/live?password=secret",
+                originalHttps = false,
+            )
+        }.exceptionOrNull() is IOException)
+        // Same-origin hops carrying the same query stay legal.
+        assertEquals(
+            "http://example.com:8080/next?token=secret",
+            NetworkPolicy.redirectTarget(withToken, "/next?token=secret", originalHttps = false).toString(),
+        )
     }
 }
