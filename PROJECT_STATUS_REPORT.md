@@ -29,7 +29,7 @@ CI-Lauf `46069122749` vollständig grün (Unit-Tests, Lint, instrumentierte Test
 
 ## Nicht verifiziert / offen
 
-- Gradle-Dependency-Verification ist nicht aktiviert: das wäre bei jedem Dependabot-Update ein manueller Regenerationsschritt ohne hier nachweisbaren Sicherheitsgewinn. Repository-Quellen (Google Maven, Maven Central, Plugin Portal) und Wrapper-Prüfsumme sind geprüft.
+- Gradle-Dependency-Verification ist aktiviert (`gradle/verification-metadata.xml`, SHA-256, inklusive Buildscript-/Plugin-Klassenpfad; 505 Komponenten); in CI-Lauf `46079956592` erfolgreich. Dependabot-Abhängigkeitsaktualisierungen erfordern einen Regenerationsschritt der Metadaten. Repository-Quellen (Google Maven, Maven Central, Plugin Portal) und Wrapper-Prüfsumme sind geprüft.
 - Rohes UDP-/Multicast-Playback, RTSP-Zugangsdaten in URLs, Casting, Multiview, Timeshift, Stalker/MAG und FFmpeg-AAR bleiben offen (Plattform-, Zertifizierungs- oder Vertrauensgrenzen); keine DRM-Umgehung.
 - Keine Gerätetests jenseits API 30/36; Android 17/18 nicht zertifiziert. Netzwerkwechsel-, Keystore-Gerätefehler- und längere Langzeitläufe (5/30/60 Minuten) nicht durchgeführt.
 - Keine belastbaren Messwerte zu Startzeit, Senderwechsel, RAM, CPU, Akku oder Datenbank; Macrobenchmark/Baseline Profiles wurden mangels konkretem Nutzen nicht eingeführt.
