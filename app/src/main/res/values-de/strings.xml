@@ -133,4 +133,22 @@
     <string name="common_tv">TV</string>
     <string name="content_desc_favorite">Favorit umschalten</string>
     <string name="content_desc_watchlist">Merkliste umschalten</string>
+    <string name="update_channel">Updates</string>
+    <string name="update_available_title">Update verfügbar</string>
+    <string name="update_available_text">Version %1$s ist bereit. Öffne die Einstellungen zur Installation.</string>
+    <string name="update_install_failed_title">Update-Installation fehlgeschlagen</string>
+    <string name="update_install_failed_text">Die signierte APK konnte nicht installiert werden. Versuche den Download erneut.</string>
+    <string name="player_record">Stream aufnehmen</string>
+    <string name="player_recording">Aufnahme: %1$s</string>
+    <string name="profiles_title">Profile</string>
+    <string name="profiles_add">Profil hinzufügen</string>
+    <string name="profiles_name">Profilname</string>
+    <string name="profiles_pin_set">PIN festlegen</string>
+    <string name="profiles_pin_remove">PIN entfernen</string>
+    <string name="profiles_switch">Wechseln</string>
+    <string name="profiles_pin_prompt">PIN eingeben</string>
+    <string name="profiles_pin_wrong">Falsche PIN oder vorübergehend gesperrt</string>
+    <string name="profiles_active">Aktiv</string>
+    <string name="qr_import">QR importieren</string>
+    <string name="qr_invalid">Keine gültige Playlist-URL gefunden</string>
 </resources>

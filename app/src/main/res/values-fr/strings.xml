@@ -136,4 +136,22 @@
     <string name="common_tv">TV</string>
     <string name="content_desc_favorite">Basculer le favori</string>
     <string name="content_desc_watchlist">Basculer la liste</string>
+    <string name="update_channel">Mises à jour</string>
+    <string name="update_available_title">Mise à jour disponible</string>
+    <string name="update_available_text">La version %1$s est prête. Ouvrez les paramètres pour l\'installer.</string>
+    <string name="update_install_failed_title">Échec de l\'installation</string>
+    <string name="update_install_failed_text">L\'APK signée n\'a pas pu être installée. Réessayez le téléchargement.</string>
+    <string name="player_record">Enregistrer le flux</string>
+    <string name="player_recording">Enregistrement : %1$s</string>
+    <string name="profiles_title">Profils</string>
+    <string name="profiles_add">Ajouter un profil</string>
+    <string name="profiles_name">Nom du profil</string>
+    <string name="profiles_pin_set">Définir le code PIN</string>
+    <string name="profiles_pin_remove">Supprimer le PIN</string>
+    <string name="profiles_switch">Changer</string>
+    <string name="profiles_pin_prompt">Saisir le PIN</string>
+    <string name="profiles_pin_wrong">PIN incorrect ou temporairement verrouillé</string>
+    <string name="profiles_active">Actif</string>
+    <string name="qr_import">Importer un QR</string>
+    <string name="qr_invalid">Aucune URL de playlist valide trouvée</string>
 </resources>

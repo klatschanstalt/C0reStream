@@ -1,11 +1,14 @@
 package pw.c0re.stream.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -22,18 +25,25 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -43,6 +53,10 @@ import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.launch
 import pw.c0re.stream.C0reStreamApp
 import pw.c0re.stream.R
+import pw.c0re.stream.data.profiles.PinManager
+import pw.c0re.stream.data.profiles.PinVerification
+import pw.c0re.stream.data.profiles.ProfileEntity
+import pw.c0re.stream.data.profiles.ProfileSessionRepository
 import pw.c0re.stream.ui.backup.M3UExporter
 import pw.c0re.stream.ui.favorites.FavoritesScreen
 import pw.c0re.stream.ui.globalsearch.GlobalSearchScreen
@@ -51,6 +65,7 @@ import pw.c0re.stream.ui.player.PlayerHub
 import pw.c0re.stream.ui.player.PlayerScreen
 import pw.c0re.stream.ui.playlistdetail.PlaylistDetailScreen
 import pw.c0re.stream.ui.playlists.PlaylistsScreen
+import pw.c0re.stream.ui.profiles.ProfilesScreen
 import pw.c0re.stream.ui.settings.SettingsScreen
 import pw.c0re.stream.ui.vod.VodScreen
 
@@ -60,6 +75,7 @@ object Routes {
     const val HISTORY = "history"
     const val SETTINGS = "settings"
     const val GLOBAL_SEARCH = "globalsearch"
+    const val PROFILES = "profiles"
     const val PLAYER = "player/{channelId}"
     fun player(channelId: Long): String = "player/$channelId"
 }
@@ -72,6 +88,20 @@ fun C0reStreamRoot(sharedM3uUrl: String?) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val app = context.applicationContext as C0reStreamApp
+    val session = remember { ProfileSessionRepository(context) }
+    val activeId by session.activeId.collectAsState(initial = 0L)
+    var gateProfile by remember { mutableStateOf<ProfileEntity?>(null) }
+    var unlocked by remember { mutableStateOf(false) }
+    LaunchedEffect(activeId) {
+        val profile = if (activeId > 0) app.database.profileDao().byId(activeId) else null
+        if (profile?.pinHash.isNullOrBlank()) {
+            gateProfile = null
+            unlocked = true
+        } else {
+            gateProfile = profile
+            unlocked = false
+        }
+    }
     val tabs = listOf(
         Tab(Routes.PLAYLISTS, R.string.nav_live, Icons.Filled.LiveTv),
         Tab(Routes.FAVORITES, R.string.nav_favorites, Icons.Filled.Favorite),
@@ -101,6 +131,10 @@ fun C0reStreamRoot(sharedM3uUrl: String?) {
         }
     }
 
+    val gate = gateProfile
+    if (!unlocked && gate != null) {
+        PinGate(profile = gate, onUnlocked = { unlocked = true })
+    } else {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 840.dp
         Scaffold(
@@ -190,13 +224,55 @@ fun C0reStreamRoot(sharedM3uUrl: String?) {
                             onExportBackup = {
                                 scope.launch { M3UExporter.share(context, app.database) }
                             },
+                            onOpenProfiles = { nav.navigate(Routes.PROFILES) },
                         )
                     }
                     composable(Routes.GLOBAL_SEARCH) {
                         GlobalSearchScreen(onPlay = { nav.navigate(Routes.player(it)) })
                     }
+                    composable(Routes.PROFILES) {
+                        ProfilesScreen(onDone = { nav.popBackStack() })
+                    }
                 }
             }
+        }
+    }
+    }
+}
+
+@Composable
+private fun PinGate(profile: ProfileEntity, onUnlocked: () -> Unit) {
+    var pin by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    Surface(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.fillMaxSize().padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(stringResource(R.string.profiles_pin_prompt), style = MaterialTheme.typography.headlineSmall)
+            Spacer(Modifier.height(16.dp))
+            OutlinedTextField(
+                value = pin,
+                onValueChange = { pin = it.filter(Char::isDigit).take(64) },
+                label = { Text(profile.name) },
+                visualTransformation = PasswordVisualTransformation(),
+                singleLine = true,
+            )
+            if (error) {
+                Text(stringResource(R.string.profiles_pin_wrong), color = MaterialTheme.colorScheme.error)
+            }
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = {
+                val value = pin
+                pin = ""
+                val chars = value.toCharArray()
+                val result = ProfileSessionRepository.pinManager.verify(profile.pinHash, chars, profile.id)
+                chars.fill('\u0000')
+                if (result == PinVerification.Success || result == PinVerification.NoPin) onUnlocked()
+                else error = true
+            }) { Text(stringResource(R.string.action_confirm)) }
         }
     }
 }

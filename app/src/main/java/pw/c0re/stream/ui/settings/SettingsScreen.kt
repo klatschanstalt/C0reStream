@@ -44,7 +44,7 @@ import pw.c0re.stream.ui.theme.Brand
 import pw.c0re.stream.ui.theme.ThemeMode
 
 @Composable
-fun SettingsScreen(onExportBackup: () -> Unit = {}, vm: SettingsViewModel = viewModel()) {
+fun SettingsScreen(onExportBackup: () -> Unit = {}, onOpenProfiles: () -> Unit = {}, vm: SettingsViewModel = viewModel()) {
     val settings by vm.settings.collectAsState()
     val mode = runCatching { ThemeMode.valueOf(settings.themeMode) }.getOrDefault(ThemeMode.DARK)
     val brand = runCatching { Brand.valueOf(settings.brand) }.getOrDefault(Brand.HAM3L)
@@ -64,6 +64,7 @@ fun SettingsScreen(onExportBackup: () -> Unit = {}, vm: SettingsViewModel = view
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
         C0reStreamWordmark()
         Spacer(Modifier.height(20.dp))
+        TextButton(onClick = onOpenProfiles) { Text(stringResource(R.string.profiles_title)) }
 
         updateInfo?.let { update ->
             Card {

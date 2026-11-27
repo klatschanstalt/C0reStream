@@ -20,6 +20,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.FiberManualRecord
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.SkipNext
@@ -66,6 +68,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import pw.c0re.stream.R
 import pw.c0re.stream.data.NetworkPolicy
+import pw.c0re.stream.data.RecordingManager
 import java.util.Locale
 
 /**
@@ -89,6 +92,7 @@ fun PlayerScreen(
     val controller = PlayerHub.controller
     val hubError = PlayerHub.error
     val playing = PlayerHub.isPlaying
+    val recording by RecordingManager.active.collectAsState()
 
     var showTracks by remember { mutableStateOf(false) }
     var showSleep by remember { mutableStateOf(false) }
@@ -313,6 +317,12 @@ fun PlayerScreen(
                 )
             }
         }
+        recording?.let { name ->
+            Surface(
+                modifier = Modifier.align(Alignment.TopStart).padding(top = 72.dp, start = 16.dp),
+                tonalElevation = 4.dp,
+            ) { Text(stringResource(R.string.player_recording, name), Modifier.padding(8.dp)) }
+        }
 
         IconButton(onClick = onBack, modifier = Modifier.padding(12.dp).align(Alignment.TopStart)) {
             Icon(
@@ -348,6 +358,19 @@ fun PlayerScreen(
             }
             FilledTonalIconButton(onClick = { showSleep = true }) {
                 Icon(Icons.Filled.Bedtime, stringResource(R.string.player_sleep_timer), tint = Color.White)
+            }
+            FilledTonalIconButton(enabled = effectiveUrl != null, onClick = {
+                if (recording != null) {
+                    RecordingManager.stop()
+                } else {
+                    effectiveUrl?.let { RecordingManager.start(context, it, effectiveTitle) }
+                }
+            }) {
+                Icon(
+                    if (recording != null) Icons.Filled.Stop else Icons.Filled.FiberManualRecord,
+                    stringResource(R.string.player_record),
+                    tint = Color.White,
+                )
             }
             FilledTonalIconButton(
                 enabled = pipSupported && controller != null,

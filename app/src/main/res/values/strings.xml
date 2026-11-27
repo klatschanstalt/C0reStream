@@ -146,4 +146,22 @@
 
     <string name="content_desc_favorite">Toggle favorite</string>
     <string name="content_desc_watchlist">Toggle watchlist</string>
+    <string name="update_channel">Updates</string>
+    <string name="update_available_title">Update available</string>
+    <string name="update_available_text">Version %1$s is ready. Open settings to install.</string>
+    <string name="update_install_failed_title">Update installation failed</string>
+    <string name="update_install_failed_text">The signed APK could not be installed. Try the download again.</string>
+    <string name="player_record">Record stream</string>
+    <string name="player_recording">Recording %1$s</string>
+    <string name="profiles_title">Profiles</string>
+    <string name="profiles_add">Add profile</string>
+    <string name="profiles_name">Profile name</string>
+    <string name="profiles_pin_set">Set PIN</string>
+    <string name="profiles_pin_remove">Remove PIN</string>
+    <string name="profiles_switch">Switch</string>
+    <string name="profiles_pin_prompt">Enter PIN</string>
+    <string name="profiles_pin_wrong">Incorrect PIN or temporarily locked</string>
+    <string name="profiles_active">Active</string>
+    <string name="qr_import">Import QR</string>
+    <string name="qr_invalid">No valid playlist URL found</string>
 </resources>

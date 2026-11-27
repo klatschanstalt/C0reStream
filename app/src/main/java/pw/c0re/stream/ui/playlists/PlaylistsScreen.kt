@@ -15,10 +15,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import android.graphics.ImageDecoder
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -41,12 +43,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import pw.c0re.stream.R
+import pw.c0re.stream.data.profiles.QrPlaylistParser
 import pw.c0re.stream.ui.components.C0reStreamWordmark
 import pw.c0re.stream.ui.components.PoweredByFooter
 
@@ -62,6 +66,8 @@ fun PlaylistsScreen(
     val error by vm.lastError
     var showAdd by remember { mutableStateOf(sharedUrl != null) }
     var deleteId by remember { mutableStateOf<Long?>(null) }
+    var qrError by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     LaunchedEffect(sharedUrl) {
         if (sharedUrl != null) showAdd = true
@@ -69,6 +75,19 @@ fun PlaylistsScreen(
 
     val importFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) vm.importFile(uri, onAddNew)
+    }
+    val importQr = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        qrError = false
+        if (uri == null) return@rememberLauncherForActivityResult
+        val bitmap = runCatching {
+            ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri))
+        }.getOrNull()
+        val url = bitmap?.let { QrPlaylistParser.parse(it) }
+        if (url == null) {
+            qrError = true
+        } else {
+            vm.add("QR playlist", url, null, null, false, null, null, null, onAddNew)
+        }
     }
 
     Scaffold(
@@ -90,6 +109,9 @@ fun PlaylistsScreen(
                 IconButton(onClick = onGlobalSearch) {
                     Icon(Icons.Filled.Search, stringResource(R.string.action_search))
                 }
+                IconButton(onClick = { importQr.launch("image/*") }) {
+                    Icon(Icons.Filled.QrCode, stringResource(R.string.qr_import))
+                }
                 TextButton(onClick = { importFile.launch(arrayOf("*/*")) }) {
                     Text(stringResource(R.string.action_import_file))
                 }
@@ -105,6 +127,9 @@ fun PlaylistsScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error,
                 )
+            }
+            if (qrError) {
+                Text(stringResource(R.string.qr_invalid), color = MaterialTheme.colorScheme.error)
             }
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
                 items(playlists, key = { it.id }) { playlist ->
