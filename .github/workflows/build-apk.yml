@@ -85,11 +85,16 @@ jobs:
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      - name: Free disk space for emulator
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost
+          if command -v docker >/dev/null 2>&1; then docker rmi -f $(docker images -q) || true; fi
+          df -h /home/runner/.android || true
       - name: Instrumented tests (API ${{ matrix.api-level }})
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api-level }}
-          target: google_apis
+          target: aosp_atd
           arch: x86_64
           disk-size: 4096M
           disable-animations: true
