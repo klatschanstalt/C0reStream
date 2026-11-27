@@ -36,6 +36,21 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun importFile(uri: android.net.Uri, onDone: (Long) -> Unit) = viewModelScope.launch {
+        try {
+            val raw = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val resolver = getApplication<C0reStreamApp>().contentResolver
+                requireNotNull(resolver.openInputStream(uri)).use { input ->
+                    val bytes = input.readNBytes(32 * 1024 * 1024 + 1)
+                    require(bytes.size <= 32 * 1024 * 1024)
+                    pw.c0re.stream.data.M3UParser.parse(bytes.toString(Charsets.UTF_8))
+                }
+            }
+            onDone(repo.storeChannels("Lokale Playlist", null, null, null, false, null, null, raw))
+        } catch (e: CancellationException) { throw e }
+        catch (_: Exception) { lastError.value = "Dateiimport fehlgeschlagen" }
+    }
+
     fun refresh(id: Long) {
         viewModelScope.launch {
             val pl = db.playlistDao().byId(id) ?: return@launch

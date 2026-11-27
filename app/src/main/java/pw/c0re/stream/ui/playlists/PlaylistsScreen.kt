@@ -52,6 +52,10 @@ fun PlaylistsScreen(
     val error by vm.lastError
     var showAdd by remember { mutableStateOf(sharedUrl != null) }
 
+    val importFile = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) vm.importFile(uri, onAddNew) }
+    var deleteId by remember { mutableStateOf<Long?>(null) }
     Scaffold(floatingActionButton = {
         FloatingActionButton(onClick = { showAdd = true }) { Icon(Icons.Filled.Add, "Playlist hinzufuegen") }
     }) { pad ->
@@ -60,6 +64,7 @@ fun PlaylistsScreen(
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Deine Playlists", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall)
+                TextButton(onClick = { importFile.launch(arrayOf("*/*")) }) { Text("Datei importieren") }
                 TextButton(onClick = onGlobalSearch) { Text("Alle Kanaele durchsuchen") }
             }
             Spacer(Modifier.height(16.dp))
@@ -82,7 +87,7 @@ fun PlaylistsScreen(
                                 Text(pl.channelCount.toString() + " Kanaele", style = MaterialTheme.typography.bodyMedium)
                             }
                             IconButton(onClick = { vm.refresh(pl.id) }) { Icon(Icons.Filled.Refresh, "Aktualisieren") }
-                            IconButton(onClick = { vm.delete(pl.id) }) { Icon(Icons.Filled.Delete, "Loeschen") }
+                            IconButton(onClick = { deleteId = pl.id }) { Icon(Icons.Filled.Delete, "Loeschen") }
                         }
                     }
                 }
@@ -91,6 +96,7 @@ fun PlaylistsScreen(
         }
     }
 
+    deleteId?.let { id -> AlertDialog(onDismissRequest = { deleteId = null }, title = { Text("Playlist löschen?") }, text = { Text("Zugehörige Favoriten und Verlaufseinträge werden entfernt.") }, confirmButton = { TextButton(onClick = { vm.delete(id); deleteId = null }) { Text("Löschen") } }, dismissButton = { TextButton(onClick = { deleteId = null }) { Text("Abbrechen") } }) }
     if (showAdd) AddPlaylistDialog(
         initialUrl = sharedUrl,
         onDismiss = { showAdd = false },
@@ -140,7 +146,7 @@ private fun AddPlaylistDialog(
                 if (useXtream) {
                     OutlinedTextField(xHost, { xHost = it }, label = { Text("Server (http://host:port)") }, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(xUser, { xUser = it }, label = { Text("Benutzername") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(xPass, { xPass = it }, label = { Text("Passwort") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(xPass, { xPass = it }, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(), label = { Text("Passwort") }, modifier = Modifier.fillMaxWidth())
                 } else {
                     OutlinedTextField(url, { url = it }, label = { Text("M3U-URL") }, modifier = Modifier.fillMaxWidth())
                 }

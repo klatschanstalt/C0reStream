@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Automatischer Playlist-Refresh im Hintergrund (12 h).
- * Xtream-Playlists werden ausgelassen, da deren Login-Refresh bewusst manuell bleibt.
+ * M3U und Xtream werden aktualisiert; lokale Dateien bleiben unverändert.
  */
 class PlaylistRefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
@@ -25,21 +25,26 @@ class PlaylistRefreshWorker(context: Context, params: WorkerParameters) : Corout
         var failed = 0
         db.playlistDao().all().first().forEach { pl ->
             val url = pl.url ?: return@forEach
-            if (url.startsWith("xtream://")) return@forEach
-            repo.fetchAndStore(pl.name, url, pl.epgUrl, pl.userAgent, pl.useProxy, pl.proxyHost, pl.proxyPort, pl.id)
+            val result = if (url.startsWith("xtream://")) runCatching {
+                val creds = requireNotNull(pw.c0re.stream.data.XtreamApi.parseSyntheticUrl(url))
+                val raw = pw.c0re.stream.data.XtreamApi(okhttp3.OkHttpClient()).fetchLiveChannels(creds)
+                repo.storeChannels(pl.name, url, pl.epgUrl, pl.userAgent, pl.useProxy, pl.proxyHost, pl.proxyPort, raw, pl.id)
+            } else repo.fetchAndStore(pl.name, url, pl.epgUrl, pl.userAgent, pl.useProxy, pl.proxyHost, pl.proxyPort, pl.id)
+            result
                 .onSuccess { ok++ }
-                .onFailure { failed++; AppLog.log("Refresh", "Playlist-Aktualisierung fehlgeschlagen") }
+                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; failed++; AppLog.log("Refresh", "Playlist-Aktualisierung fehlgeschlagen") }
         }
         AppLog.log("Refresh", "$ok aktualisiert, $failed fehlgeschlagen")
-        return Result.success()
+        return if (failed > 0 && runAttemptCount < 2) Result.retry() else Result.success()
     }
 
     companion object {
         fun schedule(context: Context) {
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 "ham3l_playlist_refresh",
-                ExistingPeriodicWorkPolicy.KEEP,
-                PeriodicWorkRequestBuilder<PlaylistRefreshWorker>(12, TimeUnit.HOURS).build(),
+                ExistingPeriodicWorkPolicy.UPDATE,
+                PeriodicWorkRequestBuilder<PlaylistRefreshWorker>(12, TimeUnit.HOURS)
+                    .setConstraints(androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build()).build(),
             )
         }
     }

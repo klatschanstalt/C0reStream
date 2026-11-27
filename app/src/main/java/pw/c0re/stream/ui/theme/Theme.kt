@@ -48,7 +48,7 @@ private val EmberDark = darkColorScheme(
     onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFFB09A8D),
 )
 
-enum class ThemeMode { DARK, LIGHT, SYSTEM }
+enum class ThemeMode { DARK, LIGHT, SYSTEM, AMOLED }
 enum class Brand { HAM3L, EMBER }
 
 @Composable
@@ -57,12 +57,13 @@ fun C0reStreamThemeFromPrefs(content: @Composable () -> Unit) {
     val mode by vm.themeMode.collectAsState()
     val brand by vm.brand.collectAsState()
     val dark = when (mode) {
-        ThemeMode.DARK -> true
+        ThemeMode.DARK, ThemeMode.AMOLED -> true
         ThemeMode.LIGHT -> false
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
     }
     val scheme = when {
-        brand == Brand.EMBER -> EmberDark
+        mode == ThemeMode.AMOLED -> DarkScheme.copy(background = androidx.compose.ui.graphics.Color.Black, surface = androidx.compose.ui.graphics.Color.Black)
+        brand == Brand.EMBER && dark -> EmberDark
         dark -> DarkScheme
         else -> LightScheme
     }
