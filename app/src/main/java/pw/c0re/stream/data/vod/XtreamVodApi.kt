@@ -1,69 +1,127 @@
 package pw.c0re.stream.data.vod
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
+import pw.c0re.stream.data.NetworkPolicy
 import pw.c0re.stream.data.XtreamApi
-import pw.c0re.stream.data.readMetadata
 
-/**
- * VOD-Filme und Serien ueber die Xtream-Codes-API.
- */
-class XtreamVodApi(private val httpClient: OkHttpClient) {
+/** VOD movies and series over the Xtream Codes API. */
+class XtreamVodApi(private val api: XtreamApi) {
 
-    data class VodItem(val id: Int, val name: String, val poster: String?, val rating: String?)
-    data class Episode(val id: Int, val season: Int, val episodeNum: Int, val title: String, val container: String)
+    data class VodItem(
+        val id: Int,
+        val name: String,
+        val poster: String?,
+        val rating: String?,
+        val container: String = "mp4",
+    )
 
-    suspend fun movies(creds: XtreamApi.Credentials): List<VodItem> = fetchItems(creds, "get_vod_streams")
-    suspend fun series(creds: XtreamApi.Credentials): List<VodItem> = fetchItems(creds, "get_series")
+    data class Episode(
+        val id: Int,
+        val season: Int,
+        val episodeNum: Int,
+        val title: String,
+        val container: String,
+    )
 
-    private suspend fun fetchItems(creds: XtreamApi.Credentials, action: String): List<VodItem> =
-        withContext(Dispatchers.IO) {
-            val url = creds.baseUrl() + "?username=" + java.net.URLEncoder.encode(creds.username, "UTF-8") +
-                "&password=" + java.net.URLEncoder.encode(creds.password, "UTF-8") + "&action=" + action
-            val body = httpClient.newBuilder().followSslRedirects(false).followRedirects(false).callTimeout(90, java.util.concurrent.TimeUnit.SECONDS).build().newCall(Request.Builder().url(url).build()).execute().use { it.readMetadata() }
-            val root = JSONArray(body)
-            (0 until root.length()).map { i ->
-                val o: JSONObject = root.getJSONObject(i)
-                VodItem(
-                    id = o.optInt(if (action == "get_series") "series_id" else "stream_id"),
-                    name = o.optString("name", "Unbekannt"),
-                    poster = o.optString("stream_icon").takeIf { it.isNotBlank() } ?: o.optString("cover").takeIf { it.isNotBlank() },
-                    rating = o.optString("rating").takeIf { it.isNotBlank() && it != "0" },
-                )
-            }.sortedBy { it.name.lowercase() }
-        }
+    suspend fun movies(creds: XtreamApi.Credentials): List<VodItem> =
+        parseItems(api.fetchVodStreams(creds), "stream_id", withContainer = true)
 
-    suspend fun seriesInfo(creds: XtreamApi.Credentials, seriesId: Int): Map<Int, List<Episode>> =
-        withContext(Dispatchers.IO) {
-            val url = creds.baseUrl() + "?username=" + java.net.URLEncoder.encode(creds.username, "UTF-8") +
-                "&password=" + java.net.URLEncoder.encode(creds.password, "UTF-8") + "&action=get_series_info&series_id=" + seriesId
-            val body = httpClient.newBuilder().followSslRedirects(false).followRedirects(false).callTimeout(90, java.util.concurrent.TimeUnit.SECONDS).build().newCall(Request.Builder().url(url).build()).execute().use { it.readMetadata() }
-            val root = JSONObject(body).optJSONObject("episodes") ?: return@withContext emptyMap()
-            val result = mutableMapOf<Int, List<Episode>>()
-            root.keys().forEach { seasonKey ->
-                val arr = root.optJSONArray(seasonKey) ?: return@forEach
-                val eps = (0 until arr.length()).map { i ->
-                    val o = arr.getJSONObject(i)
-                    Episode(
-                        id = o.optInt("id"),
-                        season = seasonKey.toIntOrNull() ?: 1,
-                        episodeNum = o.optInt("episode_num"),
-                        title = o.optString("title", "Episode"),
-                        container = o.optString("container_extension", "mp4"),
-                    )
-                }
-                result[seasonKey.toIntOrNull() ?: 1] = eps.sortedBy { it.episodeNum }
+    suspend fun series(creds: XtreamApi.Credentials): List<VodItem> =
+        parseItems(api.fetchSeries(creds), "series_id", withContainer = false)
+
+    private fun parseItems(root: JSONArray, idField: String, withContainer: Boolean): List<VodItem> {
+        check(root.length() <= 100_000) { "Too many VOD records" }
+        val result = ArrayList<VodItem>(root.length())
+        for (index in 0 until root.length()) {
+            val item = root.optJSONObject(index) ?: continue
+            val id = item.optInt(idField)
+            if (id <= 0) continue
+            val container = if (withContainer) {
+                item.optString("container_extension", "mp4")
+                    .takeIf { it.matches(Regex("[a-zA-Z0-9]{1,10}")) } ?: "mp4"
+            } else {
+                "mp4"
             }
-            result.toSortedMap()
+            result += VodItem(
+                id = id,
+                name = item.optString("name").ifBlank { "Unknown" }.take(512),
+                poster = (item.optString("stream_icon").takeIf { it.isNotBlank() }
+                    ?: item.optString("cover").takeIf { it.isNotBlank() })
+                    ?.takeIf { NetworkPolicy.parse(it) != null },
+                rating = item.optString("rating").takeIf { it.isNotBlank() && it != "0" }?.take(32),
+                container = container,
+            )
         }
+        return result.sortedBy { it.name.lowercase() }
+    }
+
+    suspend fun seriesInfo(creds: XtreamApi.Credentials, seriesId: Int): Map<Int, List<Episode>> {
+        val root = api.fetchSeriesInfo(creds, seriesId)
+        val episodes = root.optJSONObject("episodes") ?: return emptyMap()
+        val result = sortedMapOf<Int, List<Episode>>()
+        val keys = episodes.keys()
+        var total = 0
+        while (keys.hasNext()) {
+            val seasonKey = keys.next()
+            val array = episodes.optJSONArray(seasonKey) ?: continue
+            check(array.length() <= 10_000) { "Too many episodes" }
+            total += array.length()
+            check(total <= 100_000) { "Too many episodes" }
+            val season = seasonKey.toIntOrNull() ?: 1
+            val parsed = ArrayList<Episode>(array.length())
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val id = item.optInt("id")
+                if (id <= 0) continue
+                parsed += Episode(
+                    id = id,
+                    season = season,
+                    episodeNum = item.optInt("episode_num"),
+                    title = item.optString("title").ifBlank { "Episode" }.take(512),
+                    container = item.optString("container_extension", "mp4")
+                        .takeIf { it.matches(Regex("[a-zA-Z0-9]{1,10}")) } ?: "mp4",
+                )
+            }
+            result[season] = parsed.sortedBy { it.episodeNum }
+        }
+        return result
+    }
 
     fun movieUrl(creds: XtreamApi.Credentials, id: Int, container: String = "mp4"): String =
         creds.streamUrl("movie", id.toString(), container)
 
     fun episodeUrl(creds: XtreamApi.Credentials, id: Int, container: String): String =
         creds.streamUrl("series", id.toString(), container)
+
+    fun mediaKey(kind: String, playlistId: Long, id: Int): String = "$kind:$playlistId:$id"
+
+    companion object {
+        fun parseEpisodeMap(value: JSONObject?): Map<Int, List<Episode>> {
+            val episodes = value?.optJSONObject("episodes") ?: return emptyMap()
+            val result = sortedMapOf<Int, List<Episode>>()
+            val keys = episodes.keys()
+            while (keys.hasNext()) {
+                val seasonKey = keys.next()
+                val array = episodes.optJSONArray(seasonKey) ?: continue
+                val season = seasonKey.toIntOrNull() ?: 1
+                val parsed = ArrayList<Episode>(array.length())
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+                    val id = item.optInt("id")
+                    if (id <= 0) continue
+                    parsed += Episode(
+                        id = id,
+                        season = season,
+                        episodeNum = item.optInt("episode_num"),
+                        title = item.optString("title").ifBlank { "Episode" }.take(512),
+                        container = item.optString("container_extension", "mp4")
+                            .takeIf { it.matches(Regex("[a-zA-Z0-9]{1,10}")) } ?: "mp4",
+                    )
+                }
+                result[season] = parsed.sortedBy { it.episodeNum }
+            }
+            return result
+        }
+    }
 }

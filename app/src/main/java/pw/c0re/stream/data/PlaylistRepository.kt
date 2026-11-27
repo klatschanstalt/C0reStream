@@ -4,73 +4,158 @@ import androidx.room.withTransaction
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import pw.c0re.stream.data.db.AppDatabase
 import pw.c0re.stream.data.db.ChannelEntity
 import pw.c0re.stream.data.db.PlaylistEntity
+import pw.c0re.stream.data.db.ProtectedUrl
 import pw.c0re.stream.data.model.EpgEntry
-import java.net.InetSocketAddress
-import java.net.Proxy
-import java.util.concurrent.TimeUnit
 
 class PlaylistRepository(private val db: AppDatabase) {
 
-    private fun client(ua: String?, useProxy: Boolean, proxyHost: String?, proxyPort: Int?): OkHttpClient {
-        val builder = OkHttpClient.Builder()
-            .connectTimeout(20, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .callTimeout(90, TimeUnit.SECONDS)
-            .followSslRedirects(false)
-        if (!ua.isNullOrBlank()) {
-            builder.addInterceptor { chain -> chain.proceed(chain.request().newBuilder().header("User-Agent", ua).build()) }
-        }
-        if (useProxy && !proxyHost.isNullOrBlank() && proxyPort != null) {
-            builder.proxy(Proxy(Proxy.Type.HTTP, InetSocketAddress(proxyHost, proxyPort)))
-        }
-        return builder.build()
-    }
-
-    suspend fun fetchAndStore(displayName: String, url: String, epgUrl: String?, ua: String?, useProxy: Boolean, proxyHost: String?, proxyPort: Int?, existingId: Long? = null): Result<Long> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val body = client(ua, useProxy, proxyHost, proxyPort)
-                    .newCall(Request.Builder().url(NetworkPolicy.requireUrl(url)).build()).execute().use { resp ->
-                        check(resp.isSuccessful) { "HTTP " + resp.code }
-                        resp.readMetadata()
-                    }
-                val channels = M3UParser.parse(body)
-                check(channels.isNotEmpty()) { "Keine Kanaele in der Liste gefunden" }
-
-                storeChannels(displayName, url, epgUrl, ua, useProxy, proxyHost, proxyPort, channels, existingId)
-            }.onFailure { if (it is CancellationException) throw it }
-        }
-
-    suspend fun storeChannels(name: String, url: String?, epg: String?, ua: String?, proxy: Boolean, host: String?, port: Int?, raw: List<M3UParser.RawChannel>, existingId: Long? = null): Long = db.withTransaction {
-        check(raw.isNotEmpty()) { "Keine Kanaele gefunden" }
-        val id = if (existingId != null) {
-            check(db.playlistDao().byId(existingId) != null) { "Playlist nicht mehr vorhanden" }
-            existingId
-        } else db.playlistDao().upsert(PlaylistEntity(name = name, url = url, epgUrl = epg, userAgent = ua, useProxy = proxy, proxyHost = host, proxyPort = port))
-        val old = db.channelDao().snapshot(id)
-        val byUrl = old.groupBy { it.url }.mapValues { ArrayDeque(it.value) }
-        val channels = raw.distinctBy { it.url }.map { r ->
-            ChannelEntity(id = byUrl[r.url]?.removeFirstOrNull()?.id ?: 0L, playlistId = id, name = r.name, logoUrl = r.logo, group = r.group, url = r.url, tvgId = r.tvgId, catchupSource = r.catchupSource)
-        }
-        val retained = channels.map { it.id }.toHashSet()
-        old.filter { it.id !in retained }.forEach { db.channelDao().deleteById(it.id) }
-        db.channelDao().insertAll(channels)
-        db.playlistDao().updateMeta(id, channels.size, System.currentTimeMillis())
-        id
-    }
-
-    suspend fun loadEpgNow(playlistId: Long): Map<String, List<EpgEntry>> = withContext(Dispatchers.IO) {
-        val pl = db.playlistDao().byId(playlistId) ?: return@withContext emptyMap()
-        val epgUrl = pl.epgUrl ?: return@withContext emptyMap()
+    suspend fun fetchAndStore(
+        displayName: String,
+        url: String,
+        epgUrl: String?,
+        userAgent: String?,
+        useProxy: Boolean,
+        proxyHost: String?,
+        proxyPort: Int?,
+        existingId: Long? = null,
+    ): Result<Long> = withContext(Dispatchers.IO) {
         runCatching {
-            val text = client(pl.userAgent, pl.useProxy, pl.proxyHost, pl.proxyPort)
-                .newCall(Request.Builder().url(NetworkPolicy.requireUrl(epgUrl)).build()).execute().use { it.readMetadata() }
-            EpgParser.parse(text.reader()).mapValues { entry -> entry.value.sortedBy { e -> e.start } }
+            val client = NetworkPolicy.client(userAgent, useProxy, proxyHost, proxyPort)
+            val body = client.newCall(Request.Builder().url(NetworkPolicy.requireUrl(url)).build())
+                .execute()
+                .use { response -> response.readText() }
+            val channels = M3UParser.parse(body)
+            check(channels.isNotEmpty()) { "No channels found" }
+            storeChannels(displayName, url, epgUrl, userAgent, useProxy, proxyHost, proxyPort, channels, existingId)
+        }.onFailure { if (it is CancellationException) throw it }
+    }
+
+    suspend fun refresh(playlist: PlaylistEntity): Result<Long> {
+        val url = playlist.url ?: return Result.failure(IllegalArgumentException("Local playlist"))
+        return if (url.startsWith("xtream://")) {
+            runCatching {
+                val credentials = requireNotNull(XtreamApi.parseSyntheticUrl(url)) { "Invalid Xtream credentials" }
+                val client = NetworkPolicy.client(
+                    playlist.userAgent, playlist.useProxy, playlist.proxyHost, playlist.proxyPort,
+                )
+                val raw = XtreamApi(client).fetchLiveChannels(credentials)
+                check(raw.isNotEmpty()) { "No channels found" }
+                storeChannels(
+                    playlist.name, url, playlist.epgUrl, playlist.userAgent, playlist.useProxy,
+                    playlist.proxyHost, playlist.proxyPort, raw, playlist.id,
+                )
+            }.onFailure { if (it is CancellationException) throw it }
+        } else {
+            fetchAndStore(
+                playlist.name, url, playlist.epgUrl, playlist.userAgent, playlist.useProxy,
+                playlist.proxyHost, playlist.proxyPort, playlist.id,
+            )
+        }
+    }
+
+    suspend fun storeChannels(
+        name: String,
+        url: String?,
+        epg: String?,
+        userAgent: String?,
+        useProxy: Boolean,
+        proxyHost: String?,
+        proxyPort: Int?,
+        raw: List<M3UParser.RawChannel>,
+        existingId: Long? = null,
+    ): Long = db.withTransaction {
+        check(raw.isNotEmpty()) { "No channels found" }
+        val playlistId = if (existingId != null) {
+            val existing = requireNotNull(db.playlistDao().byId(existingId)) { "Playlist missing" }
+            db.playlistDao().upsert(
+                existing.copy(
+                    name = name,
+                    protectedUrl = url?.let { ProtectedUrl(it) },
+                    protectedEpgUrl = epg?.let { ProtectedUrl(it) },
+                    userAgent = NetworkPolicy.userAgent(userAgent),
+                    useProxy = useProxy,
+                    proxyHost = proxyHost,
+                    proxyPort = proxyPort,
+                ),
+            )
+            existingId
+        } else {
+            db.playlistDao().upsert(
+                PlaylistEntity(
+                    name = name,
+                    url = url,
+                    epgUrl = epg,
+                    userAgent = NetworkPolicy.userAgent(userAgent),
+                    useProxy = useProxy,
+                    proxyHost = proxyHost,
+                    proxyPort = proxyPort,
+                ),
+            )
+        }
+
+        // Stable keys deduplicate the import and preserve IDs across URL/token refreshes.
+        val deduplicated = LinkedHashMap<String, M3UParser.RawChannel>()
+        for (channel in raw) {
+            val key = ChannelKey.stableKey(channel.url, channel.tvgId)
+            deduplicated.putIfAbsent(key, channel)
+        }
+
+        val old = db.channelDao().snapshot(playlistId)
+        val oldByKey = old.filter { it.stableKey.isNotBlank() }.associateBy { it.stableKey }
+        val oldByUrl = old.groupBy { it.url }.mapValues { ArrayDeque(it.value) }
+        val channels = deduplicated.map { (key, channel) ->
+            val existing = oldByKey[key] ?: oldByUrl[channel.url]?.removeFirstOrNull()
+            ChannelEntity(
+                id = existing?.id ?: 0L,
+                playlistId = playlistId,
+                name = channel.name,
+                logoUrl = channel.logo,
+                group = channel.group,
+                url = channel.url,
+                tvgId = channel.tvgId,
+                catchupSource = channel.catchupSource,
+                stableKey = key,
+            )
+        }
+        val retainedIds = channels.mapNotNull { it.id.takeIf { id -> id > 0 } }.toSet()
+        val removedIds = old.filter { it.id !in retainedIds }.map { it.id }
+        if (removedIds.isNotEmpty()) db.channelDao().deleteByIds(removedIds)
+        db.channelDao().insertAll(channels)
+        db.favoriteDao().removeOrphans()
+        db.historyDao().removeOrphans()
+        db.playlistDao().updateMeta(playlistId, channels.size, System.currentTimeMillis())
+        playlistId
+    }
+
+    suspend fun deletePlaylist(playlistId: Long) = db.withTransaction {
+        db.favoriteDao().removeForPlaylist(playlistId)
+        db.historyDao().removeForPlaylist(playlistId)
+        db.progressDao().deleteForPlaylist(playlistId)
+        db.watchlistDao().deleteForPlaylist(playlistId)
+        db.reminderDao().deleteForPlaylist(playlistId)
+        db.epgDao().deleteForPlaylist(playlistId)
+        db.channelDao().deleteForPlaylist(playlistId)
+        db.playlistDao().delete(playlistId)
+    }
+
+    suspend fun loadEpg(playlistId: Long): Map<String, List<EpgEntry>> = withContext(Dispatchers.IO) {
+        val playlist = db.playlistDao().byId(playlistId) ?: return@withContext emptyMap()
+        val epgUrl = playlist.epgUrl ?: return@withContext emptyMap()
+        runCatching {
+            val client = NetworkPolicy.client(
+                playlist.userAgent, playlist.useProxy, playlist.proxyHost, playlist.proxyPort,
+            )
+            val text = client.newCall(Request.Builder().url(NetworkPolicy.requireUrl(epgUrl)).build())
+                .execute()
+                .use { response -> response.readText(48L * 1024 * 1024) }
+            EpgParser.parse(text)
         }.getOrDefault(emptyMap())
     }
+
+    suspend fun setRefreshPolicy(playlistId: Long, enabled: Boolean, hours: Int) =
+        db.playlistDao().setRefreshPolicy(playlistId, enabled, hours.coerceIn(1, 168))
 }

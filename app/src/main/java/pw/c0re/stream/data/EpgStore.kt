@@ -1,49 +1,84 @@
 package pw.c0re.stream.data
 
+import androidx.room.withTransaction
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import pw.c0re.stream.data.db.AppDatabase
+import pw.c0re.stream.data.db.EpgProgramEntity
 import pw.c0re.stream.data.model.EpgEntry
 
 /**
- * EPG-Cache pro Playlist mit 30-Minuten-TTL.
- * Liefert fuer einen Kanal (tvg-id) das aktuell laufende Programm.
+ * Persistent EPG cache with a 30-minute freshness window. Network failures never delete
+ * existing guide data.
  */
 class EpgStore(private val db: AppDatabase, private val repo: PlaylistRepository) {
-
-    private val cache = mutableMapOf<Long, Pair<Long, Map<String, List<EpgEntry>>>>()
-    private val ttlMs = 30 * 60 * 1000L
     private val mutex = Mutex()
+    private val ttlMs = 30 * 60 * 1000L
+    private val retentionMs = 7 * 24 * 60 * 60 * 1000L
+
+    suspend fun ensureFresh(playlistId: Long, force: Boolean = false): Boolean = mutex.withLock {
+        val playlist = db.playlistDao().byId(playlistId) ?: return@withLock false
+        val now = System.currentTimeMillis()
+        if (!force && playlist.epgUpdatedAt > 0 && now - playlist.epgUpdatedAt < ttlMs) {
+            return@withLock true
+        }
+        val parsed = runCatching { repo.loadEpg(playlistId) }.getOrDefault(emptyMap())
+        if (parsed.isEmpty()) return@withLock false
+        db.withTransaction {
+            db.epgDao().deleteForPlaylist(playlistId)
+            val rows = ArrayList<EpgProgramEntity>()
+            for ((tvgId, entries) in parsed) {
+                if (tvgId.isBlank()) continue
+                for (entry in entries) {
+                    if (entry.start <= 0 || entry.stop <= entry.start) continue
+                    rows += EpgProgramEntity(
+                        playlistId = playlistId,
+                        tvgId = tvgId.take(256),
+                        start = entry.start,
+                        stop = entry.stop,
+                        title = entry.title.take(8192),
+                        description = entry.description?.take(65536),
+                    )
+                }
+            }
+            rows.chunked(1000).forEach { chunk -> db.epgDao().insertAll(chunk) }
+            db.playlistDao().setEpgUpdated(playlistId, now)
+            db.epgDao().deleteOld(now - retentionMs)
+        }
+        true
+    }
 
     suspend fun nowFor(playlistId: Long, tvgId: String?): EpgEntry? {
         if (tvgId.isNullOrBlank()) return null
+        runCatching { ensureFresh(playlistId) }
         val now = System.currentTimeMillis()
-        val epgMap = mutex.withLock {
-            val cached = cache[playlistId]
-            if (cached != null && now - cached.first < ttlMs) {
-                cached.second
-            } else {
-                val loaded = repo.loadEpgNow(playlistId)
-                if (loaded.isEmpty()) {
-                    null
-                } else {
-                    cache[playlistId] = now to loaded
-                    loaded
-                }
-            }
-        } ?: return null
-        return epgMap[tvgId]?.firstOrNull { entry -> entry.start <= now && now < entry.stop }
-            ?: epgMap[tvgId]?.firstOrNull { entry -> entry.start > now }
+        return db.epgDao().current(playlistId, tvgId, now)?.toModel()
+            ?: db.epgDao().next(playlistId, tvgId, now)?.toModel()
     }
 
-    // Fuer EPG-Guide: alle Eintraege eines Kanals
-    suspend fun dayFor(playlistId: Long, tvgId: String?): List<EpgEntry> {
-        nowFor(playlistId, tvgId) // stellt sicher, dass der Cache warm ist
+    suspend fun guideFor(playlistId: Long, tvgId: String?): List<EpgEntry> {
         if (tvgId.isNullOrBlank()) return emptyList()
+        runCatching { ensureFresh(playlistId) }
         val now = System.currentTimeMillis()
-        val cached = mutex.withLock { cache[playlistId]?.second } ?: return emptyList()
-        return cached[tvgId].orEmpty()
+        val entries = db.epgDao().range(playlistId, tvgId, now - 6 * 60 * 60 * 1000L, now + 48 * 60 * 60 * 1000L)
+        return if (entries.isEmpty()) {
+            db.epgDao().byChannel(playlistId, tvgId).map { it.toModel() }
+        } else {
+            entries.map { it.toModel() }
+        }
     }
 
-    fun clear(playlistId: Long) { cache.remove(playlistId) }
+    suspend fun refresh(playlistId: Long): Boolean = ensureFresh(playlistId, force = true)
+
+    suspend fun clear(playlistId: Long) {
+        db.epgDao().deleteForPlaylist(playlistId)
+        db.playlistDao().setEpgUpdated(playlistId, 0)
+    }
+
+    private fun EpgProgramEntity.toModel() = EpgEntry(
+        start = start,
+        stop = stop,
+        title = title,
+        description = description,
+    )
 }

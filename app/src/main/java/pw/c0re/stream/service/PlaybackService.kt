@@ -1,26 +1,22 @@
 package pw.c0re.stream.service
 
-import android.content.Context
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.intPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
-import androidx.media3.datasource.DefaultHttpDataSource
+import android.content.Intent
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-
-private val Context.playbackStore by preferencesDataStore("ham3l_playback")
+import pw.c0re.stream.data.NetworkPolicy
+import pw.c0re.stream.data.SettingsRepository
 
 /**
- * Vordergrund-Dienst fuer die Wiedergabe: MediaSession (Lockscreen-/Kopfhoerer-Steuerung),
- * Benachrichtigung, WakeLock (kein Stream-Abbruch bei gesperrtem Display)
- * und konfigurierbare Puffer-Groessen.
+ * Foreground playback service: MediaSession (lock screen, headphones, TV remotes),
+ * notification, wake lock and configurable buffering. Redirects never downgrade HTTPS.
  */
 @UnstableApi
 class PlaybackService : MediaSessionService() {
@@ -29,22 +25,31 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
-        val (minBuffer, maxBuffer) = runBlocking { readBufferPrefs() }
+        val settings = runBlocking { SettingsRepository(applicationContext).snapshot() }
+        val minBufferMs = settings.minBufferSec.coerceIn(5, 300) * 1000
+        val maxBufferMs = settings.maxBufferSec.coerceIn(settings.minBufferSec.coerceIn(5, 300), 600) * 1000
+        val dataSourceFactory = OkHttpDataSource.Factory(NetworkPolicy.client())
+            .setUserAgent("C0reStream/${pw.c0re.stream.BuildConfig.VERSION_NAME}")
         val player = ExoPlayer.Builder(this)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultHttpDataSource.Factory()
-                .setAllowCrossProtocolRedirects(false)
-                .setConnectTimeoutMs(15000)
-                .setReadTimeoutMs(30000)))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
             .setLoadControl(
                 DefaultLoadControl.Builder()
                     .setBufferDurationsMs(
-                        minBuffer * 1000,
-                        maxBuffer * 1000,
+                        minBufferMs,
+                        maxBufferMs,
                         DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS,
                         DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS,
                     )
                     .build(),
             )
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .build(),
+                true,
+            )
+            .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
         mediaSession = MediaSession.Builder(this, player).build()
@@ -52,19 +57,20 @@ class PlaybackService : MediaSessionService() {
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
 
-    private suspend fun readBufferPrefs(): Pair<Int, Int> {
-        val prefs = playbackStore.data.first()
-        val min = (prefs[intPreferencesKey("min_buffer_sec")] ?: 50).coerceIn(5, 120)
-        val max = (prefs[intPreferencesKey("max_buffer_sec")] ?: 120).coerceIn(min, 300)
-        return min to max
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        val player = mediaSession?.player
+        if (player == null || !player.playWhenReady || player.mediaItemCount == 0) {
+            stopSelf()
+        }
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {
         mediaSession?.run {
             player.release()
             release()
-            mediaSession = null
         }
+        mediaSession = null
         super.onDestroy()
     }
 }

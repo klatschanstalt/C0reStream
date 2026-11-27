@@ -1,50 +1,64 @@
 package pw.c0re.stream.work
 
 import android.content.Context
+import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CancellationException
 import pw.c0re.stream.C0reStreamApp
 import pw.c0re.stream.data.AppLog
 import pw.c0re.stream.data.PlaylistRepository
 import java.util.concurrent.TimeUnit
 
 /**
- * Automatischer Playlist-Refresh im Hintergrund (12 h).
- * M3U und Xtream werden aktualisiert; lokale Dateien bleiben unverändert.
+ * Automatic playlist refresh. Local-only playlists are skipped; Xtream and M3U sources are
+ * refreshed transactionally with stable channel IDs.
  */
 class PlaylistRefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
-
     override suspend fun doWork(): Result {
-        val db = (applicationContext as C0reStreamApp).database
-        val repo = PlaylistRepository(db)
-        var ok = 0
+        val app = applicationContext as C0reStreamApp
+        val settings = runCatching { app.settings.snapshot() }.getOrDefault(
+            pw.c0re.stream.data.AppSettings(),
+        )
+        if (!settings.autoRefresh) return Result.success()
+        val repo = PlaylistRepository(app.database)
+        var refreshed = 0
         var failed = 0
-        db.playlistDao().all().first().forEach { pl ->
-            val url = pl.url ?: return@forEach
-            val result = if (url.startsWith("xtream://")) runCatching {
-                val creds = requireNotNull(pw.c0re.stream.data.XtreamApi.parseSyntheticUrl(url))
-                val raw = pw.c0re.stream.data.XtreamApi(okhttp3.OkHttpClient()).fetchLiveChannels(creds)
-                repo.storeChannels(pl.name, url, pl.epgUrl, pl.userAgent, pl.useProxy, pl.proxyHost, pl.proxyPort, raw, pl.id)
-            } else repo.fetchAndStore(pl.name, url, pl.epgUrl, pl.userAgent, pl.useProxy, pl.proxyHost, pl.proxyPort, pl.id)
-            result
-                .onSuccess { ok++ }
-                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; failed++; AppLog.log("Refresh", "Playlist-Aktualisierung fehlgeschlagen") }
+        for (playlist in app.database.playlistDao().allOnce()) {
+            if (!playlist.autoRefresh || playlist.url == null) continue
+            val result = repo.refresh(playlist)
+            result.onSuccess { refreshed++ }.onFailure { error ->
+                if (error is CancellationException) throw error
+                failed++
+                AppLog.log("Refresh", "Playlist refresh failed")
+            }
         }
-        AppLog.log("Refresh", "$ok aktualisiert, $failed fehlgeschlagen")
+        AppLog.log("Refresh", "$refreshed refreshed, $failed failed")
         return if (failed > 0 && runAttemptCount < 2) Result.retry() else Result.success()
     }
 
     companion object {
-        fun schedule(context: Context) {
+        private const val workName = "c0restream_playlist_refresh"
+
+        fun schedule(context: Context, hours: Int = 12, enabled: Boolean = true) {
+            if (!enabled) {
+                WorkManager.getInstance(context).cancelUniqueWork(workName)
+                return
+            }
+            val intervalHours = hours.coerceIn(1, 168).toLong()
+            val request = PeriodicWorkRequestBuilder<PlaylistRefreshWorker>(intervalHours, TimeUnit.HOURS)
+                .setConstraints(
+                    Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
+                )
+                .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-                "ham3l_playlist_refresh",
+                workName,
                 ExistingPeriodicWorkPolicy.UPDATE,
-                PeriodicWorkRequestBuilder<PlaylistRefreshWorker>(12, TimeUnit.HOURS)
-                    .setConstraints(androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build()).build(),
+                request,
             )
         }
     }

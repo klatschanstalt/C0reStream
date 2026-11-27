@@ -2,29 +2,64 @@ package pw.c0re.stream.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import java.util.Locale
 
 /**
- * Update-Check gegen eine JSON-Datei im eigenen Repo:
- *   update.json: { "latestVersion": "1.2.0", "notes": "..." }
- * URL in deinem Repo anpassen.
+ * Reads the signed-release manifest published with GitHub Releases. Only HTTPS metadata is
+ * accepted. The APK itself is verified separately by [UpdateInstaller] before installation.
  */
 object UpdateChecker {
-
     const val UPDATE_URL = "https://raw.githubusercontent.com/klatschanstalt/C0reStream/main/update.json"
 
-    data class UpdateInfo(val latestVersion: String, val notes: String?)
+    data class UpdateInfo(
+        val latestVersion: String,
+        val notes: String?,
+        val apkUrl: String?,
+        val sha256: String?,
+    )
 
     suspend fun check(currentVersion: String): UpdateInfo? = withContext(Dispatchers.IO) {
         runCatching {
-            val body = OkHttpClient.Builder().followSslRedirects(false).callTimeout(30, java.util.concurrent.TimeUnit.SECONDS).build().newCall(Request.Builder().url(UPDATE_URL).build())
-                .execute().use { it.readMetadata(65536) }
-            val o = JSONObject(body)
-            val latest = o.optString("latestVersion")
-            UpdateInfo(latest, o.optString("notes").takeIf { it.isNotBlank() })
-                .takeIf { latest.isNotBlank() && latest != currentVersion }
+            val client = NetworkPolicy.client()
+            val body = client.newCall(
+                Request.Builder().url(NetworkPolicy.requireUrl(UPDATE_URL)).build(),
+            ).execute().use { response -> response.readMetadata(64 * 1024) }
+            val json = JSONObject(body)
+            val latest = json.optString("latestVersion").trim()
+            if (latest.isBlank() || !isNewer(latest, currentVersion)) return@runCatching null
+            val apk = json.optString("apkUrl").trim().takeIf { it.isNotBlank() }
+                ?.takeIf { NetworkPolicy.isHttps(it) }
+            val checksum = json.optString("sha256").trim().lowercase(Locale.ROOT)
+                .takeIf { it.matches(Regex("[0-9a-f]{64}")) }
+            UpdateInfo(
+                latestVersion = latest.take(64),
+                notes = json.optString("notes").takeIf { it.isNotBlank() }?.take(8_192),
+                apkUrl = apk,
+                sha256 = checksum,
+            )
         }.getOrNull()
+    }
+
+    /** Compares dotted numeric versions; pre-release suffixes make a version older. */
+    fun isNewer(candidate: String, current: String): Boolean {
+        val a = parse(candidate)
+        val b = parse(current)
+        if (a == null || b == null) return candidate != current
+        for (index in 0 until maxOf(a.first.size, b.first.size)) {
+            val left = a.first.getOrElse(index) { 0 }
+            val right = b.first.getOrElse(index) { 0 }
+            if (left != right) return left > right
+        }
+        return a.second.isEmpty() && b.second.isNotEmpty()
+    }
+
+    private fun parse(value: String): Pair<List<Int>, String>? {
+        val match = Regex("^[vV]?([0-9]+(?:\\.[0-9]+){0,3})(?:-([0-9A-Za-z.-]+))?$")
+            .matchEntire(value.trim()) ?: return null
+        val numbers = match.groupValues[1].split('.').mapNotNull { it.toIntOrNull() }
+        if (numbers.isEmpty()) return null
+        return numbers to match.groupValues[2]
     }
 }
