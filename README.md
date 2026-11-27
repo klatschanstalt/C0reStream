@@ -1,5 +1,7 @@
 # C0reStream
 
+<p align="center"><img src="docs/logo.png" alt="C0reStream" width="96"></p>
+
 **Your Streams. Your Rules.**
 
 [![Build](https://github.com/klatschanstalt/C0reStream/actions/workflows/build-apk.yml/badge.svg)](https://github.com/klatschanstalt/C0reStream/actions/workflows/build-apk.yml)
@@ -16,6 +18,8 @@ C0reStream is an Android media client for user-provided, authorized IPTV playlis
 - **VOD** — movies, series and episodes with search, watchlist and resume positions.
 - **Library** — encrypted backup/restore including settings, favourites, history, progress, watchlist and reminders.
 - **Interface** — Material 3, Light/Dark/AMOLED, responsive layout, German/English/French, Android TV launcher entry and keyboard/D-pad focus navigation.
+- **Library** — local profiles with PIN protection, QR playlist import and user-authorized recording of plain streams.
+- **Updates** — signed resource manifests and APK updates from public GitHub Release assets, plus automatic cleanup of stale downloads.
 - **Privacy** — credentials and URLs encrypted with an Android Keystore key, bounded parsers, URL validation and HTTPS-downgrade protection.
 
 HTTP sources remain supported by owner decision; HTTPS is preferred and plaintext transport risk is shown in settings. No ads, analytics or tracking.
@@ -53,6 +57,6 @@ Toolchain: JDK 17, Android SDK 37.1, build-tools 37.0.0, Gradle wrapper 9.9.2. P
 
 ## Security and license
 
-See [SECURITY.md](SECURITY.md) for report channels and implemented controls. Verified CI evidence is in [PROJECT_STATUS_REPORT.md](PROJECT_STATUS_REPORT.md).
+See [SECURITY.md](SECURITY.md) for report channels and implemented controls. Verified CI evidence is in [PROJECT_STATUS_REPORT.md](PROJECT_STATUS_REPORT.md). Branding artwork is in `docs/`; the social preview is `docs/social-preview.png`.
 
-No project license has been selected by the owner and no `LICENSE` file is included. Third-party dependencies remain under their respective upstream licenses; see `THIRD_PARTY_NOTICES.md` for the direct-dependency overview.
+C0reStream is licensed under the Apache License 2.0 (`LICENSE`). Full direct and transitive dependency notices are in `NOTICE.md` and `THIRD_PARTY_NOTICES.md`. No IPTV content, subscriptions or bundled streams are included.

@@ -141,8 +141,7 @@ class AppDatabaseTest {
     }
 
     @Test
-    fun remindersAreUniquePerChannelStart() = runTest {
-        val first = ReminderEntity(
+    fun remindersAreUniquePerChannelStart() = runTest {        val first = ReminderEntity(
             channelId = 7,
             channelName = "Seven",
             tvgId = "seven",
@@ -157,5 +156,21 @@ class AppDatabaseTest {
         assertEquals(1, stored.size)
         assertEquals("Show updated", stored.single().title)
         assertEquals("Show updated", db.reminderDao().byChannelStart(7, 5_000)?.title)
+    }
+
+    @Test
+    fun profilesRoundTrip() = runTest {
+        val id = db.profileDao().upsert(
+            pw.c0re.stream.data.profiles.ProfileEntity(
+                name = "Kids",
+                pinHash = "v1$120000$salt$key",
+                createdAt = 1L,
+            ),
+        )
+        val stored = db.profileDao().byId(id)
+        assertEquals("Kids", stored?.name)
+        assertEquals(1, db.profileDao().count())
+        db.profileDao().delete(id)
+        assertEquals(0, db.profileDao().count())
     }
 }
