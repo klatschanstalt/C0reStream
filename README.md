@@ -39,7 +39,7 @@ sha256sum --check SHA256SUMS
 ## ✨ Funktionsübersicht
 
 - **Playlists:** M3U/M3U8, Xtream Codes, lokale Dateien, stabile Sender-IDs, Deduplizierung, Gruppen, Favoriten, automatische Aktualisierung, Importstatistiken und paginierter Senderzugriff.
-- **Player:** Media3 (HLS/DASH/MPEG-TS), Mini-Player, Hintergrundwiedergabe, PiP, Vollbild mit neun Skalierungsmodi, Spurwahl, Sleep-Timer, Reconnect, Catch-up und VOD-Fortsetzung.
+- **Player:** Media3 (HLS/DASH/MPEG-TS, RTSP/RTP-Unicast), Mini-Player, Hintergrundwiedergabe, PiP, Vollbild mit neun Skalierungsmodi, Spurwahl, erweiterte Codec-Diagnostik, Sleep-Timer, Reconnect, Catch-up und VOD-Fortsetzung.
 - **EPG:** XMLTV (unkomprimiert oder GZIP), Programmführer, Cache und Erinnerungen.
 - **VOD:** Filme, Serien, Episoden, Suche, Merkliste und Fortschritt.
 - **Profile & Tools:** PIN-Schutz, QR-Import und autorisierte Aufnahme ungeschützter Streams.
@@ -101,7 +101,7 @@ sha256sum --check SHA256SUMS
 ## ✨ Key Features
 
 - **Playlists:** M3U/M3U8, Xtream Codes, local files, stable channel IDs, deduplication, groups, favourites, automatic refresh, import statistics and paged channel browsing.
-- **Player:** Media3 (HLS/DASH/MPEG-TS), mini-player, background playback, PiP, nine fullscreen scaling modes, track selection, sleep timer, reconnect, catch-up and VOD resume.
+- **Player:** Media3 (HLS/DASH/MPEG-TS, RTSP/RTP unicast), mini-player, background playback, PiP, nine fullscreen scaling modes, track selection, extended codec diagnostics, sleep timer, reconnect, catch-up and VOD resume.
 - **EPG:** XMLTV (plain or gzip), programme guide, cache and reminders.
 - **VOD:** Movies, series, episodes, search, watchlist and resume positions.
 - **Profiles & tools:** PIN protection, QR import and authorized recording of unprotected streams.
@@ -163,7 +163,7 @@ sha256sum --check SHA256SUMS
 ## ✨ Fonctionnalités clés
 
 - **Playlists:** M3U/M3U8, Xtream Codes, fichiers locaux, identifiants stables, déduplication, groupes, favoris, actualisation automatique, statistiques et navigation paginée.
-- **Lecteur:** Media3 (HLS/DASH/MPEG-TS), mini-lecteur, arrière-plan, PiP, neuf modes plein écran, sélection des pistes, minuterie, reconnexion, catch-up et reprise VOD.
+- **Lecteur :** Media3 (HLS/DASH/MPEG-TS, RTSP/RTP unicast), mini-lecteur, arrière-plan, PiP, neuf modes plein écran, sélection des pistes, diagnostics codec étendus, minuterie, reconnexion, catch-up et reprise VOD.
 - **EPG:** XMLTV (brut ou gzip), guide, cache et rappels.
 - **VOD:** films, séries, épisodes, recherche, liste de suivi et reprise.
 - **Profils et outils:** code PIN, import QR et enregistrement autorisé des flux non protégés.
