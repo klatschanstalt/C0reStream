@@ -20,15 +20,6 @@ Open or not certified:
 
 Binding decisions: minimum Android 11 (API 30); HTTP and HTTPS IPTV sources supported without mandatory opt-in, HTTPS preferred, no HTTPS-to-HTTP redirects; no ads, tracking or bundled streams.
 
-## Prioritätsauftrag (2026-11-27): Import, Player, Performance
+## Abgeschlossener Prioritätsauftrag (2026-11-27)
 
-Verbindlich, ohne Verlust bestehender Funktionen und Nutzerdaten:
-
-1. Senderimport vollständig und transparent: M3U/M3U8/Xtream, Encoding/BOM/gzip, Limits, Gruppierung, Reihenfolge, Sendernummern, tvg-id, Streamvarianten und identische URLs. Unterschiedliche Sender darf Dedup nicht zusammenführen; Zähler für empfangen/importiert/zusammengeführt/fehlerhaft; stabile IDs und Datenmigration erhalten.
-2. Immersives Vollbild mit Modi Auto/Original/Fit/Fill/Zoom/Stretch/16:9/4:3/21:9, korrekter Skalierung, Insets, Rotation, Pixel- und Display-Seitenverhältnis; globale und senderspezifische Einstellungen.
-3. Media3-Modernisierung: stabile APIs, Hardwaredecoder mit Fallback, HLS/DASH/MPEG-TS/progressive Medien, Track- und Audioauswahl, Puffer, Lifecycle und Diagnose; keine unerfüllten Codec-/Dolby-Versprechen.
-4. Kategorisiertes Einstellungscenter mit Expertenmodus, Reset, DE/EN/FR und verständlichen Hilfetexten.
-5. Performanzprofile (Automatik/Performance/Maximale Qualität/Low Latency/Stabile Wiedergabe/Energiesparen), schnelle Senderwechsel, Logos-Cache, geringer RAM/CPU/Akkuverbrauch, Diagnose ohne Zugangsdaten.
-6. Regressionstests für große Playlists, Doppel-URLs mit verschiedenen Sendern, Gruppierung, Reihenfolge, Importgrenzen, Refresh, Bildformate, Vollbild, Rotation, Audio-/Decoder-Fallback und persistente Einstellungen.
-
-CI und Veröffentlichung bleiben während der Implementierung pausiert. Nach gebündelter Verifikation wird eine signierte Nachfolgeversion ohne Pre-Releases veröffentlicht; die aktuelle öffentliche APK bleibt bis dahin verfügbar.
+Senderimport mit vollständiger Statistik, stabilen IDs und Anbieterreihenfolge (Room v6), Vollbildmodi inklusive Pixel-/Anamorph-Behandlung, modernisierter Media3-Player mit Decoder-Fallback und Diagnose, kategorisiertes Einstellungscenter mit DE/EN/FR und Performanzprofilen. Geprüft in CI-Lauf `46009609741`; Nachfolgeversion `1.5.0` wird signiert veröffentlicht. Nicht umgesetzt: Casting/Multiview (Plattform-/Zertifizierungsgrenzen), echte Geräte-Screenshots, Gerätezertifizierung jenseits API 30/36.
