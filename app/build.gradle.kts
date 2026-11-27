@@ -120,6 +120,7 @@ dependencies {
     testImplementation(libs.json)
     // JVM XMLPull implementation so the hardened XMLTV parser is unit-testable.
     testImplementation(libs.kxml2)
+    testImplementation(libs.mockwebserver)
 
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.ext.junit)
