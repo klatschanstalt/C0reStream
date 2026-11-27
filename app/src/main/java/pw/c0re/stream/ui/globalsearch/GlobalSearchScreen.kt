@@ -11,10 +11,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
@@ -32,22 +30,28 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import pw.c0re.stream.R
 import pw.c0re.stream.data.db.ChannelEntity
 import pw.c0re.stream.ui.components.AdaptivePane
+import pw.c0re.stream.ui.components.gridItems
+import pw.c0re.stream.ui.components.listItems
 import pw.c0re.stream.ui.components.BrandBackdrop
 import pw.c0re.stream.ui.components.BrandBadge
 import pw.c0re.stream.ui.components.BrandCard
-import pw.c0re.stream.ui.components.BrandEmptyState
 import pw.c0re.stream.ui.components.BrandTopBar
 import pw.c0re.stream.ui.components.PoweredByFooter
 import pw.c0re.stream.ui.components.rememberResponsivePadding
 import pw.c0re.stream.ui.playlistdetail.ChannelLogo
+import pw.c0re.stream.ui.playlistdetail.pagingStatusItems
 
 @Composable
 fun GlobalSearchScreen(onPlay: (Long) -> Unit, vm: GlobalSearchViewModel = viewModel()) {
     val query by vm.query.collectAsState()
-    val results by vm.results.collectAsState(initial = emptyList())
+    val results = vm.results.collectAsLazyPagingItems()
+    val playlistNames by vm.playlistNames.collectAsState()
     val horizontalPadding = rememberResponsivePadding()
 
     BrandBackdrop(Modifier.fillMaxSize()) {
@@ -56,7 +60,7 @@ fun GlobalSearchScreen(onPlay: (Long) -> Unit, vm: GlobalSearchViewModel = viewM
         ) {
             BrandTopBar(
                 title = stringResource(R.string.search_title),
-                actions = { BrandBadge(results.size.toString()) },
+                actions = { BrandBadge(results.itemCount.toString()) },
             )
             OutlinedTextField(
                 value = query,
@@ -69,41 +73,46 @@ fun GlobalSearchScreen(onPlay: (Long) -> Unit, vm: GlobalSearchViewModel = viewM
                 singleLine = true,
             )
             Spacer(Modifier.height(8.dp))
-            if (results.isEmpty()) {
-                BrandEmptyState(stringResource(R.string.search_hint))
-            } else {
-                AdaptivePane(
-                    modifier = Modifier.weight(1f),
-                    compact = {
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            items(results, key = { it.first.id }) { (channel, playlistName) ->
-                                SearchResultCard(channel, playlistName, onPlay)
+            val emptyLabel = stringResource(R.string.search_hint)
+            AdaptivePane(
+                modifier = Modifier.weight(1f),
+                compact = {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        listItems(count = results.itemCount, key = results.itemKey { it.id }) { index ->
+                            results[index]?.let { channel ->
+                                SearchResultCard(channel, playlistNames[channel.playlistId] ?: "?", onPlay)
                             }
-                            item { PoweredByFooter() }
                         }
-                    },
-                    medium = { SearchGrid(results, onPlay) },
-                    expanded = { SearchGrid(results, onPlay) },
-                )
-            }
+                        pagingStatusItems(results, emptyMessage = emptyLabel)
+                        item(key = "footer") { PoweredByFooter() }
+                    }
+                },
+                medium = { SearchGrid(results, playlistNames, onPlay) },
+                expanded = { SearchGrid(results, playlistNames, onPlay) },
+            )
         }
     }
 }
 
 @Composable
 private fun SearchGrid(
-    results: List<Pair<ChannelEntity, String>>,
+    results: LazyPagingItems<ChannelEntity>,
+    playlistNames: Map<Long, String>,
     onPlay: (Long) -> Unit,
 ) {
+    val emptyLabel = stringResource(R.string.search_hint)
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 280.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        gridItems(results, key = { it.first.id }) { (channel, playlistName) ->
-            SearchResultCard(channel, playlistName, onPlay)
+        gridItems(count = results.itemCount, key = results.itemKey { it.id }) { index ->
+            results[index]?.let { channel ->
+                SearchResultCard(channel, playlistNames[channel.playlistId] ?: "?", onPlay)
+            }
         }
-        item { PoweredByFooter() }
+        pagingStatusItems(results, emptyMessage = emptyLabel)
+        gridItems(count = 1, key = { "footer" }) { PoweredByFooter() }
     }
 }
 

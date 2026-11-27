@@ -16,11 +16,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items as listItems
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -53,6 +53,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.paging.LoadState
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -64,6 +68,8 @@ import pw.c0re.stream.data.readBytes
 import pw.c0re.stream.data.db.ChannelEntity
 import pw.c0re.stream.data.model.EpgEntry
 import pw.c0re.stream.ui.components.AdaptivePane
+import pw.c0re.stream.ui.components.gridItems
+import pw.c0re.stream.ui.components.listItems
 import pw.c0re.stream.ui.components.BrandBackdrop
 import pw.c0re.stream.ui.components.BrandBadge
 import pw.c0re.stream.ui.components.BrandCard
@@ -87,7 +93,7 @@ fun PlaylistDetailScreen(
     vm: PlaylistDetailViewModel = viewModel(key = "pl$playlistId"),
 ) {
     LaunchedEffect(playlistId) { vm.init(playlistId) }
-    val channels by vm.channels.collectAsState(initial = emptyList())
+    val channels = vm.channels.collectAsLazyPagingItems()
     val groups by vm.groups.collectAsState(initial = emptyList())
     val query by vm.query.collectAsState()
     val group by vm.selectedGroup.collectAsState()
@@ -101,7 +107,7 @@ fun PlaylistDetailScreen(
             BrandTopBar(
                 title = stringResource(R.string.nav_live),
                 actions = {
-                    BrandBadge(channels.size.toString())
+                    BrandBadge(channels.itemCount.toString())
                     BrandSecondaryButton(
                         stringResource(R.string.detail_movies_series),
                         onClick = { onOpenVod(playlistId) },
@@ -147,9 +153,12 @@ fun PlaylistDetailScreen(
                 modifier = Modifier.weight(1f),
                 compact = {
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        listItems(channels, key = { it.id }) { channel ->
-                            ChannelCard(channel, playlistId, vm, onPlayChannel) { guideChannel = it }
+                        listItems(count = channels.itemCount, key = channels.itemKey { it.id }) { index ->
+                            channels[index]?.let { channel ->
+                                ChannelCard(channel, playlistId, vm, onPlayChannel) { guideChannel = it }
+                            }
                         }
+                        pagingStatusItems(channels)
                         item(key = "footer") { PoweredByFooter() }
                     }
                 },
@@ -173,9 +182,64 @@ fun PlaylistDetailScreen(
     }
 }
 
+/** Refresh/append loading and error rows shared by both paged channel layouts. */
+internal fun LazyListScope.pagingStatusItems(
+    items: LazyPagingItems<*>,
+    emptyMessage: String? = null,
+) {
+    when (val refresh = items.loadState.refresh) {
+        is LoadState.Loading -> item(key = "refresh_loading") { BrandLoading() }
+        is LoadState.Error -> item(key = "refresh_error") { PagingErrorRow(refresh) { items.retry() } }
+        is LoadState.NotLoading -> {
+            if (emptyMessage != null && items.itemCount == 0) {
+                item(key = "paging_empty") { BrandEmptyState(emptyMessage) }
+            }
+        }
+    }
+    when (val append = items.loadState.append) {
+        is LoadState.Loading -> item(key = "append_loading") { BrandLoading() }
+        is LoadState.Error -> item(key = "append_error") { PagingErrorRow(append) { items.retry() } }
+        is LoadState.NotLoading -> Unit
+    }
+}
+
+/** Grid counterpart of [pagingStatusItems]. */
+internal fun LazyGridScope.pagingStatusItems(
+    items: LazyPagingItems<*>,
+    emptyMessage: String? = null,
+) {
+    when (val refresh = items.loadState.refresh) {
+        is LoadState.Loading -> gridItems(count = 1, key = { "refresh_loading" }) { BrandLoading() }
+        is LoadState.Error -> gridItems(count = 1, key = { "refresh_error" }) {
+            PagingErrorRow(refresh) { items.retry() }
+        }
+        is LoadState.NotLoading -> {
+            if (emptyMessage != null && items.itemCount == 0) {
+                gridItems(count = 1, key = { "paging_empty" }) { BrandEmptyState(emptyMessage) }
+            }
+        }
+    }
+    when (val append = items.loadState.append) {
+        is LoadState.Loading -> gridItems(count = 1, key = { "append_loading" }) { BrandLoading() }
+        is LoadState.Error -> gridItems(count = 1, key = { "append_error" }) {
+            PagingErrorRow(append) { items.retry() }
+        }
+        is LoadState.NotLoading -> Unit
+    }
+}
+
+@Composable
+internal fun PagingErrorRow(error: LoadState.Error, retry: () -> Unit) {
+    BrandEmptyState(
+        message = error.error.localizedMessage ?: stringResource(R.string.error_playlist_load),
+        actionLabel = stringResource(R.string.action_retry),
+        onAction = retry,
+    )
+}
+
 @Composable
 private fun ChannelGrid(
-    channels: List<ChannelEntity>,
+    channels: LazyPagingItems<ChannelEntity>,
     playlistId: Long,
     vm: PlaylistDetailViewModel,
     onPlayChannel: (Long) -> Unit,
@@ -186,10 +250,13 @@ private fun ChannelGrid(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        gridItems(channels, key = { it.id }) { channel ->
-            ChannelCard(channel, playlistId, vm, onPlayChannel, onGuide)
+        gridItems(count = channels.itemCount, key = channels.itemKey { it.id }) { index ->
+            channels[index]?.let { channel ->
+                ChannelCard(channel, playlistId, vm, onPlayChannel, onGuide)
+            }
         }
-        item(key = "footer") { PoweredByFooter() }
+        pagingStatusItems(channels)
+        gridItems(count = 1, key = { "footer" }) { PoweredByFooter() }
     }
 }
 

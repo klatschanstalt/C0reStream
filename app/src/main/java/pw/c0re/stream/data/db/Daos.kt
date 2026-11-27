@@ -1,10 +1,12 @@
 package pw.c0re.stream.data.db
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
+import pw.c0re.stream.data.paging.ChannelPagingQuery
 
 @Dao
 interface PlaylistDao {
@@ -44,6 +46,20 @@ interface ChannelDao {
     @Query("DELETE FROM channels WHERE id = :id") suspend fun deleteById(id: Long)
     @Query("DELETE FROM channels WHERE id IN (:ids)") suspend fun deleteByIds(ids: List<Long>)
     @Query("SELECT COUNT(*) FROM channels WHERE playlistId = :playlistId") suspend fun countForPlaylist(playlistId: Long): Int
+
+    // Paged variants: no LIMIT, so every matching row is reachable by scrolling. The un-paged
+    // Flow methods above are kept for callers that still need a full snapshot (e.g. the player).
+    // Group and name filters are always evaluated in SQLite; the UI never filters a page in memory.
+    @Query(ChannelPagingQuery.FILTERED_SQL)
+    fun channelsPaged(playlistId: Long, group: String?, query: String?): PagingSource<Int, ChannelEntity>
+    @Query(ChannelPagingQuery.SEARCH_ALL_SQL)
+    fun searchAllPaged(query: String): PagingSource<Int, ChannelEntity>
+    @Query(ChannelPagingQuery.SEARCH_SQL)
+    fun searchPaged(playlistId: Long, query: String): PagingSource<Int, ChannelEntity>
+    @Query(ChannelPagingQuery.BY_GROUP_SQL)
+    fun byGroupPaged(playlistId: Long, group: String): PagingSource<Int, ChannelEntity>
+    @Query(ChannelPagingQuery.BY_PLAYLIST_SQL)
+    fun byPlaylistPaged(playlistId: Long): PagingSource<Int, ChannelEntity>
 }
 
 @Dao

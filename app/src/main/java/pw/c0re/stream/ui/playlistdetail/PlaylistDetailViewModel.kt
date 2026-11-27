@@ -3,6 +3,9 @@ package pw.c0re.stream.ui.playlistdetail
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.Pager
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,11 +25,13 @@ import pw.c0re.stream.data.db.ChannelEntity
 import pw.c0re.stream.data.db.FavoriteEntity
 import pw.c0re.stream.data.db.ReminderEntity
 import pw.c0re.stream.data.model.EpgEntry
+import pw.c0re.stream.data.paging.ChannelPagingConfig
 import pw.c0re.stream.work.ReminderScheduler
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlaylistDetailViewModel(app: Application) : AndroidViewModel(app) {
     private val db = (app as C0reStreamApp).database
+    private val channelDao = db.channelDao()
     private val epgStore = EpgStore(db, PlaylistRepository(db))
     private val playlistIdFlow = MutableStateFlow(0L)
     private val queryFlow = MutableStateFlow("")
@@ -35,20 +40,22 @@ class PlaylistDetailViewModel(app: Application) : AndroidViewModel(app) {
     val query: StateFlow<String> = queryFlow.asStateFlow()
     val selectedGroup: StateFlow<String?> = groupFlow.asStateFlow()
 
-    val groups = playlistIdFlow.flatMapLatest { id -> db.channelDao().groups(id) }
+    val groups = playlistIdFlow.flatMapLatest { id -> channelDao.groups(id) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val channels = combine(playlistIdFlow, queryFlow, groupFlow) { id, q, g -> Triple(id, q, g) }
-        .flatMapLatest { (id, q, g) ->
-            if (g == null) {
-                if (q.isBlank()) db.channelDao().byPlaylist(id) else db.channelDao().search(id, q)
-            } else {
-                db.channelDao().byGroup(id, g).map { list ->
-                    if (q.isBlank()) list else list.filter { it.name.contains(q, ignoreCase = true) }
-                }
+    /**
+     * A new source is created whenever the playlist, group or query changes. All predicates are
+     * evaluated by SQLite, so no limited list is ever filtered in memory and every match is
+     * reachable by scrolling.
+     */
+    val channels: Flow<PagingData<ChannelEntity>> =
+        combine(playlistIdFlow, queryFlow, groupFlow) { id, q, g -> Triple(id, q, g) }
+            .flatMapLatest { (id, q, g) ->
+                Pager(config = ChannelPagingConfig.config) {
+                    channelDao.channelsPaged(id, g, q.trim().takeIf { it.isNotEmpty() })
+                }.flow
             }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+            .cachedIn(viewModelScope)
 
     fun init(id: Long) {
         playlistIdFlow.value = id

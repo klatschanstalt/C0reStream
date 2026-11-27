@@ -5,7 +5,7 @@ Coordinates were extracted from the Gradle `releaseRuntimeClasspath` of version 
 
 ## Apache-2.0 (12)
 
-androidx.paging:paging-common-ktx:3.3.2, androidx.paging:paging-compose:3.3.2, androidx.paging:paging-runtime-ktx:3.3.2,
+androidx.paging:paging-common-ktx:3.5.3, androidx.paging:paging-compose:3.5.3, androidx.paging:paging-runtime-ktx:3.5.3,
 
 org.jetbrains.kotlin:kotlin-stdlib:2.2.21, org.jetbrains.kotlin:kotlin-stdlib:2.4.21, org.jetbrains.kotlin:kotlin-stdlib-common:2.4.21, org.jetbrains.kotlinx:atomicfu:0.28.0, org.jetbrains.kotlinx:atomicfu-jvm:0.28.0, org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0, org.jetbrains.kotlinx:kotlinx-coroutines-bom:1.11.0, org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0, org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.11.0
 
