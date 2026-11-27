@@ -47,6 +47,7 @@ import pw.c0re.stream.ui.components.BrandCard
 import pw.c0re.stream.ui.components.BrandPrimaryButton
 import pw.c0re.stream.ui.components.BrandSecondaryButton
 import pw.c0re.stream.ui.components.BrandTopBar
+import pw.c0re.stream.ui.components.rememberResponsivePadding
 
 class ProfilesViewModel(app: Application) : AndroidViewModel(app) {
     private val dao = (app as C0reStreamApp).database.profileDao()
@@ -97,7 +98,7 @@ fun ProfilesScreen(onDone: () -> Unit, vm: ProfilesViewModel = viewModel()) {
     val scope = rememberCoroutineScope()
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val horizontalPadding = if (maxWidth < 600.dp) 16.dp else 24.dp
+        val horizontalPadding = rememberResponsivePadding().coerceAtMost(maxWidth / 8)
         BrandBackdrop(modifier = Modifier.fillMaxSize()) {
             Column(
                 Modifier

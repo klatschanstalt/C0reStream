@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 
@@ -98,7 +99,7 @@ fun PoweredByFooter() {
     ) {
         C0reStreamMark(16)
         Text(
-            "Powered by C0reStream",
+            stringResource(pw.c0re.stream.R.string.common_powered_by),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

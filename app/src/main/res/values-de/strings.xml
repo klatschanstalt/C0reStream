@@ -15,6 +15,14 @@
     <string name="action_confirm">Bestätigen</string>
     <string name="action_back">Zurück</string>
     <string name="common_loading">Lädt</string>
+    <string name="common_powered_by">Präsentiert von C0reStream</string>
+    <string name="player_service_unavailable">Wiedergabedienst nicht verfügbar</string>
+    <string name="player_error_network">Netzwerk- oder Streamfehler</string>
+    <string name="player_error_decode">Nicht unterstütztes oder beschädigtes Medium</string>
+    <string name="player_error_unknown">Wiedergabe fehlgeschlagen</string>
+    <string name="vod_error">VOD-Inhalte konnten nicht geladen werden</string>
+    <string name="playlist_qr_name">QR-Playlist</string>
+    <string name="player_show_controls">Player-Steuerung anzeigen</string>
     <string name="action_play">Abspielen</string>
     <string name="action_pause">Pause</string>
     <string name="action_next_channel">Nächster Sender</string>

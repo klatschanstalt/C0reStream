@@ -83,14 +83,7 @@ data class BrandThemeTokens(
 /** Ready-made token sets for each theme/brand combination. Dark is the reference. */
 object BrandTokens {
     private val spectrum = listOf(BrandCyan, BrandBlue, BrandViolet, BrandMagenta, BrandOrange)
-    private val spectrumStops = listOf(0f, 0.35f, 0.65f, 0.85f, 1f)
-
-    private fun spectrumBrush(colors: List<Color>, stops: List<Float>? = null): Brush {
-        val resolved = stops ?: colors.indices.map {
-            it.toFloat() / (colors.size - 1).coerceAtLeast(1).toFloat()
-        }
-        return Brush.linearGradient(colors = colors)
-    }
+    private fun spectrumBrush(colors: List<Color>): Brush = Brush.linearGradient(colors = colors)
 
     private fun glowBrush(color: Color, alpha: Float): Brush =
         Brush.radialGradient(colors = listOf(color.copy(alpha = alpha), Color.Transparent))
@@ -102,11 +95,11 @@ object BrandTokens {
         accentSecondary = BrandViolet,
         onAccent = BrandNavyDeep,
         backdrop = spectrumBrush(listOf(BrandNavyStart, BrandNavyDeep, BrandPlumDeep)),
-        primaryGradient = spectrumBrush(spectrum, spectrumStops),
+        primaryGradient = spectrumBrush(spectrum),
         secondaryGradient = spectrumBrush(listOf(BrandViolet, BrandMagenta, BrandPink)),
         hotGradient = spectrumBrush(listOf(BrandGold, BrandPink)),
         cardBackground = spectrumBrush(listOf(BrandSurfaceDarkHigh, BrandSurfaceDark)),
-        badgeBackground = spectrumBrush(spectrum, spectrumStops),
+        badgeBackground = spectrumBrush(spectrum),
         glow = glowBrush(BrandCyan, 0.20f),
         glowSecondary = glowBrush(BrandViolet, 0.16f),
         cardBorder = BrandBorderDark.copy(alpha = 0.7f),
@@ -132,7 +125,6 @@ object BrandTokens {
         backdrop = spectrumBrush(listOf(BrandBaseLight, Color(0xFFEAF0FA))),
         primaryGradient = spectrumBrush(
             listOf(BrandCyanLight, BrandBlueLight, BrandVioletLight, BrandMagentaLight, BrandOrangeLight),
-            spectrumStops,
         ),
         secondaryGradient = spectrumBrush(listOf(BrandBlueLight, BrandVioletLight, BrandMagentaLight)),
         hotGradient = spectrumBrush(listOf(BrandOrangeLight, BrandMagentaLight)),
@@ -169,7 +161,6 @@ object BrandTokens {
         backdrop = spectrumBrush(listOf(EmberBackgroundLight, Color(0xFFFFEEE7))),
         primaryGradient = spectrumBrush(
             listOf(EmberPrimaryLight, BrandOrangeLight, EmberSecondaryLight),
-            spectrumStops,
         ),
         secondaryGradient = spectrumBrush(listOf(EmberSecondaryLight, BrandMagentaLight)),
         hotGradient = spectrumBrush(listOf(BrandOrangeLight, EmberSecondaryLight)),

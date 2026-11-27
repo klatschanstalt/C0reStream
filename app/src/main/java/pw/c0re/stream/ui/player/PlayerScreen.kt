@@ -11,6 +11,7 @@ import android.os.Build
 import android.util.Rational
 import android.view.WindowManager
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -76,6 +77,10 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -150,6 +155,7 @@ fun PlayerScreen(
     var loadedKey by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val liveLabel = stringResource(R.string.player_live)
+    val showControlsLabel = stringResource(R.string.player_show_controls)
     val orientation = LocalConfiguration.current.orientation
 
     // Compact chrome auto-hides during playback. No animation is used: the state change is an
@@ -415,9 +421,12 @@ fun PlayerScreen(
         // Transparent tap-to-reveal layer sits above the Surface only while chrome is hidden.
         if (!controlsVisible && error == null && controller != null) {
             Box(
-                Modifier.fillMaxSize().pointerInput(Unit) {
-                    detectTapGestures(onTap = { showControls() })
-                },
+                Modifier.fillMaxSize()
+                    .clickable(onClick = { showControls() })
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = showControlsLabel
+                        role = Role.Button
+                    },
             )
         }
 
@@ -444,7 +453,7 @@ fun PlayerScreen(
                     .padding(16.dp),
             ) {
                 Text(
-                    stringResource(R.string.player_failed, error),
+                    stringResource(R.string.player_failed, playerErrorText(error)),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 3,
@@ -801,6 +810,18 @@ private fun Modifier.dialogModifier(): Modifier = this
 
 private fun Modifier.revealControls(onInteraction: () -> Unit): Modifier =
     pointerInput(Unit) { detectTapGestures(onTap = { onInteraction() }) }
+
+@Composable
+private fun playerErrorText(code: String?): String = when {
+    code == null -> stringResource(R.string.player_error_unknown)
+    code == "Invalid stream URL" -> stringResource(R.string.reason_invalid_stream_url)
+    code == "Playback service unavailable" -> stringResource(R.string.player_service_unavailable)
+    code.contains("IO", ignoreCase = true) || code.contains("NETWORK", ignoreCase = true) ->
+        stringResource(R.string.player_error_network)
+    code.contains("DECOD", ignoreCase = true) || code.contains("FORMAT", ignoreCase = true) ->
+        stringResource(R.string.player_error_decode)
+    else -> stringResource(R.string.player_error_unknown)
+}
 
 @Composable
 private fun DiagnosticLine(labelRes: Int, value: String) {

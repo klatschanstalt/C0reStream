@@ -17,6 +17,14 @@
     <string name="action_confirm">Confirm</string>
     <string name="action_back">Back</string>
     <string name="common_loading">Loading</string>
+    <string name="common_powered_by">Powered by C0reStream</string>
+    <string name="player_service_unavailable">Playback service unavailable</string>
+    <string name="player_error_network">Network or stream error</string>
+    <string name="player_error_decode">Unsupported or damaged media</string>
+    <string name="player_error_unknown">Playback failed</string>
+    <string name="vod_error">VOD content could not be loaded</string>
+    <string name="playlist_qr_name">QR playlist</string>
+    <string name="player_show_controls">Show player controls</string>
     <string name="action_play">Play</string>
     <string name="action_pause">Pause</string>
     <string name="action_next_channel">Next channel</string>

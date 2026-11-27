@@ -144,6 +144,7 @@ fun BrandPrimaryButton(
             .heightIn(min = tokens.spacing.touchTarget)
             .clip(BrandButtonShape)
             .background(if (enabled) tokens.primaryGradient else disabledBackground),
+        contentAlignment = Alignment.Center,
     ) {
         Button(
             onClick = onClick,

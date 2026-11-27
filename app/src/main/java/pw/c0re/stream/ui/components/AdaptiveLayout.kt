@@ -3,6 +3,7 @@ package pw.c0re.stream.ui.components
 import android.app.Activity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.WindowHeightSizeClass
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
@@ -22,6 +23,15 @@ fun rememberWindowWidthSizeClass(): WindowWidthSizeClass {
     // Recomputed on each composition so configuration and multi-window changes are honoured.
     return if (context is Activity) calculateWindowSizeClass(context).widthSizeClass
     else WindowWidthSizeClass.Compact
+}
+
+/** Remembers the current height bucket; compact height forces the compact layout. */
+@Composable
+@OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
+fun rememberWindowHeightSizeClass(): WindowHeightSizeClass {
+    val context = LocalContext.current
+    return if (context is Activity) calculateWindowSizeClass(context).heightSizeClass
+    else WindowHeightSizeClass.Compact
 }
 
 /** Horizontal page padding that grows with the available width (phone -> tablet -> TV). */
@@ -47,11 +57,15 @@ fun AdaptivePane(
     expanded: @Composable () -> Unit = medium,
 ) {
     Box(modifier) {
-        when (rememberWindowWidthSizeClass()) {
-            WindowWidthSizeClass.Compact -> compact()
-            WindowWidthSizeClass.Medium -> medium()
-            WindowWidthSizeClass.Expanded -> expanded()
-            else -> compact()
+        if (rememberWindowHeightSizeClass() == WindowHeightSizeClass.Compact) {
+            compact()
+        } else {
+            when (rememberWindowWidthSizeClass()) {
+                WindowWidthSizeClass.Compact -> compact()
+                WindowWidthSizeClass.Medium -> medium()
+                WindowWidthSizeClass.Expanded -> expanded()
+                else -> compact()
+            }
         }
     }
 }

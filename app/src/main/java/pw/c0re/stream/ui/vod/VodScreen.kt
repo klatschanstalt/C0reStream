@@ -66,6 +66,7 @@ import pw.c0re.stream.ui.components.BrandLoading
 import pw.c0re.stream.ui.components.BrandSecondaryButton
 import pw.c0re.stream.ui.components.BrandSectionTitle
 import pw.c0re.stream.ui.components.BrandTopBar
+import pw.c0re.stream.ui.components.rememberResponsivePadding
 import pw.c0re.stream.ui.components.PoweredByFooter
 import pw.c0re.stream.ui.playlistdetail.ChannelLogo
 
@@ -188,7 +189,7 @@ fun VodScreen(
     }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val horizontalPadding = if (maxWidth < 600.dp) 16.dp else 24.dp
+        val horizontalPadding = rememberResponsivePadding().coerceAtMost(maxWidth / 8)
         BrandBackdrop(modifier = Modifier.fillMaxSize()) {
             Column(
                 Modifier
@@ -229,11 +230,9 @@ fun VodScreen(
                     Spacer(Modifier.height(12.dp))
                     BrandCard(modifier = Modifier.fillMaxWidth(), onClick = null) {
                         Text(
-                            if (message == "Xtream login required") {
-                                stringResource(R.string.vod_xtream_only)
-                            } else {
-                                message
-                            },
+                            stringResource(
+                                if (message == "Xtream login required") R.string.vod_xtream_only else R.string.vod_error,
+                            ),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.error,
                             maxLines = 4,

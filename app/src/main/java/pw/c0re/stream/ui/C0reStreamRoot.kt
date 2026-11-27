@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
@@ -319,7 +321,10 @@ private fun PinGate(profile: ProfileEntity, onUnlocked: () -> Unit) {
     var error by remember { mutableStateOf(false) }
     BrandBackdrop(Modifier.fillMaxSize()) {
         Column(
-            Modifier.fillMaxSize().padding(24.dp),
+            Modifier.fillMaxSize()
+                .windowInsetsPadding(WindowInsets.systemBars)
+                .imePadding()
+                .padding(24.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {

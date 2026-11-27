@@ -42,6 +42,7 @@ import pw.c0re.stream.data.UpdateChecker
 import pw.c0re.stream.data.UpdateInstaller
 import pw.c0re.stream.ui.backup.BackupControls
 import pw.c0re.stream.ui.components.AdaptivePane
+import pw.c0re.stream.ui.components.rememberResponsivePadding
 import pw.c0re.stream.ui.components.BrandBackdrop
 import pw.c0re.stream.ui.components.BrandCard
 import pw.c0re.stream.ui.components.BrandLoading
@@ -104,7 +105,7 @@ fun SettingsScreen(onExportBackup: () -> Unit = {}, onOpenProfiles: () -> Unit =
     }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val horizontalPadding = if (maxWidth < 600.dp) 16.dp else 24.dp
+        val horizontalPadding = rememberResponsivePadding().coerceAtMost(maxWidth / 8)
         BrandBackdrop(modifier = Modifier.fillMaxSize()) {
             Column(
                 Modifier

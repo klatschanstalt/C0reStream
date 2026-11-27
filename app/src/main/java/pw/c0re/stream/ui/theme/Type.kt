@@ -159,15 +159,4 @@ val LocalBrandTypography = compositionLocalOf<BrandTypography> { BrandTypography
  * so user font-size preferences still work exactly as with any other Compose text.
  */
 @Composable
-fun rememberBrandTypography(): BrandTypography {
-    val windowInfo = LocalWindowInfo.current
-    val density = LocalDensity.current
-    val widthDp = with(density) { windowInfo.containerSize.width.toDp().value }
-    val step = when {
-        widthDp < 360f -> 0.92f
-        widthDp < 600f -> 1f
-        widthDp < 840f -> 1.05f
-        else -> 1.1f
-    }
-    return remember(step) { BrandTypography.Base.scaled(step) }
-}
+fun rememberBrandTypography(): BrandTypography = BrandTypography.Base

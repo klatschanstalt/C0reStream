@@ -83,6 +83,7 @@ fun PlaylistsScreen(
     var deleteId by remember { mutableStateOf<Long?>(null) }
     var qrError by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val qrPlaylistName = stringResource(R.string.playlist_qr_name)
     val horizontalPadding = rememberResponsivePadding()
 
     LaunchedEffect(sharedUrl) {
@@ -102,7 +103,7 @@ fun PlaylistsScreen(
         if (url == null) {
             qrError = true
         } else {
-            vm.add("QR playlist", url, null, null, false, null, null, null, onAddNew)
+            vm.add(qrPlaylistName, url, null, null, false, null, null, null, onAddNew)
         }
     }
 

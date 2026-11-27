@@ -15,6 +15,14 @@
     <string name="action_confirm">Confirmer</string>
     <string name="action_back">Retour</string>
     <string name="common_loading">Chargement</string>
+    <string name="common_powered_by">Propulsé par C0reStream</string>
+    <string name="player_service_unavailable">Service de lecture indisponible</string>
+    <string name="player_error_network">Erreur réseau ou de flux</string>
+    <string name="player_error_decode">Média non pris en charge ou endommagé</string>
+    <string name="player_error_unknown">Lecture impossible</string>
+    <string name="vod_error">Contenu VOD indisponible</string>
+    <string name="playlist_qr_name">Playlist QR</string>
+    <string name="player_show_controls">Afficher les commandes</string>
     <string name="action_play">Lire</string>
     <string name="action_pause">Pause</string>
     <string name="action_next_channel">Chaîne suivante</string>
