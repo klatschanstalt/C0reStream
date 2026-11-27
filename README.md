@@ -12,12 +12,13 @@ C0reStream is an Android media client for user-provided, authorized IPTV playlis
 
 ## Features
 
-- **Playlists** — M3U/M3U8, Xtream Codes, local file import, stable channel IDs, deduplication, groups, favourites and automatic refresh.
-- **Player** — Media3 HLS/DASH/MPEG-TS, mini-player, background playback, PiP, audio/subtitle/video-track selection, sleep timer, reconnect, catch-up and VOD resume.
+- **Playlists** — M3U/M3U8, Xtream Codes, local file import, stable channel IDs, deduplication, groups, favourites, automatic refresh and transparent import statistics.
+- **Player** — Media3 HLS/DASH/MPEG-TS, mini-player, background playback, PiP, immersive fullscreen with nine scaling modes, audio/subtitle/video-track selection, sleep timer, reconnect, catch-up and VOD resume.
 - **EPG** — XMLTV (plain or gzip), programme guide, cache, reminders and catch-up links.
 - **VOD** — movies, series and episodes with search, watchlist and resume positions.
 - **Library** — encrypted backup/restore including settings, favourites, history, progress, watchlist and reminders.
 - **Interface** — Material 3, Light/Dark/AMOLED, responsive layout, German/English/French, Android TV launcher entry and keyboard/D-pad focus navigation.
+- **Settings** — categorized center with expert mode, reset and persistent global/per-channel playback preferences.
 - **Library** — local profiles with PIN protection, QR playlist import and user-authorized recording of plain streams.
 - **Updates** — signed resource manifests and APK updates from public GitHub Release assets, plus automatic cleanup of stale downloads.
 - **Privacy** — credentials and URLs encrypted with an Android Keystore key, bounded parsers, URL validation and HTTPS-downgrade protection.
@@ -32,14 +33,14 @@ HTTP sources remain supported by owner decision; HTTPS is preferred and plaintex
 
 ## Install and verify
 
-1. Download the current signed APK: [C0reStream.apk (latest)](https://github.com/klatschanstalt/C0reStream/releases/latest/download/C0reStream.apk) or the [version-bound v1.4.0 APK](https://github.com/klatschanstalt/C0reStream/releases/download/v1.4.0/C0reStream.apk).
+1. Download the current signed APK: [C0reStream.apk (latest)](https://github.com/klatschanstalt/C0reStream/releases/latest/download/C0reStream.apk) or the [version-bound v1.5.0 APK](https://github.com/klatschanstalt/C0reStream/releases/download/v1.5.0/C0reStream.apk).
 2. Verify the checksum with [SHA256SUMS](https://github.com/klatschanstalt/C0reStream/releases/latest/download/SHA256SUMS):
 
    ```bash
    sha256sum --check SHA256SUMS
    ```
 
-   Version 1.4.0 SHA-256: `69048c17214ea307425f98a1cf3b0aca159a9c27f0d2f0134c8c4e115b66a20f` (6,027,029 bytes).
+   Version 1.5.0 SHA-256: `f34f18e63880add27e9baeab8ec79ff07d129ab7299a74bc843698283f78f0ad` (6,200,405 bytes).
 3. Install the APK (Android may require allowing installation from unknown sources). The signing certificate fingerprint is `65FB26B0F617583228EA8813080FA7E2F8F6421022D8D279F928C726EA6E8543`.
 
 ## Updates

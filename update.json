@@ -1,6 +1,6 @@
 {
     "latestVersion": "1.5.0",
-    "notes": "C0reStream 1.5.0: vollstaendiger Senderimport mit Importstatistik, Anbieterreihenfolge, Vollbildmodi, modernisierter Media3-Player und kategorisiertes Einstellungscenter.",
+    "notes": "C0reStream 1.5.0: vollständiger Senderimport mit Importstatistik, Anbieterreihenfolge, Vollbildmodi, modernisierter Media3-Player und kategorisiertes Einstellungscenter.",
     "apkUrl": "https://github.com/klatschanstalt/C0reStream/releases/download/v1.5.0/C0reStream.apk",
-    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    "sha256": "f34f18e63880add27e9baeab8ec79ff07d129ab7299a74bc843698283f78f0ad"
 }
