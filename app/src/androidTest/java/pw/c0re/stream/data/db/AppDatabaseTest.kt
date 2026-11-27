@@ -163,7 +163,7 @@ class AppDatabaseTest {
         val id = db.profileDao().upsert(
             pw.c0re.stream.data.profiles.ProfileEntity(
                 name = "Kids",
-                pinHash = "v1$120000$salt$key",
+                pinHash = "v1\$120000\$salt\$key",
                 createdAt = 1L,
             ),
         )
