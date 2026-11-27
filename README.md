@@ -77,7 +77,7 @@ Android 11 (API 30) oder neuer. Physische TV-Hardware ist nicht Teil der automat
 <details>
 <summary>Toolchain · Signing · Documentation</summary>
 
-- JDK 17 · SDK 37.1 · Build-Tools 37.0.0 · Gradle 9.9.2
+- JDK 17 · SDK 37.1 · Build-Tools 37.0.0 · Gradle 9.9.3
 - Production signing: `ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `ANDROID_CERT_SHA256`.
 - [SECURITY.md](SECURITY.md) · [PROJECT_STATUS_REPORT.md](PROJECT_STATUS_REPORT.md) · [Branding](assets/branding/) · [Previews](docs/)
 - Apache License 2.0: [LICENSE](LICENSE) · [NOTICE.md](NOTICE.md) · [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
@@ -149,7 +149,7 @@ Android 11 (API 30) or newer. Physical TV hardware is not part of the automated 
 <details>
 <summary>Toolchain · Signing · Documentation</summary>
 
-- JDK 17 · SDK 37.1 · Build-Tools 37.0.0 · Gradle 9.9.2
+- JDK 17 · SDK 37.1 · Build-Tools 37.0.0 · Gradle 9.9.3
 - Production signing: `ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `ANDROID_CERT_SHA256`.
 - [SECURITY.md](SECURITY.md) · [PROJECT_STATUS_REPORT.md](PROJECT_STATUS_REPORT.md) · [Branding](assets/branding/) · [Previews](docs/)
 - Apache License 2.0: [LICENSE](LICENSE) · [NOTICE.md](NOTICE.md) · [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
@@ -221,7 +221,7 @@ Android 11 (API 30) ou supérieur. Le matériel TV physique ne fait pas partie d
 <details>
 <summary>Toolchain · Signing · Documentation</summary>
 
-- JDK 17 · SDK 37.1 · Build-Tools 37.0.0 · Gradle 9.9.2
+- JDK 17 · SDK 37.1 · Build-Tools 37.0.0 · Gradle 9.9.3
 - Production signing: `ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `ANDROID_CERT_SHA256`.
 - [SECURITY.md](SECURITY.md) · [PROJECT_STATUS_REPORT.md](PROJECT_STATUS_REPORT.md) · [Branding](assets/branding/) · [Previews](docs/)
 - Apache License 2.0: [LICENSE](LICENSE) · [NOTICE.md](NOTICE.md) · [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)

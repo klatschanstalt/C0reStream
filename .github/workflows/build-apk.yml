@@ -16,35 +16,29 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v6
-      - uses: android-actions/setup-android@v4
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
           packages: 'platforms;android-37.1 build-tools;37.0.0 platform-tools'
-      - name: Unit tests, lint and release build
-        run: ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --stacktrace
-      - name: Upload database schemas
+      - name: Unit tests and lint
+        run: ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug --stacktrace
+      - name: Upload verification reports
         if: always()
-        uses: actions/upload-artifact@v7.0.2
-        with:
-          name: room-schemas
-          path: app/schemas/
-          if-no-files-found: warn
-      - name: Upload test and lint reports
-        if: always()
-        uses: actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: verification-reports
           path: |
             app/build/reports/tests/
             app/build/reports/lint-results-debug.*
           if-no-files-found: ignore
+          retention-days: 7
 
   instrumented:
     needs: verify
@@ -56,15 +50,15 @@ jobs:
         # the emulator runner publishes matching system images.
         api-level: [30, 36]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v6
-      - uses: android-actions/setup-android@v4
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
           packages: 'platforms;android-37.1 build-tools;37.0.0 platform-tools'
       - name: Enable KVM
@@ -79,7 +73,7 @@ jobs:
           if command -v docker >/dev/null 2>&1; then docker rmi -f $(docker images -q) || true; fi
           df -h /home/runner/.android || true
       - name: Instrumented tests (API ${{ matrix.api-level }})
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: ${{ matrix.api-level }}
           target: aosp_atd
@@ -89,11 +83,12 @@ jobs:
           script: ./gradlew --no-daemon :app:connectedDebugAndroidTest --stacktrace
       - name: Upload instrumented reports
         if: always()
-        uses: actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: instrumented-reports-api${{ matrix.api-level }}
           path: app/build/reports/androidTests/
           if-no-files-found: ignore
+          retention-days: 7
 
   publish-production:
     needs: [verify, instrumented]
@@ -101,32 +96,37 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      actions: read
     concurrency:
-      group: production-release-${{ github.sha }}
+      # Serialise releases across commits; the tag guard below is not atomic.
+      group: production-release
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v6
-      - uses: android-actions/setup-android@v4
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
           packages: 'platforms;android-37.1 build-tools;37.0.0 platform-tools'
-      - name: Check signing secrets
+      - name: Check signing configuration
         id: signing
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          EXPECTED_CERT: ${{ vars.ANDROID_CERT_SHA256 }}
         run: |
-          if [[ -n "${KEYSTORE_BASE64:-}" ]]; then
+          if [[ -n "${KEYSTORE_BASE64:-}" && -n "${KEYSTORE_PASSWORD:-}" && \
+                -n "${KEY_ALIAS:-}" && -n "${KEY_PASSWORD:-}" && -n "${EXPECTED_CERT:-}" ]]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "Production signing secrets are not configured; skipping signed release."
+            echo "Production signing configuration is incomplete; skipping signed release."
           fi
       - name: Decode durable signing key
         if: steps.signing.outputs.available == 'true'
@@ -150,13 +150,10 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew --no-daemon :app:signResourceManifest --stacktrace
+        run: ./gradlew --no-daemon :app:signResourceManifest :app:verifyResourceManifest --stacktrace
       - name: Verify signature and checksum
         if: steps.signing.outputs.available == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          BUILD_SHA: ${{ github.sha }}
           EXPECTED_CERT: ${{ vars.ANDROID_CERT_SHA256 }}
         shell: bash
         run: |
@@ -176,7 +173,7 @@ jobs:
           sha256sum C0reStream.apk > SHA256SUMS
       - name: Upload signed APK for verification
         if: steps.signing.outputs.available == 'true'
-        uses: actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: C0reStream-signed-verification
           path: |

@@ -1,7 +1,134 @@
 # Third-party notices
 
-C0reStream is released under the Apache License 2.0 (see `LICENSE`). The owner has approved this license; no other project license is asserted.
+C0reStream steht unter der Apache License 2.0 (`LICENSE`). Diese Datei listet die tatsächlich aufgelösten Laufzeitabhängigkeiten und ihre in den POM-Metadaten deklarierten Lizenzen.
 
-The complete coordinate-level overview of the shipped `releaseRuntimeClasspath` and the licenses declared in cached dependency metadata is in `NOTICE.md`. Components whose metadata does not declare a license remain under their respective upstream terms; build-time-only tooling is not shipped in the APK.
+Ermittelt aus `releaseRuntimeClasspath` des Release-Builds; die Namen stammen aus den zwischengespeicherten Maven-POMs. Bei fehlender Deklaration gilt die jeweilige Upstream-Lizenz. Build-Zeit-Only-Werkzeuge werden nicht in die APK aufgenommen; Lizenzhinweise der Abhängigkeiten bleiben im APK erhalten.
 
-No IPTV content, subscriptions or bundled streams are included.
+## Apache License 2.0 (115)
+
+- `androidx.activity:activity-compose:1.13.0`
+- `androidx.activity:activity-ktx:1.13.0`
+- `androidx.activity:activity:1.13.0`
+- `androidx.annotation:annotation-experimental:1.5.0`
+- `androidx.annotation:annotation-jvm:1.10.0`
+- `androidx.arch.core:core-common:2.2.0`
+- `androidx.arch.core:core-runtime:2.2.0`
+- `androidx.autofill:autofill:1.0.0`
+- `androidx.collection:collection-jvm:1.6.0`
+- `androidx.collection:collection-ktx:1.6.0`
+- `androidx.compose.animation:animation-android:1.13.0`
+- `androidx.compose.animation:animation-core-android:1.13.0`
+- `androidx.compose.foundation:foundation-android:1.13.0`
+- `androidx.compose.foundation:foundation-layout-android:1.13.0`
+- `androidx.compose.material3:material3-android:1.5.0`
+- `androidx.compose.material3:material3-ripple-android:1.5.0`
+- `androidx.compose.material3:material3-window-size-class-android:1.5.0`
+- `androidx.compose.material:material-icons-core-android:1.7.8`
+- `androidx.compose.material:material-icons-extended-android:1.7.8`
+- `androidx.compose.material:material-ripple-android:1.13.0`
+- `androidx.compose.runtime:runtime-android:1.13.0`
+- `androidx.compose.runtime:runtime-annotation-android:1.13.0`
+- `androidx.compose.runtime:runtime-retain-android:1.13.0`
+- `androidx.compose.runtime:runtime-saveable-android:1.13.0`
+- `androidx.compose.ui:ui-android:1.13.0`
+- `androidx.compose.ui:ui-geometry-android:1.13.0`
+- `androidx.compose.ui:ui-graphics-android:1.13.0`
+- `androidx.compose.ui:ui-text-android:1.13.0`
+- `androidx.compose.ui:ui-unit-android:1.13.0`
+- `androidx.compose.ui:ui-util-android:1.13.0`
+- `androidx.concurrent:concurrent-futures-ktx:1.2.0`
+- `androidx.concurrent:concurrent-futures:1.2.0`
+- `androidx.core:core-ktx:1.19.0`
+- `androidx.core:core-viewtree:1.0.0`
+- `androidx.core:core:1.19.0`
+- `androidx.customview:customview-poolingcontainer:1.0.0`
+- `androidx.customview:customview:1.0.0`
+- `androidx.datastore:datastore-android:1.3.0`
+- `androidx.datastore:datastore-core-android:1.3.0`
+- `androidx.datastore:datastore-core-okio-jvm:1.3.0`
+- `androidx.datastore:datastore-preferences-android:1.3.0`
+- `androidx.datastore:datastore-preferences-core-android:1.3.0`
+- `androidx.datastore:datastore-preferences-proto:1.3.0`
+- `androidx.emoji2:emoji2:1.7.0`
+- `androidx.exifinterface:exifinterface:1.3.6`
+- `androidx.graphics:graphics-path:1.1.0`
+- `androidx.graphics:graphics-shapes-android:1.0.1`
+- `androidx.interpolator:interpolator:1.0.0`
+- `androidx.lifecycle:lifecycle-common-java8:2.11.1`
+- `androidx.lifecycle:lifecycle-common-jvm:2.11.1`
+- `androidx.lifecycle:lifecycle-livedata-core-ktx:2.11.1`
+- `androidx.lifecycle:lifecycle-livedata-core:2.11.1`
+- `androidx.lifecycle:lifecycle-livedata-ktx:2.11.1`
+- `androidx.lifecycle:lifecycle-livedata:2.11.1`
+- `androidx.lifecycle:lifecycle-process:2.11.1`
+- `androidx.lifecycle:lifecycle-runtime-android:2.11.1`
+- `androidx.lifecycle:lifecycle-runtime-compose-android:2.11.1`
+- `androidx.lifecycle:lifecycle-runtime-ktx-android:2.11.1`
+- `androidx.lifecycle:lifecycle-service:2.11.1`
+- `androidx.lifecycle:lifecycle-viewmodel-android:2.11.1`
+- `androidx.lifecycle:lifecycle-viewmodel-compose-android:2.11.1`
+- `androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.1`
+- `androidx.lifecycle:lifecycle-viewmodel-savedstate-android:2.11.1`
+- `androidx.media3:media3-common:1.11.1`
+- `androidx.media3:media3-container:1.11.1`
+- `androidx.media3:media3-database:1.11.1`
+- `androidx.media3:media3-datasource-okhttp:1.11.1`
+- `androidx.media3:media3-datasource:1.11.1`
+- `androidx.media3:media3-decoder:1.11.1`
+- `androidx.media3:media3-exoplayer-dash:1.11.1`
+- `androidx.media3:media3-exoplayer-hls:1.11.1`
+- `androidx.media3:media3-exoplayer-rtsp:1.11.1`
+- `androidx.media3:media3-exoplayer:1.11.1`
+- `androidx.media3:media3-extractor:1.11.1`
+- `androidx.media3:media3-session:1.11.1`
+- `androidx.media3:media3-ui:1.11.1`
+- `androidx.media:media:1.7.0`
+- `androidx.navigation:navigation-common-android:2.10.2`
+- `androidx.navigation:navigation-compose-android:2.10.2`
+- `androidx.navigation:navigation-runtime-android:2.10.2`
+- `androidx.navigationevent:navigationevent-android:1.1.2`
+- `androidx.navigationevent:navigationevent-compose-android:1.1.2`
+- `androidx.paging:paging-common-android:3.5.3`
+- `androidx.paging:paging-common-ktx:3.5.3`
+- `androidx.paging:paging-compose-android:3.5.3`
+- `androidx.paging:paging-runtime-ktx:3.5.3`
+- `androidx.paging:paging-runtime:3.5.3`
+- `androidx.profileinstaller:profileinstaller:1.4.0`
+- `androidx.recyclerview:recyclerview:1.3.0`
+- `androidx.room:room-common-jvm:2.8.5`
+- `androidx.room:room-ktx:2.8.5`
+- `androidx.room:room-paging-android:2.8.5`
+- `androidx.room:room-runtime-android:2.8.5`
+- `androidx.savedstate:savedstate-android:1.5.0`
+- `androidx.savedstate:savedstate-compose-android:1.5.0`
+- `androidx.savedstate:savedstate-ktx:1.5.0`
+- `androidx.sqlite:sqlite-android:2.6.2`
+- `androidx.sqlite:sqlite-framework-android:2.6.2`
+- `androidx.startup:startup-runtime:1.2.0`
+- `androidx.tracing:tracing-android:2.0.1`
+- `androidx.tracing:tracing-ktx:2.0.1`
+- `androidx.versionedparcelable:versionedparcelable:1.1.1`
+- `androidx.window:window-core-android:1.5.0`
+- `androidx.window:window:1.5.0`
+- `androidx.work:work-runtime-ktx:2.12.0`
+- `androidx.work:work-runtime:2.12.0`
+- `com.squareup.okhttp3:okhttp-android:5.5.1`
+- `com.squareup.okio:okio-jvm:3.18.1`
+- `org.jetbrains.kotlin:kotlin-stdlib:2.4.21`
+- `org.jetbrains.kotlinx:atomicfu-jvm:0.28.0`
+- `org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0`
+- `org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.11.0`
+- `org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.7.3`
+- `org.jetbrains:annotations:23.0.0`
+- `org.jspecify:jspecify:1.0.1`
+
+## BSD-3-Clause (1)
+
+- `androidx.datastore:datastore-preferences-external-protobuf:1.3.0`
+
+## Im POM nicht deklariert (Upstream-Lizenz maßgeblich) (4)
+
+- `com.google.guava:failureaccess:1.0.3`
+- `com.google.guava:guava:33.8.0-android`
+- `com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava`
+- `com.google.zxing:core:3.5.4`

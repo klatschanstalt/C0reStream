@@ -2,6 +2,7 @@ import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.Signature
 import java.util.Properties
+import org.gradle.api.GradleException
 import org.gradle.api.tasks.testing.Test
 
 plugins {
@@ -13,8 +14,21 @@ plugins {
 val versionProps = Properties().apply {
     rootProject.file("version.properties").inputStream().use { load(it) }
 }
-fun versionProperty(key: String, fallback: String): String =
-    (project.findProperty("c0re.$key") as String?) ?: versionProps.getProperty(key) ?: fallback
+// version.properties is the single source of truth. Missing or malformed metadata must fail
+// the build instead of silently producing a wrongly labelled release.
+fun requiredVersion(key: String): String =
+    versionProps.getProperty(key)?.trim()?.takeIf { it.isNotEmpty() }
+        ?: throw GradleException("Missing required '$key' in version.properties")
+
+val projectVersionCode = requiredVersion("versionCode").toIntOrNull()
+    ?: throw GradleException("Invalid 'versionCode' in version.properties: expected a positive integer")
+if (projectVersionCode <= 0) {
+    throw GradleException("Invalid 'versionCode' in version.properties: expected a positive integer")
+}
+val projectVersionName = requiredVersion("versionName")
+if (!projectVersionName.matches(Regex("""\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?"""))) {
+    throw GradleException("Invalid 'versionName' in version.properties: expected MAJOR.MINOR.PATCH")
+}
 
 val releaseStoreFile = System.getenv("C0RE_KEYSTORE_FILE")
     ?: System.getenv("ANDROID_KEYSTORE_FILE")
@@ -43,8 +57,8 @@ android {
         applicationId = "pw.c0re.stream"
         minSdk = 30
         targetSdk = 37
-        versionCode = versionProperty("versionCode", "4").toInt()
-        versionName = versionProperty("versionName", "1.3.0")
+        versionCode = projectVersionCode
+        versionName = projectVersionName
         vectorDrawables { useSupportLibrary = true }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -80,16 +94,6 @@ android {
     dependenciesInfo {
         includeInApk = false
         includeInBundle = false
-    }
-    packaging {
-        resources.excludes += setOf(
-            "/META-INF/{AL2.0,LGPL2.1}",
-            "/META-INF/*.version",
-            // No cookie jar is used; OkHttp's public-suffix table is unnecessary.
-            "assets/PublicSuffixDatabase.list",
-            // CI and modern emulators use x86_64; 32-bit x86 devices are unsupported.
-            "lib/x86/**",
-        )
     }
     lint {
         abortOnError = true
@@ -136,6 +140,14 @@ dependencies {
     implementation(libs.zxing)
     implementation(libs.kotlinx.coroutines.android)
 
+    // Media3 pulls in Guava transitively. Pin the Android flavour above the fix for
+    // GHSA-xxph-c9ww-hj94 (deserialization OOM), without adding a direct runtime dependency.
+    constraints {
+        implementation(libs.guava) {
+            because("GHSA-xxph-c9ww-hj94: Guava < 33.7.2 allows unbounded deserialization allocation")
+        }
+    }
+
     debugImplementation(libs.compose.ui.tooling)
 
     testImplementation(libs.junit)
@@ -156,18 +168,21 @@ tasks.withType<Test>().configureEach {
     System.getProperty("c0re.longstream")?.let { systemProperty("c0re.longstream", it) }
 }
 
-// Signs the non-executable resource manifest with the existing production key. No new key is
-// created and the signature file is published only together with a signed APK.
+// Signs/verifies the non-executable resource manifest with the existing production key. No new
+// key is created and the signature file is published only together with a signed APK.
+fun loadReleaseKeyStore(): KeyStore {
+    val storeFile = releaseStoreFile ?: error("Release keystore is not configured")
+    val storePassword = releaseStorePassword ?: error("Release store password is not configured")
+    return KeyStore.getInstance("PKCS12").apply {
+        file(storeFile).inputStream().use { load(it, storePassword.toCharArray()) }
+    }
+}
+
 tasks.register("signResourceManifest") {
     doLast {
-        val storeFile = releaseStoreFile ?: error("Release keystore is not configured")
-        val storePassword = releaseStorePassword ?: error("Release store password is not configured")
-        val alias = releaseKeyAlias ?: error("Release key alias is not configured")
         val keyPassword = releaseKeyPassword ?: error("Release key password is not configured")
-        val keystore = KeyStore.getInstance("PKCS12").apply {
-            file(storeFile).inputStream().use { load(it, storePassword.toCharArray()) }
-        }
-        val privateKey = keystore.getKey(alias, keyPassword.toCharArray()) as? PrivateKey
+        val alias = releaseKeyAlias ?: error("Release key alias is not configured")
+        val privateKey = loadReleaseKeyStore().getKey(alias, keyPassword.toCharArray()) as? PrivateKey
             ?: error("Release private key unavailable")
         val manifestBytes = rootProject.file("resources/manifest.json").readBytes()
         val signature = Signature.getInstance("SHA256withRSA").run {
@@ -178,5 +193,24 @@ tasks.register("signResourceManifest") {
         rootProject.file("resources/manifest.sig").writeText(
             signature.joinToString("") { "%02x".format(it) },
         )
+    }
+}
+
+tasks.register("verifyResourceManifest") {
+    doLast {
+        val alias = releaseKeyAlias ?: error("Release key alias is not configured")
+        val certificate = loadReleaseKeyStore().getCertificate(alias)
+            ?: error("Release certificate unavailable")
+        val hex = rootProject.file("resources/manifest.sig").readText().trim()
+        require(hex.length % 2 == 0 && hex.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) {
+            "Resource manifest signature is not valid hexadecimal"
+        }
+        val signature = hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        val valid = Signature.getInstance("SHA256withRSA").run {
+            initVerify(certificate.publicKey)
+            update(rootProject.file("resources/manifest.json").readBytes())
+            verify(signature)
+        }
+        check(valid) { "Resource manifest signature verification failed" }
     }
 }
