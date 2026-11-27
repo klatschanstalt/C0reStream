@@ -29,7 +29,7 @@ CI-Läufe `46035485381` (Integration) und `46037771079` (Release, Push-Trigger) 
 
 ## APK-Größe
 
-v1.5.0: 6.200.405 Bytes; signierter Design-Verifikationsbuild 6.434.349 Bytes; v1.6.0: 6.552.789 Bytes (+118.440 Bytes durch Paging 3). Das <5-MB-Ziel bleibt nicht erreicht. Weitere Performancekennzahlen (Startzeit, Senderwechsel, RAM/CPU) wurden nicht gemessen.
+v1.5.0: 6.200.405 Bytes; signierter Design-Verifikationsbuild 6.434.349 Bytes; v1.6.0: 6.552.789 Bytes (+118.440 Bytes durch Paging 3). Eine feste APK-Größengrenze existiert nicht mehr; die Größe ist nur Information. Weitere Performancekennzahlen (Startzeit, Senderwechsel, RAM/CPU) wurden nicht gemessen.
 
 ## Nicht verifiziert / offen
 

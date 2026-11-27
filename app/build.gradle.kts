@@ -119,6 +119,8 @@ dependencies {
     implementation(libs.media3.datasource.okhttp)
     implementation(libs.media3.ui)
     implementation(libs.media3.session)
+    implementation(libs.media3.rtsp)
+    implementation(libs.media3.ffmpeg)
 
     implementation(libs.paging.runtime)
     implementation(libs.paging.compose)

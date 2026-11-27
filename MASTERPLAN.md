@@ -16,9 +16,13 @@ Open or not certified:
 
 - Physical-device validation beyond the API 30/36 emulator matrix; Android 17 and 18 are not device-certified.
 - Casting needs a registered receiver ID and Play Services certification; multiview is not implemented; no DRM circumvention.
-- APK size 6,200,405 B exceeds the <5 MB goal; measured justification in `PROJECT_STATUS_REPORT.md`.
+- APK size is informational only; the former <5 MB target is permanently retired.
 
 Binding decisions: minimum Android 11 (API 30); HTTP and HTTPS IPTV sources supported without mandatory opt-in, HTTPS preferred, no HTTPS-to-HTTP redirects; no ads, tracking or bundled streams.
+
+## Aktiver Auftrag (2026-11-27): Erweiterte Streaming-Engine und Multimedia
+
+Auf Basis von v1.6.0: dauerhafte Aufhebung der APK-Größenschranke; RTSP/RTP/UDP-Multicast und Media3-Decoder-Erweiterungen prüfen und integrieren; Audio-/Video-Codec- und Container-Kompatibilität erweitern; Casting, Multiview, Timeshift und Stalker-Portale unter klaren Sicherheits- und Plattformgrenzen bewerten; Langzeit-, Performance- und Geräteverifikation nach Möglichkeit schließen; neue signierte Produktionsversion nach vollständiger CI-Verifikation. Bestehendes Design, Daten, Sicherheit und Update-Kompatibilität bleiben erhalten.
 
 ## Abgeschlossener Auftrag (2026-11-27): Streaming, Codecs, Performance, Sicherheit, Release
 
