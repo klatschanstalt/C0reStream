@@ -24,17 +24,17 @@ interface PlaylistDao {
 @Dao
 interface ChannelDao {
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertOne(channel: ChannelEntity): Long
-    @Query("SELECT * FROM channels WHERE playlistId = :playlistId ORDER BY name")
+    @Query("SELECT * FROM channels WHERE playlistId = :playlistId ORDER BY orderIndex, id")
     fun byPlaylist(playlistId: Long): Flow<List<ChannelEntity>>
-    @Query("SELECT * FROM channels WHERE name LIKE '%' || :query || '%' ORDER BY name LIMIT 500")
+    @Query("SELECT * FROM channels WHERE name LIKE '%' || :query || '%' ORDER BY orderIndex, id LIMIT 500")
     fun searchAll(query: String): Flow<List<ChannelEntity>>
-    @Query("SELECT * FROM channels WHERE playlistId = :playlistId AND name LIKE '%' || :query || '%' ORDER BY name LIMIT 5000")
+    @Query("SELECT * FROM channels WHERE playlistId = :playlistId AND name LIKE '%' || :query || '%' ORDER BY orderIndex, id LIMIT 5000")
     fun search(playlistId: Long, query: String): Flow<List<ChannelEntity>>
-    @Query("SELECT * FROM channels WHERE playlistId = :playlistId AND `group` = :group ORDER BY name LIMIT 5000")
+    @Query("SELECT * FROM channels WHERE playlistId = :playlistId AND `group` = :group ORDER BY orderIndex, id LIMIT 5000")
     fun byGroup(playlistId: Long, group: String): Flow<List<ChannelEntity>>
     @Query("SELECT DISTINCT `group` FROM channels WHERE playlistId = :playlistId AND `group` IS NOT NULL ORDER BY `group`")
     fun groups(playlistId: Long): Flow<List<String>>
-    @Query("SELECT * FROM channels WHERE playlistId = :playlistId ORDER BY id")
+    @Query("SELECT * FROM channels WHERE playlistId = :playlistId ORDER BY orderIndex, id")
     suspend fun snapshot(playlistId: Long): List<ChannelEntity>
     @Query("SELECT * FROM channels WHERE id = :id") suspend fun byId(id: Long): ChannelEntity?
     @Query("SELECT * FROM channels WHERE playlistId = :playlistId AND stableKey = :stableKey LIMIT 1")

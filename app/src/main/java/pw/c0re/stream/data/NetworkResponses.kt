@@ -61,3 +61,11 @@ internal fun Response.readText(maxBytes: Long = defaultMaxBytes): String {
 
 /** Backwards-compatible alias used by metadata/update endpoints. */
 internal fun Response.readMetadata(maxBytes: Long = defaultMaxBytes): String = readText(maxBytes)
+
+/** Inflates a gzip payload that was passed as raw text; bounded by [maxBytes]. */
+internal fun decodeGzipText(value: String, maxBytes: Long = maxDecompressedBytes): String =
+    decodeGzipBytes(ByteArray(value.length) { value[it].code.toByte() }, maxBytes)
+
+/** Inflates gzip bytes with an explicit decompressed-byte ceiling. */
+internal fun decodeGzipBytes(bytes: ByteArray, maxBytes: Long = maxDecompressedBytes): String =
+    gunzip(bytes, maxBytes).toString(Charsets.UTF_8)

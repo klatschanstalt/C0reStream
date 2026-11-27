@@ -1,9 +1,12 @@
 package pw.c0re.stream.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.ByteArrayOutputStream
+import java.util.zip.GZIPOutputStream
 
 class M3UParserTest {
 
@@ -25,20 +28,26 @@ class M3UParserTest {
     }
 
     @Test
-    fun `group from EXTGRP is used when group-title is missing`() {
+    fun `group from EXTGRP is used when group-title is missing and does not leak`() {
         val text = """
             #EXTM3U
             #EXTINF:-1 tvg-name="Sport One",Sport One
             #EXTGRP:Sports
             http://stream.example/sport.ts
+            #EXTINF:-1 group-title="News",News One
+            http://stream.example/news.ts
+            #EXTINF:-1,No group
+            http://stream.example/other.ts
         """.trimIndent()
-        val channel = M3UParser.parse(text).single()
-        assertEquals("Sports", channel.group)
-        assertEquals("Sport One", channel.name)
+        val channels = M3UParser.parse(text)
+        assertEquals("Sports", channels[0].group)
+        assertEquals("Sport One", channels[0].name)
+        assertEquals("News", channels[1].group)
+        assertNull(channels[2].group)
     }
 
     @Test
-    fun `rejects non http stream urls`() {
+    fun `rejects non http stream urls with a reason code`() {
         val text = """
             #EXTM3U
             #EXTINF:-1,Local file
@@ -46,9 +55,13 @@ class M3UParserTest {
             #EXTINF:-1,Valid
             https://stream.example/live.ts
         """.trimIndent()
-        val channels = M3UParser.parse(text)
-        assertEquals(1, channels.size)
-        assertEquals("Valid", channels.single().name)
+        val parsed = M3UParser.parseWithStats(text)
+        assertEquals(1, parsed.channels.size)
+        assertEquals("Valid", parsed.channels.single().name)
+        assertEquals(2, parsed.stats.received)
+        assertEquals(1, parsed.stats.rejected)
+        assertEquals(1, parsed.stats.rejectedCount(ImportRejectionCode.INVALID_STREAM_URL))
+        assertEquals("INVALID_STREAM_URL", parsed.stats.rejections.single().code)
     }
 
     @Test
@@ -74,13 +87,18 @@ class M3UParserTest {
         """.trimIndent()
         val channels = M3UParser.parse(text)
         assertEquals("Fallback", channels[0].name)
+        assertEquals("Fallback", channels[0].tvgName)
         assertEquals("Unknown", channels[1].name)
     }
 
-    @Test(expected = IllegalArgumentException::class)
-    fun `oversized playlist is rejected`() {
-        val text = "x".repeat(32 * 1024 * 1024 + 1)
-        M3UParser.parse(text)
+    @Test
+    fun `oversized playlist is reported instead of silently truncated`() {
+        val text = "x".repeat(1_000)
+        val result = M3UParser.parseWithStats(text, ImportLimits(maxTextLength = 100))
+        assertEquals(0, result.channels.size)
+        assertTrue(result.stats.truncated)
+        assertEquals(1, result.stats.rejectedCount(ImportRejectionCode.PLAYLIST_TOO_LARGE))
+        assertTrue(result.stats.rejectionCounts.containsKey("PLAYLIST_TOO_LARGE"))
     }
 
     @Test
@@ -88,6 +106,127 @@ class M3UParserTest {
         val text = "\uFEFF#EXTM3U\r\n#EXTINF:-1,One\r\nhttps://stream.example/1.ts\r\n"
         val channels = M3UParser.parse(text)
         assertEquals(1, channels.size)
-        assertTrue(channels.single().name == "One")
+        assertEquals("One", channels.single().name)
+    }
+
+    @Test
+    fun `keeps 5000 entries in provider order with their groups`() {
+        val lines = StringBuilder("\uFEFF#EXTM3U\r\n")
+        repeat(5_000) { index ->
+            lines.append("#EXTINF:$index tvg-id=\"id-$index\" group-title=\"Group ${index % 7}\",Channel $index\r\n")
+            lines.append("https://stream.example/$index.ts\r\n")
+        }
+        val parsed = M3UParser.parseWithStats(lines.toString())
+        assertEquals(5_000, parsed.channels.size)
+        assertEquals(5_000, parsed.stats.received)
+        assertEquals(5_000, parsed.stats.accepted)
+        assertEquals(0, parsed.stats.rejected)
+        assertFalse(parsed.stats.truncated)
+        parsed.channels.forEachIndexed { index, channel ->
+            assertEquals("Channel $index", channel.name)
+            assertEquals("Group ${index % 7}", channel.group)
+            assertEquals("id-$index", channel.tvgId)
+        }
+    }
+
+    @Test
+    fun `duplicate url with different channel names and tvg ids is kept`() {
+        val text = """
+            #EXTM3U
+            #EXTINF:-1 tvg-id="one" group-title="News",News HD
+            https://stream.example/shared.ts
+            #EXTINF:-1 tvg-id="two" group-title="Sport",Sport HD
+            https://stream.example/shared.ts
+            #EXTINF:-1 group-title="News",News SD
+            https://stream.example/shared.ts
+        """.trimIndent()
+        val channels = M3UParser.parse(text)
+        assertEquals(3, channels.size)
+        assertEquals(listOf("News HD", "Sport HD", "News SD"), channels.map { it.name })
+        assertEquals(listOf("News", "Sport", "News"), channels.map { it.group })
+    }
+
+    @Test
+    fun `channel numbers come from tvg chno channel id number and leading extinf value`() {
+        val text = """
+            #EXTM3U
+            #EXTINF:7 tvg-chno="1.1" tvg-id="a",First
+            https://stream.example/a.ts
+            #EXTINF:8 channel-id=22 tvg-id="b",Second
+            https://stream.example/b.ts
+            #EXTINF:9 "number"="33" tvg-id="c",Third
+            https://stream.example/c.ts
+            #EXTINF:44 tvg-id="d",Fourth
+            https://stream.example/d.ts
+        """.trimIndent()
+        val channels = M3UParser.parse(text)
+        assertEquals("1.1", channels[0].channelNumber)
+        assertEquals("22", channels[1].channelNumber)
+        assertEquals("33", channels[2].channelNumber)
+        assertEquals("44", channels[3].channelNumber)
+    }
+
+    @Test
+    fun `unquoted attributes and quality are parsed`() {
+        val text = """
+            #EXTM3U
+            #EXTINF:-1 tvg-id=unq tvg-name=Stable group-title=News quality=HD,Display
+            https://stream.example/unquoted.ts
+        """.trimIndent()
+        val channel = M3UParser.parse(text).single()
+        assertEquals("unq", channel.tvgId)
+        assertEquals("Stable", channel.tvgName)
+        assertEquals("News", channel.group)
+        assertEquals("HD", channel.quality)
+    }
+
+    @Test
+    fun `gzip payload passed as raw text is inflated`() {
+        val plain = "#EXTM3U\r\n#EXTINF:-1,Gzip Channel\r\nhttps://stream.example/gzip.ts\r\n"
+        val out = ByteArrayOutputStream()
+        GZIPOutputStream(out).use { it.write(plain.toByteArray(Charsets.UTF_8)) }
+        val rawText = out.toByteArray().toString(Charsets.ISO_8859_1)
+        val parsed = M3UParser.parseWithStats(rawText)
+        assertTrue(parsed.stats.gzipDecoded)
+        assertEquals(1, parsed.channels.size)
+        assertEquals("Gzip Channel", parsed.channels.single().name)
+    }
+
+    @Test
+    fun `gzip bytes with byte order mark are decoded through the bounded decoder`() {
+        val plain = "\uFEFF#EXTM3U\n#EXTINF:-1,BOM Gzip\nhttps://stream.example/bom.ts\n"
+        val out = ByteArrayOutputStream()
+        GZIPOutputStream(out).use { it.write(plain.toByteArray(Charsets.UTF_8)) }
+        val parsed = M3UParser.parseWithStats(out.toByteArray())
+        assertEquals(1, parsed.channels.size)
+        assertEquals("BOM Gzip", parsed.channels.single().name)
+    }
+
+    @Test
+    fun `channel limit is reported`() {
+        val text = (1..5).joinToString("\n") { "#EXTINF:-1,Channel $it\nhttps://stream.example/$it.ts" }
+        val parsed = M3UParser.parseWithStats(text, ImportLimits(maxChannels = 2))
+        assertEquals(2, parsed.channels.size)
+        assertTrue(parsed.stats.truncated)
+        assertEquals(1, parsed.stats.rejectedCount(ImportRejectionCode.TOO_MANY_CHANNELS))
+        assertEquals("TOO_MANY_CHANNELS", parsed.stats.rejectionCounts.keys.first())
+    }
+
+    @Test
+    fun `overlong lines are rejected and reported without stopping the import`() {
+        val longUrl = "https://stream.example/" + "a".repeat(64) + ".ts"
+        val text = "https://a.co/2\n$longUrl\nhttps://a.co/1\n"
+        val parsed = M3UParser.parseWithStats(text, ImportLimits(maxLineLength = 20))
+        assertEquals(2, parsed.channels.size)
+        assertEquals(1, parsed.stats.rejectedCount(ImportRejectionCode.LINE_TOO_LONG))
+        assertFalse(parsed.stats.truncated)
+    }
+
+    @Test
+    fun `line limit is reported`() {
+        val text = (1..20).joinToString("\n") { "https://stream.example/$it.ts" }
+        val parsed = M3UParser.parseWithStats(text, ImportLimits(maxLines = 3))
+        assertTrue(parsed.stats.truncated)
+        assertEquals(1, parsed.stats.rejectedCount(ImportRejectionCode.TOO_MANY_LINES))
     }
 }

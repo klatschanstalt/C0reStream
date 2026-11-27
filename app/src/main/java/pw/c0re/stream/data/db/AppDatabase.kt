@@ -19,7 +19,7 @@ import java.io.File
         ReminderEntity::class,
         pw.c0re.stream.data.profiles.ProfileEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(ProtectedUrlConverters::class)
@@ -40,7 +40,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, resolveDatabaseName(context))
-                .addMigrations(encryptUrlsMigration, schemaV4Migration, schemaV5Migration)
+                .addMigrations(encryptUrlsMigration, schemaV4Migration, schemaV5Migration, schemaV6Migration)
                 .build()
 
         /**

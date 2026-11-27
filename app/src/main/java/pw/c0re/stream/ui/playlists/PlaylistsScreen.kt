@@ -64,6 +64,7 @@ fun PlaylistsScreen(
 ) {
     val playlists by vm.playlists.collectAsState()
     val error by vm.lastError
+    val importResult by vm.lastImport
     var showAdd by remember { mutableStateOf(sharedUrl != null) }
     var deleteId by remember { mutableStateOf<Long?>(null) }
     var qrError by remember { mutableStateOf(false) }
@@ -130,6 +131,24 @@ fun PlaylistsScreen(
             }
             if (qrError) {
                 Text(stringResource(R.string.qr_invalid), color = MaterialTheme.colorScheme.error)
+            }
+            importResult?.let { result ->
+                val stats = result.stats
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(stringResource(R.string.import_received, stats.received))
+                        Text(stringResource(R.string.import_imported, stats.accepted))
+                        Text(stringResource(R.string.import_merged, stats.merged))
+                        Text(stringResource(R.string.import_rejected, stats.rejected))
+                        if (stats.truncated) Text(stringResource(R.string.import_limit))
+                        if (stats.rejections.any { it.code == "SHRINK_GUARD" }) {
+                            Text(stringResource(R.string.import_shrink_guard))
+                        }
+                        stats.rejections.take(4).forEach { rejection ->
+                            Text(reasonLabel(rejection.code), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
             }
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
                 items(playlists, key = { it.id }) { playlist ->
@@ -342,3 +361,23 @@ private fun AddPlaylistDialog(
         },
     )
 }
+
+@Composable
+private fun reasonLabel(code: String): String = stringResource(
+    when (code) {
+        "PLAYLIST_TOO_LARGE" -> R.string.reason_playlist_too_large
+        "TOO_MANY_LINES" -> R.string.reason_too_many_lines
+        "LINE_TOO_LONG" -> R.string.reason_line_too_long
+        "TOO_MANY_CHANNELS" -> R.string.reason_too_many_channels
+        "INVALID_STREAM_URL" -> R.string.reason_invalid_stream_url
+        "GZIP_DECODE_FAILED" -> R.string.reason_gzip_decode_failed
+        "GZIP_TOO_LARGE" -> R.string.reason_gzip_too_large
+        "SHRINK_GUARD" -> R.string.reason_shrink_guard
+        "DUPLICATE_KEY_COLLISION" -> R.string.reason_duplicate_collision
+        "XTREAM_RECORD_LIMIT" -> R.string.reason_xtream_record_limit
+        "XTREAM_PAGINATION_UNSUPPORTED" -> R.string.reason_xtream_pagination
+        "XTREAM_CATEGORIES_UNAVAILABLE" -> R.string.reason_xtream_categories
+        "XTREAM_INVALID_RECORD" -> R.string.reason_xtream_invalid_record
+        else -> R.string.error_playlist_load
+    },
+)

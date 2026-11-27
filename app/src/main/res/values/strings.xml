@@ -94,7 +94,6 @@
     <string name="watchlist_title">Watchlist</string>
     <string name="watchlist_empty">Your watchlist is empty.</string>
 
-    <string name="settings_appearance">Appearance</string>
     <string name="settings_theme">Theme</string>
     <string name="theme_dark">Dark</string>
     <string name="theme_light">Light</string>
@@ -103,25 +102,19 @@
     <string name="settings_brand">Brand palette</string>
     <string name="brand_cyan">Cyan</string>
     <string name="brand_ember">Ember</string>
-    <string name="settings_playback">Playback</string>
     <string name="settings_buffer">Buffer size</string>
     <string name="settings_buffer_hint">Increase for unstable streams. Applies after the next player start.</string>
     <string name="settings_buffer_min">Min (seconds)</string>
     <string name="settings_buffer_max">Max (seconds)</string>
-    <string name="settings_refresh">Automatic refresh</string>
     <string name="settings_auto_refresh">Refresh playlists in the background</string>
     <string name="settings_refresh_hours">Interval (hours)</string>
-    <string name="settings_backup">Backup and export</string>
     <string name="settings_export_m3u">Export M3U (unencrypted)</string>
-    <string name="settings_diagnostics">Diagnostics</string>
     <string name="settings_log_refresh">Refresh log</string>
     <string name="settings_version">C0reStream %1$s</string>
     <string name="settings_update_available">Version %1$s is available.</string>
     <string name="settings_update_download">Download and verify</string>
     <string name="settings_update_verify_failed">Update verification failed. Installation was blocked.</string>
     <string name="settings_update_install">Verified. Continue with the system installer.</string>
-    <string name="settings_security">Security</string>
-    <string name="settings_http_warning">HTTP sources are supported, but traffic can be read or modified on the network. Prefer HTTPS. HTTPS-to-HTTP redirects are blocked.</string>
     <string name="settings_about_text">Independent IPTV client for authorized M3U, Xtream Codes, VOD and series sources with EPG, catch-up, favorites, history, search, mini-player and proxy support. No tracking, no ads.</string>
 
     <string name="backup_create">Create encrypted backup</string>
@@ -242,4 +235,23 @@
     <string name="diagnostics_buffer">Buffer</string>
     <string name="diagnostics_dropped">Dropped frames</string>
     <string name="diagnostics_audio">Audio</string>
+    <string name="import_received">Received %1$d</string>
+    <string name="import_imported">Imported %1$d</string>
+    <string name="import_merged">Merged duplicates %1$d</string>
+    <string name="import_rejected">Rejected %1$d</string>
+    <string name="import_limit">Import limit reached - some entries were not imported</string>
+    <string name="import_shrink_guard">Kept previous playlist (shrink guard)</string>
+    <string name="reason_playlist_too_large">Playlist too large</string>
+    <string name="reason_too_many_lines">Too many lines</string>
+    <string name="reason_line_too_long">Line too long</string>
+    <string name="reason_too_many_channels">Too many channels</string>
+    <string name="reason_invalid_stream_url">Invalid stream URL</string>
+    <string name="reason_gzip_decode_failed">Gzip decode failed</string>
+    <string name="reason_gzip_too_large">Gzip payload too large</string>
+    <string name="reason_shrink_guard">Playlist shrank unexpectedly</string>
+    <string name="reason_duplicate_collision">Duplicate key collision</string>
+    <string name="reason_xtream_record_limit">Xtream record limit</string>
+    <string name="reason_xtream_pagination">Xtream paging unsupported</string>
+    <string name="reason_xtream_categories">Xtream categories unavailable</string>
+    <string name="reason_xtream_invalid_record">Invalid Xtream record</string>
 </resources>

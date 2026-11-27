@@ -55,6 +55,7 @@ data class PlaylistEntity(
         Index("playlistId"),
         Index("name"),
         Index(value = ["playlistId", "stableKey"]),
+        Index(value = ["playlistId", "orderIndex"]),
     ],
 )
 data class ChannelEntity(
@@ -67,6 +68,10 @@ data class ChannelEntity(
     val tvgId: String?,
     @ColumnInfo(name = "catchupSource") val protectedCatchupSource: ProtectedUrl? = null,
     @ColumnInfo(defaultValue = "''") val stableKey: String = "",
+    @ColumnInfo(defaultValue = "0") val orderIndex: Int = 0,
+    val tvgName: String? = null,
+    val channelNumber: String? = null,
+    val quality: String? = null,
 ) {
     @Ignore
     constructor(
@@ -79,9 +84,13 @@ data class ChannelEntity(
         tvgId: String?,
         catchupSource: String? = null,
         stableKey: String = "",
+        orderIndex: Int = 0,
+        tvgName: String? = null,
+        channelNumber: String? = null,
+        quality: String? = null,
     ) : this(
         id, playlistId, name, logoUrl?.let(::ProtectedUrl), group, ProtectedUrl(url), tvgId,
-        catchupSource?.let(::ProtectedUrl), stableKey,
+        catchupSource?.let(::ProtectedUrl), stableKey, orderIndex, tvgName, channelNumber, quality,
     )
 
     @get:Ignore
