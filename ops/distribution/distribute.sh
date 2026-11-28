@@ -57,12 +57,14 @@ fail() {
 # force push, and never publish a tag or artifact from this service.
 sync_repo_metadata() {
     local desired="$1" wt="$BASE/staging/git-meta"
+    # Clean a worktree left behind by an interrupted previous run.
+    git -C "$REPO_DIR" worktree remove --force "$wt" >/dev/null 2>&1 || true
     rm -rf "$wt"
     if ! git -C "$REPO_DIR" fetch --quiet origin main 2>"$tmp/curl.err"; then
         return 1
     fi
     git -C "$REPO_DIR" worktree add --quiet --detach "$wt" origin/main >/dev/null 2>&1 || return 1
-    if python3 - "$wt/update.json" "$desired" <<'PY'
+    if python3 - "$wt/update.json" "$desired" 2>"$tmp/curl.err" <<'PY'
 import json, sys
 a, b = (json.load(open(p)) for p in sys.argv[1:3])
 keys = ("latestVersion", "apkUrl", "sha256", "notes", "notes_de", "notes_en", "notes_fr")
@@ -143,7 +145,7 @@ PY
 )
 if [ "$newer" != "1" ]; then
     log "no newer stable release (active=$ACTIVE_VERSION latest=$VERSION)"
-    sync_repo_metadata "$BASE/versions/$ACTIVE_VERSION/update.json" || \
+    sync_repo_metadata "$(readlink -f "$BASE/current")/update.json" || \
         log "WARNING: repository metadata sync pending"
     write_state ok none "no-new-release"
     exit 0
