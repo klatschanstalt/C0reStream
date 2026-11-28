@@ -117,6 +117,27 @@ object M3UParser {
     /** Backwards-compatible entry point; use [parseWithStats] to see limits and rejections. */
     fun parse(text: String): List<RawChannel> = parseWithStats(text).channels
 
+    /**
+     * Content-based format check for locally picked files. Document providers frequently report
+     * `application/octet-stream`, the all-files wildcard type or another generic MIME type for
+     * valid M3U/M3U8 files, so
+     * the provider's type is never trusted. Gzip payloads are accepted here and fully validated by
+     * [parseWithStats]; empty, binary or unstructured input is rejected before anything is stored.
+     */
+    fun looksLikePlaylist(bytes: ByteArray): Boolean {
+        if (bytes.isEmpty()) return false
+        if (bytes.size >= 2 && bytes[0] == 0x1f.toByte() && bytes[1] == 0x8b.toByte()) return true
+        // A NUL byte in the header is a reliable indicator of binary (e.g. image) content.
+        val head = bytes.copyOf(minOf(bytes.size, 4_096))
+        if (head.any { it == 0.toByte() }) return false
+        val text = stripBom(String(head, Charsets.UTF_8))
+        val firstEntry = text.lineSequence()
+            .map { stripBom(it).trim() }
+            .firstOrNull { it.isNotEmpty() && !it.startsWith("#") }
+            ?: return false
+        return NetworkPolicy.parseStreamUrl(firstEntry) != null
+    }
+
     /** Parses text, including text that holds an undecoded gzip payload. */
     fun parseWithStats(text: String, limits: ImportLimits = ImportLimits()): M3uParseResult {
         val builder = StatsBuilder(limits)

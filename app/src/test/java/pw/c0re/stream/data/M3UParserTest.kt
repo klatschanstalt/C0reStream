@@ -312,4 +312,30 @@ class M3UParserTest {
         assertTrue(parsed.stats.truncated)
         assertEquals(1, parsed.stats.rejectedCount(ImportRejectionCode.TOO_MANY_LINES))
     }
+
+    @Test
+    fun `content sniff accepts m3u m3u8 bom and gzip without trusting provider mime`() {
+        val m3u = "#EXTM3U\n#EXTINF:-1,One\nhttps://stream.example/1.ts\n".toByteArray(Charsets.UTF_8)
+        val m3u8 = "\uFEFF#EXTM3U\r\n#EXTINF:-1,One\r\nhttps://stream.example/1.m3u8\r\n"
+            .toByteArray(Charsets.UTF_8)
+        val plain = "#EXTINF:-1,One\nhttps://stream.example/1.ts\n".toByteArray(Charsets.UTF_8)
+        val out = ByteArrayOutputStream()
+        GZIPOutputStream(out).use { it.write(m3u) }
+        assertTrue(M3UParser.looksLikePlaylist(m3u))
+        assertTrue(M3UParser.looksLikePlaylist(m3u8))
+        assertTrue(M3UParser.looksLikePlaylist(plain))
+        assertTrue("gzip payload must not be rejected on a generic MIME type", M3UParser.looksLikePlaylist(out.toByteArray()))
+    }
+
+    @Test
+    fun `content sniff rejects empty binary and unstructured files`() {
+        assertFalse(M3UParser.looksLikePlaylist(ByteArray(0)))
+        assertFalse(M3UParser.looksLikePlaylist("just some random text".toByteArray(Charsets.UTF_8)))
+        assertFalse(
+            M3UParser.looksLikePlaylist(
+                byteArrayOf(0x89.toByte(), 0x50.toByte(), 0x4e.toByte(), 0x47.toByte(), 0, 0, 0, 0x0d.toByte()),
+            ),
+        )
+        assertFalse(M3UParser.looksLikePlaylist("#EXTM3U\n# no entries\n".toByteArray(Charsets.UTF_8)))
+    }
 }

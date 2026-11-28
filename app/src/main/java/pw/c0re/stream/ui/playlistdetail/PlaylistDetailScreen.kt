@@ -80,9 +80,13 @@ import pw.c0re.stream.ui.components.BrandSecondaryButton
 import pw.c0re.stream.ui.components.BrandTopBar
 import pw.c0re.stream.ui.components.PoweredByFooter
 import pw.c0re.stream.ui.components.rememberResponsivePadding
+import java.io.InputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.floor
+import kotlin.math.min
+import kotlin.math.sqrt
 
 @Composable
 fun PlaylistDetailScreen(
@@ -453,11 +457,88 @@ private fun EpgRow(
     }
 }
 
-/** Bounded logo loader; rejects non-HTTP(S) URLs and oversized responses. */
+/**
+ * Pure bounds/sampling helpers shared by QR and logo decoding. Compressed byte size alone is not
+ * a memory guard: a tiny image can declare enormous dimensions. Every decoder first reads bounds
+ * (or the header) and downscales before any full-size allocation happens.
+ */
+object SafeImageDecode {
+    const val MAX_COMPRESSED_BYTES = 8L * 1024 * 1024
+    const val MAX_DECODED_DIMENSION = 2_048
+    const val MAX_DECODED_PIXELS = 2_000_000L
+    const val MAX_DECODED_MEMORY_BYTES = 32L * 1024 * 1024
+    const val MAX_SAMPLE_SIZE = 1_024
+    /** A 48 dp logo at 4x density; decoding beyond this only wastes memory. */
+    const val LOGO_TARGET_PX = 256
+
+    fun isWithinLimits(
+        width: Int,
+        height: Int,
+        maxDimension: Int = MAX_DECODED_DIMENSION,
+        maxPixels: Long = MAX_DECODED_PIXELS,
+    ): Boolean {
+        if (width <= 0 || height <= 0) return false
+        if (width > maxDimension || height > maxDimension) return false
+        return width.toLong() * height.toLong() <= maxPixels
+    }
+
+    /** Power-of-two sample size that keeps both dimensions and the pixel count within limits. */
+    fun sampleSize(
+        width: Int,
+        height: Int,
+        target: Int,
+        maxPixels: Long = MAX_DECODED_PIXELS,
+    ): Int {
+        if (width <= 0 || height <= 0) return 1
+        var sample = 1
+        while (width / sample > target || height / sample > target ||
+            (width.toLong() / sample) * (height.toLong() / sample) > maxPixels
+        ) {
+            if (sample >= MAX_SAMPLE_SIZE) return MAX_SAMPLE_SIZE
+            sample *= 2
+        }
+        return sample
+    }
+
+    /** Target size passed to ImageDecoder so the decoded bitmap stays inside both ceilings. */
+    fun targetSize(
+        width: Int,
+        height: Int,
+        maxDimension: Int = MAX_DECODED_DIMENSION,
+        maxPixels: Long = MAX_DECODED_PIXELS,
+    ): Pair<Int, Int> {
+        if (width <= 0 || height <= 0) return 1 to 1
+        val byDimension = min(maxDimension.toDouble() / width, maxDimension.toDouble() / height)
+        val byPixels = sqrt(maxPixels.toDouble() / (width.toLong() * height.toLong()).toDouble())
+        val scale = minOf(1.0, byDimension, byPixels)
+        return maxOf(1, floor(width * scale).toInt()) to maxOf(1, floor(height * scale).toInt())
+    }
+
+    /** ARGB_8888 memory an image of this size occupies after decode. */
+    fun decodedBytes(width: Int, height: Int): Long =
+        width.toLong() * height.toLong() * Int.SIZE_BYTES.toLong()
+
+    /** Reads at most [maxBytes] compressed bytes; throws instead of buffering an endless body. */
+    fun readBounded(input: InputStream, maxBytes: Long): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(8_192)
+        var total = 0L
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            total += count
+            check(total <= maxBytes) { "Image too large" }
+            out.write(buffer, 0, count)
+        }
+        return out.toByteArray()
+    }
+}
+
 /** Bounded logo cache: avoids refetching the same artwork while scrolling large lists. */
 private object LogoCache {
     private const val maxEntries = 128
     private const val maxBytes = 8L * 1024 * 1024
+    private const val maxEntryBytes = 1L * 1024 * 1024
     private var bytes = 0L
     private val cache = object : LinkedHashMap<String, Bitmap>(16, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap>?): Boolean {
@@ -473,6 +554,8 @@ private object LogoCache {
 
     @Synchronized
     fun put(url: String, bitmap: Bitmap) {
+        // One oversized bitmap must not enter the cache even when the cache total is still small.
+        if (bitmap.byteCount <= 0 || bitmap.byteCount > maxEntryBytes) return
         cache[url]?.let { bytes -= it.byteCount }
         cache[url] = bitmap
         bytes += bitmap.byteCount
@@ -495,7 +578,33 @@ fun ChannelLogo(url: String?, modifier: Modifier = Modifier) {
                 NetworkPolicy.client().newCall(Request.Builder().url(key).build()).execute().use { response ->
                     if (!response.isSuccessful) return@runCatching null
                     val bytes = response.readBytes(4L * 1024 * 1024)
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    // Bounds pass first: a small compressed file can declare a huge bitmap.
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+                    if (!SafeImageDecode.isWithinLimits(
+                            bounds.outWidth,
+                            bounds.outHeight,
+                            maxDimension = 4_096,
+                            maxPixels = 16_000_000L,
+                        )
+                    ) return@runCatching null
+                    val options = BitmapFactory.Options().apply {
+                        inSampleSize = SafeImageDecode.sampleSize(
+                            bounds.outWidth,
+                            bounds.outHeight,
+                            SafeImageDecode.LOGO_TARGET_PX,
+                            1_000_000L,
+                        )
+                    }
+                    val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+                        ?: return@runCatching null
+                    if (SafeImageDecode.decodedBytes(decoded.width, decoded.height) >
+                        SafeImageDecode.MAX_DECODED_MEMORY_BYTES
+                    ) {
+                        decoded.recycle()
+                        return@runCatching null
+                    }
+                    decoded
                 }
             }.onSuccess { decoded ->
                 if (decoded != null) {

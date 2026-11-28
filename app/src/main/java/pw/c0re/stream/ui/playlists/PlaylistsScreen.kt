@@ -1,6 +1,9 @@
 package pw.c0re.stream.ui.playlists
 
+import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.ImageDecoder
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -64,6 +67,7 @@ import pw.c0re.stream.data.ImportStats
 import pw.c0re.stream.data.db.PlaylistEntity
 import pw.c0re.stream.data.profiles.QrPlaylistParser
 import pw.c0re.stream.ui.components.AdaptivePane
+import pw.c0re.stream.ui.playlistdetail.SafeImageDecode
 import pw.c0re.stream.ui.components.BrandBadge
 import pw.c0re.stream.ui.components.BrandBackdrop
 import pw.c0re.stream.ui.components.BrandCard
@@ -75,6 +79,31 @@ import pw.c0re.stream.ui.components.BrandTopBar
 import pw.c0re.stream.ui.components.C0reStreamWordmark
 import pw.c0re.stream.ui.components.PoweredByFooter
 import pw.c0re.stream.ui.components.rememberResponsivePadding
+import java.nio.ByteBuffer
+
+/**
+ * Decodes a picked QR image without ever allocating a full-size bitmap: compressed bytes are
+ * bounded and the declared header dimensions are checked before [ImageDecoder] decodes pixels.
+ */
+suspend fun decodeQrBitmap(context: Context, uri: Uri): Bitmap? = withContext(Dispatchers.Default) {
+    val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+        SafeImageDecode.readBounded(input, SafeImageDecode.MAX_COMPRESSED_BYTES)
+    } ?: return@withContext null
+    runCatching {
+        val source = ImageDecoder.createSource(ByteBuffer.wrap(bytes))
+        ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+            val width = info.size.width
+            val height = info.size.height
+            if (!SafeImageDecode.isWithinLimits(width, height)) {
+                throw IllegalArgumentException("Image dimensions exceed limit")
+            }
+            val (targetWidth, targetHeight) = SafeImageDecode.targetSize(width, height)
+            decoder.setTargetSize(targetWidth, targetHeight)
+            decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE)
+            decoder.setMutableRequired(false)
+        }
+    }.getOrNull()
+}
 
 @Composable
 fun PlaylistsScreen(
@@ -107,10 +136,7 @@ fun PlaylistsScreen(
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
             val url = withContext(Dispatchers.Default) {
-                val bitmap = runCatching {
-                    ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri))
-                }.getOrNull()
-                bitmap?.let { QrPlaylistParser.parse(it) }
+                decodeQrBitmap(context, uri)?.let { QrPlaylistParser.parse(it) }
             }
             if (url == null) {
                 qrError = true
@@ -150,13 +176,9 @@ fun PlaylistsScreen(
                         BrandSecondaryButton(
                             stringResource(R.string.action_import_file),
                             onClick = {
-                                importFile.launch(
-                                    arrayOf(
-                                        "audio/x-mpegurl", "audio/mpegurl", "application/x-mpegurl",
-                                        "application/vnd.apple.mpegurl", "application/octet-stream",
-                                        "text/plain", "application/gzip", "application/x-gzip", "*/*",
-                                    ),
-                                )
+                                // Show every document: providers report M3U/M3U8 with unreliable or
+                                // generic MIME types. The importer validates the actual content.
+                                importFile.launch(arrayOf("*/*"))
                             },
                         )
                     },

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="import_local_name">Local playlist</string>
+    <string name="error_import_permission">File access was denied by the document provider.</string>
+    <string name="error_import_unreadable">The selected file could not be opened.</string>
+    <string name="error_import_too_large">Playlist file is too large.</string>
+    <string name="error_import_format">The selected file is not a supported M3U/M3U8 playlist.</string>
+    <string name="error_import_failed">Import failed.</string>
+</resources>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="import_local_name">Lokale Playlist</string>
+    <string name="error_import_permission">Der Dokumentanbieter hat den Dateizugriff verweigert.</string>
+    <string name="error_import_unreadable">Die ausgewählte Datei konnte nicht geöffnet werden.</string>
+    <string name="error_import_too_large">Die Playlist-Datei ist zu groß.</string>
+    <string name="error_import_format">Die ausgewählte Datei ist keine unterstützte M3U/M3U8-Playlist.</string>
+    <string name="error_import_failed">Import fehlgeschlagen.</string>
+</resources>

@@ -13,10 +13,11 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
-import pw.c0re.stream.data.NetworkPolicy
+import pw.c0re.stream.data.profiles.QrPlaylistParser
 import pw.c0re.stream.ui.C0reStreamRoot
 import pw.c0re.stream.ui.player.PlayerHub
 import pw.c0re.stream.ui.theme.C0reStreamThemeFromPrefs
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private val sharedM3u = mutableStateOf<String?>(null)
@@ -55,17 +56,29 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Accepts only a single, well-formed HTTP(S) playlist URL. The value only pre-fills the add
+     * dialog after the user has passed the profile/PIN gate; nothing is fetched or played here, so
+     * an external intent cannot execute a URL or bypass protected profiles.
+     */
     private fun extractSharedPlaylist(intent: Intent?): String? {
         if (intent == null) return null
         val value = when (intent.action) {
-            Intent.ACTION_VIEW -> intent.data?.toString()
-            Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)?.trim()
+            Intent.ACTION_VIEW -> {
+                val uri = intent.data ?: return null
+                if (uri.scheme != "http" && uri.scheme != "https") return null
+                val path = runCatching { uri.path?.lowercase(Locale.ROOT) }.getOrNull().orEmpty()
+                if (path.endsWith(".m3u") || path.endsWith(".m3u8")) uri.toString() else null
+            }
+            Intent.ACTION_SEND -> {
+                // Only plain-text playlist URLs are supported; stream/content extras are ignored.
+                if (intent.hasExtra(Intent.EXTRA_STREAM)) return null
+                if (intent.type?.lowercase(Locale.ROOT) !in SEND_MIME_TYPES) return null
+                intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()?.trim()
+            }
             else -> null
         } ?: return null
-        if (NetworkPolicy.parse(value) == null) return null
-        if (intent.action == Intent.ACTION_SEND) return value
-        val path = runCatching { intent.data?.path?.lowercase() }.getOrNull().orEmpty()
-        return value.takeIf { path.endsWith(".m3u") || path.endsWith(".m3u8") }
+        return QrPlaylistParser.parsePayload(value)
     }
 
     private fun requestNotificationPermission() {
@@ -74,5 +87,16 @@ class MainActivity : ComponentActivity() {
             PackageManager.PERMISSION_GRANTED
         ) return
         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    private companion object {
+        val SEND_MIME_TYPES = setOf(
+            "text/plain",
+            "text/x-mpegurl",
+            "application/x-mpegurl",
+            "application/vnd.apple.mpegurl",
+            "audio/x-mpegurl",
+            "audio/mpegurl",
+        )
     }
 }
