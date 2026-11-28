@@ -1,5 +1,10 @@
 package pw.c0re.stream.ui.settings
 
+import android.content.Intent
+import androidx.core.net.toUri
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -56,6 +61,7 @@ import pw.c0re.stream.ui.components.C0reStreamWordmark
 import pw.c0re.stream.ui.components.PoweredByFooter
 import pw.c0re.stream.ui.theme.Brand
 import pw.c0re.stream.ui.theme.ThemeMode
+import java.io.File
 
 @Composable
 fun SettingsScreen(onExportBackup: () -> Unit = {}, onOpenProfiles: () -> Unit = {}, vm: SettingsViewModel = viewModel()) {
@@ -65,12 +71,22 @@ fun SettingsScreen(onExportBackup: () -> Unit = {}, onOpenProfiles: () -> Unit =
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var updateInfo by remember { mutableStateOf<UpdateChecker.UpdateInfo?>(null) }
-    var updateStatus by remember { mutableStateOf<String?>(null) }
+    var updateFile by remember { mutableStateOf<File?>(null) }
+    var updateStatusRes by remember { mutableStateOf<Int?>(null) }
     var updateBusy by remember { mutableStateOf(false) }
     var logSnapshot by remember { mutableStateOf(AppLog.lines) }
     var showResetDialog by remember { mutableStateOf(false) }
-    val updateInstallHint = stringResource(R.string.settings_update_install)
-    val updateVerifyFailed = stringResource(R.string.settings_update_verify_failed)
+    val installSettings = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) {
+        // Returning from settings without granting the permission is a distinct state; no
+        // installation is started implicitly.
+        updateStatusRes = if (UpdateInstaller.canInstall(context)) {
+            R.string.update_permission_granted
+        } else {
+            R.string.update_permission_still_denied
+        }
+    }
 
     LaunchedEffect(Unit) {
         updateInfo = UpdateChecker.check(BuildConfig.VERSION_NAME)
@@ -157,20 +173,17 @@ fun SettingsScreen(onExportBackup: () -> Unit = {}, onOpenProfiles: () -> Unit =
                                     onClick = {
                                         scope.launch {
                                             updateBusy = true
-                                            updateStatus = null
+                                            updateStatusRes = null
                                             try {
                                                 when (val result = UpdateInstaller.downloadAndVerify(context, update)) {
                                                     is UpdateInstaller.Result.Ready -> {
-                                                        updateStatus = updateInstallHint
-                                                        runCatching {
-                                                            withContext(Dispatchers.IO) {
-                                                                UpdateInstaller.install(context, result.file)
-                                                            }
-                                                        }.onFailure { updateStatus = updateVerifyFailed }
+                                                        updateFile = result.file
+                                                        updateStatusRes = R.string.settings_update_install
                                                     }
                                                     is UpdateInstaller.Result.Failure -> {
-                                                        updateStatus = updateVerifyFailed
-                                                        AppLog.log("Update", result.reason)
+                                                        updateFile = null
+                                                        updateStatusRes = updateFailureMessage(result)
+                                                        AppLog.log("Update", result.detail)
                                                     }
                                                 }
                                             } finally {
@@ -180,9 +193,54 @@ fun SettingsScreen(onExportBackup: () -> Unit = {}, onOpenProfiles: () -> Unit =
                                     },
                                     modifier = Modifier.fillMaxWidth(),
                                 )
+                                updateFile?.let { file ->
+                                    BrandPrimaryButton(
+                                        text = stringResource(R.string.update_action_install),
+                                        onClick = {
+                                            scope.launch {
+                                                updateBusy = true
+                                                try {
+                                                    when (val result = withContext(Dispatchers.IO) {
+                                                        UpdateInstaller.install(context, file)
+                                                    }) {
+                                                        UpdateInstaller.InstallResult.HandedOff ->
+                                                            updateStatusRes = R.string.update_handover_success
+                                                        UpdateInstaller.InstallResult.PermissionRequired ->
+                                                            updateStatusRes = R.string.update_error_permission
+                                                        is UpdateInstaller.InstallResult.Failed -> {
+                                                            updateStatusRes = R.string.update_error_install
+                                                            AppLog.log("Update", result.detail)
+                                                        }
+                                                    }
+                                                } finally {
+                                                    updateBusy = false
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                }
+                                if (updateStatusRes == R.string.update_error_permission ||
+                                    updateStatusRes == R.string.update_permission_still_denied
+                                ) {
+                                    BrandSecondaryButton(
+                                        text = stringResource(R.string.update_action_enable_install_permission),
+                                        onClick = {
+                                            val intent = Intent(
+                                                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                                "package:${context.packageName}".toUri(),
+                                            )
+                                            runCatching { installSettings.launch(intent) }.onFailure { error ->
+                                                AppLog.log("Update", error.message ?: "settings unavailable")
+                                                updateStatusRes = R.string.update_error_permission
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                }
                             }
-                            updateStatus?.let {
-                                Text(it, style = MaterialTheme.typography.bodyMedium)
+                            updateStatusRes?.let {
+                                Text(stringResource(it), style = MaterialTheme.typography.bodyMedium)
                             }
                         }
                     }
@@ -651,6 +709,13 @@ private fun ChipRow(
             )
         }
     }
+}
+
+/** Keeps download, integrity and signature failures visually distinct. */
+private fun updateFailureMessage(failure: UpdateInstaller.Result.Failure): Int = when (failure) {
+    is UpdateInstaller.Result.DownloadFailure -> R.string.update_error_download
+    is UpdateInstaller.Result.IntegrityFailure -> R.string.update_error_integrity
+    is UpdateInstaller.Result.SignatureFailure -> R.string.update_error_signature
 }
 
 private fun themeLabelRes(mode: ThemeMode): Int = when (mode) {

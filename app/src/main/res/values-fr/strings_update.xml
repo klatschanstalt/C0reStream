@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_action_install">Installer la mise à jour</string>
+    <string name="update_action_enable_install_permission">Activer l\'autorisation d\'installation</string>
+
+    <string name="update_error_download">La mise à jour n\'a pas pu être téléchargée. Vérifiez la connexion et réessayez.</string>
+    <string name="update_error_integrity">L\'APK téléchargée a échoué au contrôle d\'intégrité. Rien n\'a été installé.</string>
+    <string name="update_error_signature">La signature de l\'APK ne correspond pas à celle de l\'application installée. L\'installation a été bloquée.</string>
+    <string name="update_error_install">L\'installateur système n\'a pas pu démarrer. Rien n\'a été installé.</string>
+    <string name="update_error_permission">L\'autorisation d\'installation est désactivée. Activez-la pour C0reStream dans les paramètres Android.</string>
+    <string name="update_permission_granted">L\'autorisation d\'installation est activée. Touchez « Installer la mise à jour » pour continuer.</string>
+    <string name="update_permission_still_denied">L\'autorisation d\'installation est toujours désactivée. La mise à jour n\'a pas été installée.</string>
+    <string name="update_handover_success">L\'installateur système est ouvert. Terminez l\'installation à cet endroit.</string>
+
+    <string name="update_installed_title">Mise à jour installée</string>
+    <string name="update_installed_text">C0reStream a été mis à jour avec succès.</string>
+    <string name="update_install_failed_blocked">L\'installation a été bloquée par le système. Vérifiez l\'autorisation d\'installation.</string>
+    <string name="update_install_failed_incompatible">L\'APK n\'est pas compatible avec cet appareil.</string>
+    <string name="update_install_failed_storage">L\'espace de stockage est insuffisant pour la mise à jour.</string>
+    <string name="update_install_failed_invalid">Le système a rejeté l\'APK comme invalide.</string>
+    <string name="update_install_failed_aborted">L\'installation a été annulée.</string>
+    <string name="update_install_failed_conflict">La mise à jour est en conflit avec un autre paquet.</string>
+    <string name="update_install_failed_unknown">L\'installateur système n\'a pas pu terminer la mise à jour.</string>
+</resources>

@@ -58,7 +58,8 @@ class UpdateWorker(context: Context, params: WorkerParameters) : CoroutineWorker
 
     companion object {
         private const val workName = "c0restream_update_check"
-        private const val UPDATE_ID = 4404
+        /** Shared with the install receiver so a successful install clears the stale notice. */
+        const val UPDATE_ID = 4404
 
         fun schedule(context: Context) {
             val constraints = Constraints.Builder()

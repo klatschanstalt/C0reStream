@@ -113,7 +113,6 @@
     <string name="settings_version">C0reStream %1$s</string>
     <string name="settings_update_available">Version %1$s ist verfügbar.</string>
     <string name="settings_update_download">Herunterladen und prüfen</string>
-    <string name="settings_update_verify_failed">Update-Prüfung fehlgeschlagen. Installation blockiert.</string>
     <string name="settings_update_install">Geprüft. Weiter mit dem System-Installer.</string>
     <string name="settings_about_text">Eigenständiger IPTV-Client für autorisierte M3U-, Xtream-Codes-, VOD- und Serienquellen mit EPG, Catch-up, Favoriten, Verlauf, Suche, Mini-Player und Proxy. Kein Tracking, keine Werbung.</string>
     <string name="backup_create">Verschlüsseltes Backup erstellen</string>
@@ -121,10 +120,6 @@
     <string name="backup_password">Backup-Passwort</string>
     <string name="backup_password_hint">Mindestens 12 Zeichen. Das Passwort kann nicht wiederhergestellt werden.</string>
     <string name="backup_saved">Verschlüsseltes Backup gespeichert.</string>
-    <plurals name="backup_restored_playlists">
-        <item quantity="one">%d Playlist zusammengeführt. Einstellungen, Merkliste und Fortschritt wiederhergestellt.</item>
-        <item quantity="other">%d Playlists zusammengeführt. Einstellungen, Merkliste und Fortschritt wiederhergestellt.</item>
-    </plurals>
     <string name="backup_failed">Backup fehlgeschlagen. Datei, Passwort und Speicher prüfen.</string>
     <string name="backup_import_merge_note">Die Wiederherstellung ergänzt die vorhandene Bibliothek. Identische Playlists und Sender werden nicht doppelt angelegt.</string>
     <string name="backup_export_m3u_warning">Die Datei kann Zugangsdaten enthalten. Nur mit vertrauenswürdigen Empfängern teilen.</string>
@@ -139,7 +134,6 @@
     <string name="update_available_title">Update verfügbar</string>
     <string name="update_available_text">Version %1$s ist bereit. Öffne die Einstellungen zur Installation.</string>
     <string name="update_install_failed_title">Update-Installation fehlgeschlagen</string>
-    <string name="update_install_failed_text">Die signierte APK konnte nicht installiert werden. Versuche den Download erneut.</string>
     <string name="player_record">Stream aufnehmen</string>
     <string name="player_recording">Aufnahme: %1$s</string>
     <string name="profiles_title">Profile</string>

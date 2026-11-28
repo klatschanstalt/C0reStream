@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_action_install">Update installieren</string>
+    <string name="update_action_enable_install_permission">Installationsberechtigung aktivieren</string>
+
+    <string name="update_error_download">Das Update konnte nicht heruntergeladen werden. Prüfe die Verbindung und versuche es erneut.</string>
+    <string name="update_error_integrity">Die heruntergeladene APK hat die Integritätsprüfung nicht bestanden. Es wurde nichts installiert.</string>
+    <string name="update_error_signature">Die APK-Signatur entspricht nicht der installierten App. Die Installation wurde blockiert.</string>
+    <string name="update_error_install">Der System-Installer konnte nicht gestartet werden. Es wurde nichts installiert.</string>
+    <string name="update_error_permission">Die Installationsberechtigung ist aus. Aktiviere sie für C0reStream in den Android-Einstellungen.</string>
+    <string name="update_permission_granted">Die Installationsberechtigung ist an. Tippe auf „Update installieren“, um fortzufahren.</string>
+    <string name="update_permission_still_denied">Die Installationsberechtigung ist weiterhin aus. Das Update wurde nicht installiert.</string>
+    <string name="update_handover_success">Der System-Installer wurde geöffnet. Schließe die Installation dort ab.</string>
+
+    <string name="update_installed_title">Update installiert</string>
+    <string name="update_installed_text">C0reStream wurde erfolgreich aktualisiert.</string>
+    <string name="update_install_failed_blocked">Die Installation wurde vom System blockiert. Prüfe die Installationsberechtigung.</string>
+    <string name="update_install_failed_incompatible">Die APK ist nicht mit diesem Gerät kompatibel.</string>
+    <string name="update_install_failed_storage">Für das Update ist nicht genügend Speicherplatz vorhanden.</string>
+    <string name="update_install_failed_invalid">Das System hat die APK als ungültig abgelehnt.</string>
+    <string name="update_install_failed_aborted">Die Installation wurde abgebrochen.</string>
+    <string name="update_install_failed_conflict">Das Update steht im Konflikt mit einem anderen Paket.</string>
+    <string name="update_install_failed_unknown">Der System-Installer konnte das Update nicht abschließen.</string>
+</resources>

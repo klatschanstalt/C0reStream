@@ -122,7 +122,6 @@
     <string name="settings_version">C0reStream %1$s</string>
     <string name="settings_update_available">Version %1$s is available.</string>
     <string name="settings_update_download">Download and verify</string>
-    <string name="settings_update_verify_failed">Update verification failed. Installation was blocked.</string>
     <string name="settings_update_install">Verified. Continue with the system installer.</string>
     <string name="settings_about_text">Independent IPTV client for authorized M3U, Xtream Codes, VOD and series sources with EPG, catch-up, favorites, history, search, mini-player and proxy support. No tracking, no ads.</string>
 
@@ -131,10 +130,6 @@
     <string name="backup_password">Backup password</string>
     <string name="backup_password_hint">At least 12 characters. The password cannot be recovered.</string>
     <string name="backup_saved">Encrypted backup saved.</string>
-    <plurals name="backup_restored_playlists">
-        <item quantity="one">%d playlist merged. Settings, watchlist and progress restored.</item>
-        <item quantity="other">%d playlists merged. Settings, watchlist and progress restored.</item>
-    </plurals>
     <string name="backup_failed">Backup failed. Check file, password and free storage.</string>
     <string name="backup_import_merge_note">Restore merges with the existing library. Identical playlists and channels are not duplicated.</string>
     <string name="backup_export_m3u_warning">The file can contain credentials. Share it only with trusted recipients.</string>
@@ -152,7 +147,6 @@
     <string name="update_available_title">Update available</string>
     <string name="update_available_text">Version %1$s is ready. Open settings to install.</string>
     <string name="update_install_failed_title">Update installation failed</string>
-    <string name="update_install_failed_text">The signed APK could not be installed. Try the download again.</string>
     <string name="player_record">Record stream</string>
     <string name="player_recording">Recording %1$s</string>
     <string name="profiles_title">Profiles</string>

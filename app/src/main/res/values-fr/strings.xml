@@ -115,7 +115,6 @@
     <string name="settings_version">C0reStream %1$s</string>
     <string name="settings_update_available">La version %1$s est disponible.</string>
     <string name="settings_update_download">Télécharger et vérifier</string>
-    <string name="settings_update_verify_failed">Échec de la vérification. Installation bloquée.</string>
     <string name="settings_update_install">Vérifié. Continuez avec l\'installateur système.</string>
     <string name="settings_about_text">Client IPTV indépendant pour sources M3U, Xtream Codes, VOD et séries autorisées, avec EPG, replay, favoris, historique, recherche, mini-lecteur et proxy. Sans suivi ni publicité.</string>
     <string name="backup_create">Créer une sauvegarde chiffrée</string>
@@ -123,11 +122,6 @@
     <string name="backup_password">Mot de passe de sauvegarde</string>
     <string name="backup_password_hint">Au moins 12 caractères. Le mot de passe est irrécupérable.</string>
     <string name="backup_saved">Sauvegarde chiffrée enregistrée.</string>
-    <plurals name="backup_restored_playlists">
-        <item quantity="one">%d playlist fusionnée. Paramètres, liste et progression restaurés.</item>
-        <item quantity="many">%d de playlists fusionnées. Paramètres, liste et progression restaurés.</item>
-        <item quantity="other">%d playlists fusionnées. Paramètres, liste et progression restaurés.</item>
-    </plurals>
     <string name="backup_failed">Échec de la sauvegarde. Vérifiez le fichier, le mot de passe et l\'espace libre.</string>
     <string name="backup_import_merge_note">La restauration fusionne avec la bibliothèque existante. Les playlists et chaînes identiques ne sont pas dupliquées.</string>
     <string name="backup_export_m3u_warning">Le fichier peut contenir des identifiants. Ne le partagez qu\'avec des destinataires de confiance.</string>
@@ -142,7 +136,6 @@
     <string name="update_available_title">Mise à jour disponible</string>
     <string name="update_available_text">La version %1$s est prête. Ouvrez les paramètres pour l\'installer.</string>
     <string name="update_install_failed_title">Échec de l\'installation</string>
-    <string name="update_install_failed_text">L\'APK signée n\'a pas pu être installée. Réessayez le téléchargement.</string>
     <string name="player_record">Enregistrer le flux</string>
     <string name="player_recording">Enregistrement : %1$s</string>
     <string name="profiles_title">Profils</string>

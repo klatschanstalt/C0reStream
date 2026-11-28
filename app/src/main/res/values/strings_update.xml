@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_action_install">Install update</string>
+    <string name="update_action_enable_install_permission">Enable install permission</string>
+
+    <string name="update_error_download">The update could not be downloaded. Check your connection and try again.</string>
+    <string name="update_error_integrity">The downloaded APK failed the integrity check. Nothing was installed.</string>
+    <string name="update_error_signature">The APK signature does not match the installed app. Installation was blocked.</string>
+    <string name="update_error_install">The system installer could not be started. Nothing was installed.</string>
+    <string name="update_error_permission">Install permission is off. Enable it for C0reStream in Android settings.</string>
+    <string name="update_permission_granted">Install permission is on. Tap Install update to continue.</string>
+    <string name="update_permission_still_denied">Install permission is still off. The update was not installed.</string>
+    <string name="update_handover_success">System installer opened. Finish the installation there.</string>
+
+    <string name="update_installed_title">Update installed</string>
+    <string name="update_installed_text">C0reStream was updated successfully.</string>
+    <string name="update_install_failed_blocked">Installation was blocked by the system. Check the install permission.</string>
+    <string name="update_install_failed_incompatible">The APK is not compatible with this device.</string>
+    <string name="update_install_failed_storage">There is not enough storage for the update.</string>
+    <string name="update_install_failed_invalid">The system rejected the APK as invalid.</string>
+    <string name="update_install_failed_aborted">Installation was cancelled.</string>
+    <string name="update_install_failed_conflict">The update conflicts with another package.</string>
+    <string name="update_install_failed_unknown">The system installer could not complete the update.</string>
+</resources>
