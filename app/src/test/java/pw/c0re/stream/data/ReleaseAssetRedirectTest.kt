@@ -5,6 +5,8 @@ import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -149,5 +151,26 @@ class ReleaseAssetRedirectTest {
         }.exceptionOrNull()
         assertTrue(failure is IOException)
         assertTrue(failure!!.message!!.contains("Credential-bearing"))
+    }
+
+    /**
+     * Backward compatibility for installed v1.7.0/v1.7.1 clients: their strict general profile
+     * accepts a direct HTTPS URL with no cross-origin, credential-bearing hop. The published
+     * update manifest therefore points at a credential-free mirror of the exact signed APK.
+     */
+    @Test
+    fun `strict general profile accepts a credential free direct download`() {
+        val server = MockWebServer()
+        try {
+            server.enqueue(MockResponse().setResponseCode(200).setBody("apk-bytes"))
+            val url = server.url("/downloads/v1.7.2/C0reStream.apk")
+            NetworkPolicy.client().newCall(Request.Builder().url(url).build()).execute().use { response ->
+                assertEquals(200, response.code)
+                assertEquals("apk-bytes", response.body.string())
+            }
+            assertEquals(1, server.requestCount)
+        } finally {
+            server.shutdown()
+        }
     }
 }

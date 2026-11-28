@@ -35,9 +35,21 @@ jobs:
           version_name=$(grep '^versionName=' version.properties | cut -d= -f2)
           [[ "$version_code" =~ ^[0-9]+$ ]] && [ "$version_code" -gt 0 ] || { echo "Invalid versionCode"; exit 1; }
           [[ "$version_name" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]] || { echo "Invalid versionName"; exit 1; }
-          python3 -c "import json; d=json.load(open('update.json')); assert all(k in d and d[k].strip() for k in ('notes_de','notes_en','notes_fr')), 'missing localized release notes'"
-          update_latest=$(python3 -c "import json; print(json.load(open('update.json'))['latestVersion'])")
-          [ "$update_latest" = "$version_name" ] || { echo "update.json latestVersion mismatch"; exit 1; }
+          VERSION_NAME="$version_name" python3 - <<'PY'
+          import json, os, re
+          # release-notes.json carries the notes of the version that is being prepared.
+          # update.json must keep describing the last *published* version until the
+          # release job has verified and published the new artifact (see below).
+          pending = json.load(open('release-notes.json'))
+          assert pending.get('version') == os.environ['VERSION_NAME'], 'release-notes.json version mismatch'
+          for key in ('notes_de', 'notes_en', 'notes_fr'):
+              assert isinstance(pending.get(key), str) and pending[key].strip(), f'missing {key}'
+          published = json.load(open('update.json'))
+          assert re.fullmatch(r'\d+\.\d+\.\d+', published['latestVersion']), 'invalid published version'
+          assert published['apkUrl'].startswith('https://'), 'published APK URL must be HTTPS'
+          assert re.fullmatch(r'[0-9a-f]{64}', published['sha256']), 'invalid published checksum'
+          assert published['sha256'] != '0' * 64, 'placeholder checksum in published metadata'
+          PY
       - name: Check version monotonicity
         env:
           GH_TOKEN: ${{ github.token }}
@@ -193,6 +205,7 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew --no-daemon :app:signResourceManifest :app:verifyResourceManifest --stacktrace
       - name: Verify signature and checksum
+        id: artifact
         if: steps.signing.outputs.available == 'true'
         env:
           EXPECTED_CERT: ${{ vars.ANDROID_CERT_SHA256 }}
@@ -212,6 +225,7 @@ jobs:
           fi
           cp "$APK" C0reStream.apk
           sha256sum C0reStream.apk > SHA256SUMS
+          echo "apk_sha=$(sha256sum C0reStream.apk | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
       - name: Upload signed APK for verification
         if: steps.signing.outputs.available == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -223,6 +237,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - name: Publish release
+        id: publish
         # Manual dispatches build and upload the signed APK for verification but never publish.
         if: steps.signing.outputs.available == 'true' && github.event_name != 'workflow_dispatch'
         env:
@@ -238,8 +253,8 @@ jobs:
           TAG="v$(grep '^versionName=' ../../../../../version.properties | cut -d= -f2)"
           python3 - <<'PY' > release-notes.md
           import json
-          d = json.load(open('../../../../../update.json'))
-          lines = [f"# C0reStream {d['latestVersion']}", ""]
+          d = json.load(open('../../../../../release-notes.json'))
+          lines = [f"# C0reStream {d['version']}", ""]
           for key, header in (('de', 'Deutsch'), ('en', 'English'), ('fr', 'Français')):
               note = d.get(f'notes_{key}', '').strip()
               if note:
@@ -249,7 +264,102 @@ jobs:
           PY
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists; preserving immutable assets. Bump version.properties for a new release."
+            echo "published=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           gh release create "$TAG" C0reStream.apk SHA256SUMS resources.json resources.sig --target "$BUILD_SHA" \
             --title "C0reStream $TAG" --notes-file release-notes.md
+          echo "published=true" >> "$GITHUB_OUTPUT"
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+
+      # The checksum is derived from the exact signed artifact that was just published.
+      # No Gradle invocation happens after this point, so no second build can change it.
+      - name: Verify public release artifact
+        id: public
+        if: steps.publish.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EXPECTED_CERT: ${{ vars.ANDROID_CERT_SHA256 }}
+          EXPECTED_SHA: ${{ steps.artifact.outputs.apk_sha }}
+          VERSION: ${{ steps.publish.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd app/build/outputs/apk/release
+          url="https://github.com/$GH_REPO/releases/download/$VERSION/C0reStream.apk"
+          for attempt in 1 2 3 4 5; do
+            if curl -fsSL "$url" -o public.apk; then break; fi
+            [ "$attempt" -lt 5 ] && sleep 10
+          done
+          test -s public.apk
+          actual=$(sha256sum public.apk | cut -d' ' -f1)
+          [ "$actual" = "$EXPECTED_SHA" ] || { echo "Public APK checksum mismatch"; exit 1; }
+          cmp -s public.apk C0reStream.apk || { echo "Public APK differs from published artifact"; exit 1; }
+          sha256sum SHA256SUMS >/dev/null
+          grep -q "$actual  C0reStream.apk" SHA256SUMS || { echo "SHA256SUMS mismatch"; exit 1; }
+          APKSIGNER="$ANDROID_HOME/build-tools/37.0.0/apksigner"
+          "$APKSIGNER" verify --print-certs public.apk >/dev/null
+          public_cert="$("$APKSIGNER" verify --print-certs public.apk \
+            | awk -F': ' '/certificate SHA-256 digest/ {print $NF; exit}' | tr -d '[:space:]' | tr 'A-Z' 'a-z')"
+          [ "$public_cert" = "$(printf '%s' "$EXPECTED_CERT" | tr -d '[:space:]' | tr 'A-Z' 'a-z')" ] \
+            || { echo "Public APK certificate mismatch"; exit 1; }
+          badging=$("$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging public.apk)
+          public_code=$(printf '%s\n' "$badging" | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p" | head -n1)
+          public_name=$(printf '%s\n' "$badging" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p" | head -n1)
+          echo "$badging" | grep -q "name='pw.c0re.stream'" || { echo "Public APK package mismatch"; exit 1; }
+          [ "$public_code" = "$(grep '^versionCode=' ../../../../../version.properties | cut -d= -f2)" ] \
+            || { echo "Public APK versionCode mismatch"; exit 1; }
+          [ "$public_name" = "$VERSION" ] || { echo "Public APK versionName mismatch"; exit 1; }
+
+      # Only after the public artifact is verified does update.json reference the new
+      # version. The APK is mirrored at a credential-free HTTPS URL so installed
+      # v1.7.0/v1.7.1 clients (whose strict redirect guard blocks GitHub's signed
+      # asset hop) can still update. This is a normal new commit: no amend, no force
+      # push, no tag or asset rewrite.
+      - name: Publish update metadata
+        if: steps.public.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EXPECTED_SHA: ${{ steps.artifact.outputs.apk_sha }}
+          VERSION: ${{ steps.publish.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version_number="${VERSION#v}"
+          mirror_dir="downloads/$VERSION"
+          mirror_url="https://raw.githubusercontent.com/$GH_REPO/main/$mirror_dir/C0reStream.apk"
+          mkdir -p "$mirror_dir"
+          cp app/build/outputs/apk/release/C0reStream.apk "$mirror_dir/C0reStream.apk"
+          VERSION_NAME="$version_number" VERSION_TAG="$VERSION" MIRROR_URL="$mirror_url" \
+          EXPECTED_SHA="$EXPECTED_SHA" python3 - <<'PY' > update.json.new
+          import json, os
+          pending = json.load(open('release-notes.json'))
+          assert pending['version'] == os.environ['VERSION_NAME']
+          data = {
+              'latestVersion': os.environ['VERSION_NAME'],
+              'notes': pending['notes_de'],
+              'notes_de': pending['notes_de'],
+              'notes_en': pending['notes_en'],
+              'notes_fr': pending['notes_fr'],
+              'apkUrl': os.environ['MIRROR_URL'],
+              'sha256': os.environ['EXPECTED_SHA'],
+          }
+          print(json.dumps(data, ensure_ascii=False, indent=4))
+          PY
+          mv update.json.new update.json
+          git config user.name "C0reStream Release"
+          git config user.email "release@c0re.stream"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GH_REPO}.git"
+          git add update.json "$mirror_dir/C0reStream.apk"
+          git commit -m "release: publish $VERSION update metadata [skip ci]"
+          git push origin HEAD:main
+          for attempt in 1 2 3 4 5; do
+            if curl -fsSL "$mirror_url" -o /tmp/opencode-mirror.apk; then break; fi
+            [ "$attempt" -lt 5 ] && sleep 10
+          done
+          test -s /tmp/opencode-mirror.apk
+          mirror_sha=$(sha256sum /tmp/opencode-mirror.apk | cut -d' ' -f1)
+          [ "$mirror_sha" = "$EXPECTED_SHA" ] || { echo "Public mirror checksum mismatch"; exit 1; }
+          echo "$MIRROR_URL verified: $mirror_sha"
