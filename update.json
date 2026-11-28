@@ -5,5 +5,5 @@
     "notes_en": "C0reStream 1.7.2: security and stability update. Changing or removing a PIN now requires the existing PIN; profile access stays locked until authentication completes. Credentials are protected across redirects, local playlist import and the update download are fixed, and partial restores are reported truthfully. Player retry races, XMLTV time zones, resource manifest, contrast and external playlist sharing corrected.",
     "notes_fr": "C0reStream 1.7.2 : mise à jour de sécurité et de stabilité. La modification ou la suppression d'un code PIN exige désormais l'ancien code ; l'accès au profil reste verrouillé jusqu'à l'authentification. Les identifiants sont protégés lors des redirections, l'import local de playlists et le téléchargement de mise à jour sont corrigés, les restaurations partielles sont signalées correctement. Courses de nouvelle tentative du lecteur, fuseaux horaires XMLTV, manifeste des ressources, contraste et partage de playlists corrigés.",
     "apkUrl": "https://github.com/klatschanstalt/C0reStream/releases/download/v1.7.2/C0reStream.apk",
-    "sha256": "f72b1a7620e48114e9c785fed1ef8912d0505978bf3893c78a9253d3a4068dc0"
+    "sha256": "0a46693033151ccb0dbe8d55da18f375d0065ff2c484fb45faf6bb1f689c512e"
 }
