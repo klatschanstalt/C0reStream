@@ -10,3 +10,12 @@
 app/build
 /.kotlin/
 /resources/manifest.sig
+
+# Published APKs live on the signed GitHub release and the own-server distribution,
+# never in the working tree. Ignore local builds, staging and temporary downloads.
+*.apk
+*.apk.part
+*.apk.tmp
+/downloads/
+/staging/
+**/staging/

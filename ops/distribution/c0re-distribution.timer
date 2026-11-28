@@ -1,0 +1,12 @@
+[Unit]
+Description=Check for new C0reStream stable releases every 30 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+AccuracySec=1min
+Persistent=true
+Unit=c0re-distribution.service
+
+[Install]
+WantedBy=timers.target

@@ -14,7 +14,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # GitHub Actions does not honour [skip ci] on its own. The explicit guard below
+  # stops the metadata commit made by the release job (and by the distribution
+  # service) from triggering another verify/publish run.
   verify:
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -46,7 +50,8 @@ jobs:
               assert isinstance(pending.get(key), str) and pending[key].strip(), f'missing {key}'
           published = json.load(open('update.json'))
           assert re.fullmatch(r'\d+\.\d+\.\d+', published['latestVersion']), 'invalid published version'
-          assert published['apkUrl'].startswith('https://'), 'published APK URL must be HTTPS'
+          assert published['apkUrl'].startswith('https://stream.c0re.pw/distribution/releases/'), \
+              'published APK URL must use the credential-free own-server distribution endpoint'
           assert re.fullmatch(r'[0-9a-f]{64}', published['sha256']), 'invalid published checksum'
           assert published['sha256'] != '0' * 64, 'placeholder checksum in published metadata'
           PY
@@ -81,6 +86,7 @@ jobs:
 
   instrumented:
     needs: verify
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -133,8 +139,9 @@ jobs:
 
   publish-production:
     needs: [verify, instrumented]
-    # Never sign or publish for pull requests (including fork PRs). Only trusted main pushes.
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    # Never sign or publish for pull requests (including fork PRs) or metadata-only
+    # [skip ci] commits. Only trusted main pushes can publish.
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -177,7 +184,17 @@ jobs:
         run: |
           umask 077
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.p12"
-      - name: Build signed release
+      # Sign the resource manifest before the APK exists. After the checksum is taken
+      # below, no Gradle task runs again, so the published bytes cannot change.
+      - name: Sign resource manifest
+        if: steps.signing.outputs.available == 'true'
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/release.p12
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon :app:signResourceManifest :app:verifyResourceManifest --stacktrace
+      - name: Build signed release (exactly once)
         if: steps.signing.outputs.available == 'true'
         env:
           ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/release.p12
@@ -196,14 +213,6 @@ jobs:
           actual_version_name=$(printf '%s\n' "$badging" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p" | head -n1)
           [ "$actual_version_code" = "$expected_version_code" ] || { echo "APK versionCode mismatch"; exit 1; }
           [ "$actual_version_name" = "$expected_version_name" ] || { echo "APK versionName mismatch"; exit 1; }
-      - name: Sign resource manifest
-        if: steps.signing.outputs.available == 'true'
-        env:
-          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/release.p12
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew --no-daemon :app:signResourceManifest :app:verifyResourceManifest --stacktrace
       - name: Verify signature and checksum
         id: artifact
         if: steps.signing.outputs.available == 'true'
@@ -223,8 +232,10 @@ jobs:
             echo "Signing certificate fingerprint mismatch; refusing to publish."
             exit 1
           fi
+          # Checksum and SHA256SUMS are derived from this exact signed artifact only.
           cp "$APK" C0reStream.apk
           sha256sum C0reStream.apk > SHA256SUMS
+          sha256sum -c SHA256SUMS >/dev/null
           echo "apk_sha=$(sha256sum C0reStream.apk | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
       - name: Upload signed APK for verification
         if: steps.signing.outputs.available == 'true'
@@ -296,8 +307,8 @@ jobs:
           actual=$(sha256sum public.apk | cut -d' ' -f1)
           [ "$actual" = "$EXPECTED_SHA" ] || { echo "Public APK checksum mismatch"; exit 1; }
           cmp -s public.apk C0reStream.apk || { echo "Public APK differs from published artifact"; exit 1; }
-          sha256sum SHA256SUMS >/dev/null
-          grep -q "$actual  C0reStream.apk" SHA256SUMS || { echo "SHA256SUMS mismatch"; exit 1; }
+          sha256sum -c SHA256SUMS >/dev/null || { echo "SHA256SUMS mismatch"; exit 1; }
+          grep -q "$actual  C0reStream.apk" SHA256SUMS || { echo "SHA256SUMS entry mismatch"; exit 1; }
           APKSIGNER="$ANDROID_HOME/build-tools/37.0.0/apksigner"
           "$APKSIGNER" verify --print-certs public.apk >/dev/null
           public_cert="$("$APKSIGNER" verify --print-certs public.apk \
@@ -310,29 +321,49 @@ jobs:
           echo "$badging" | grep -q "name='pw.c0re.stream'" || { echo "Public APK package mismatch"; exit 1; }
           [ "$public_code" = "$(grep '^versionCode=' ../../../../../version.properties | cut -d= -f2)" ] \
             || { echo "Public APK versionCode mismatch"; exit 1; }
-          [ "$public_name" = "$VERSION" ] || { echo "Public APK versionName mismatch"; exit 1; }
+          [ "$public_name" = "${VERSION#v}" ] || { echo "Public APK versionName mismatch"; exit 1; }
 
-      # Only after the public artifact is verified does update.json reference the new
-      # version. The APK is mirrored at a credential-free HTTPS URL so installed
-      # v1.7.0/v1.7.1 clients (whose strict redirect guard blocks GitHub's signed
-      # asset hop) can still update. This is a normal new commit: no amend, no force
-      # push, no tag or asset rewrite.
+      # Only after the public GitHub artifact is verified does update.json reference the
+      # new version. The APK is served credential-free from the project's own HTTPS
+      # distribution endpoint, so older clients (whose strict redirect guard blocks
+      # GitHub's signed-asset hop) can still update. The systemd distributor installs
+      # and verifies that endpoint; we poll it here too, so metadata is never committed
+      # for a path that does not yet serve the exact signed bytes. Normal commit only:
+      # no amend, no force push, no tag or asset rewrite.
       - name: Publish update metadata
         if: steps.public.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
           EXPECTED_SHA: ${{ steps.artifact.outputs.apk_sha }}
           VERSION: ${{ steps.publish.outputs.version }}
+          DIST_URL: https://stream.c0re.pw/distribution/releases/${{ steps.publish.outputs.version }}/C0reStream.apk
+          TMPDIR_ROOT: ${{ runner.temp }}
         shell: bash
         run: |
           set -euo pipefail
           version_number="${VERSION#v}"
-          mirror_dir="downloads/$VERSION"
-          mirror_url="https://raw.githubusercontent.com/$GH_REPO/main/$mirror_dir/C0reStream.apk"
-          mkdir -p "$mirror_dir"
-          cp app/build/outputs/apk/release/C0reStream.apk "$mirror_dir/C0reStream.apk"
-          VERSION_NAME="$version_number" VERSION_TAG="$VERSION" MIRROR_URL="$mirror_url" \
+          published_apk="$TMPDIR_ROOT/opencode-dist.apk"
+          available=false
+          for attempt in 1 2 3 4 5 6; do
+            if curl -fsS --max-time 60 "$DIST_URL" -o "$published_apk"; then
+              available=true
+              break
+            fi
+            [ "$attempt" -lt 6 ] && sleep 10
+          done
+          if [ "$available" != true ]; then
+            echo "Own-server APK is not published yet; update.json stays unchanged."
+            echo "The distribution service will activate the metadata after verification."
+            exit 0
+          fi
+          test -s "$published_apk"
+          dist_sha=$(sha256sum "$published_apk" | cut -d' ' -f1)
+          if [ "$dist_sha" != "$EXPECTED_SHA" ] \
+             || ! cmp -s "$published_apk" app/build/outputs/apk/release/C0reStream.apk; then
+            echo "Own-server APK differs from the signed artifact; update.json stays unchanged."
+            exit 0
+          fi
+          VERSION_NAME="$version_number" DIST_URL="$DIST_URL" \
           EXPECTED_SHA="$EXPECTED_SHA" python3 - <<'PY' > update.json.new
           import json, os
           pending = json.load(open('release-notes.json'))
@@ -343,23 +374,21 @@ jobs:
               'notes_de': pending['notes_de'],
               'notes_en': pending['notes_en'],
               'notes_fr': pending['notes_fr'],
-              'apkUrl': os.environ['MIRROR_URL'],
+              'apkUrl': os.environ['DIST_URL'],
               'sha256': os.environ['EXPECTED_SHA'],
           }
           print(json.dumps(data, ensure_ascii=False, indent=4))
           PY
+          if cmp -s update.json.new update.json; then
+            echo "Own-server metadata already current; no commit needed."
+            exit 0
+          fi
           mv update.json.new update.json
           git config user.name "C0reStream Release"
           git config user.email "release@c0re.stream"
-          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GH_REPO}.git"
-          git add update.json "$mirror_dir/C0reStream.apk"
+          git add update.json
+          git diff --cached --quiet || { echo "No metadata change to commit"; exit 0; }
           git commit -m "release: publish $VERSION update metadata [skip ci]"
-          git push origin HEAD:main
-          for attempt in 1 2 3 4 5; do
-            if curl -fsSL "$mirror_url" -o /tmp/opencode-mirror.apk; then break; fi
-            [ "$attempt" -lt 5 ] && sleep 10
-          done
-          test -s /tmp/opencode-mirror.apk
-          mirror_sha=$(sha256sum /tmp/opencode-mirror.apk | cut -d' ' -f1)
-          [ "$mirror_sha" = "$EXPECTED_SHA" ] || { echo "Public mirror checksum mismatch"; exit 1; }
-          echo "$MIRROR_URL verified: $mirror_sha"
+          # Keep the token out of .git/config and out of logs.
+          git -c http.extraheader="AUTHORIZATION: bearer ${GH_TOKEN}" push origin HEAD:main
+          echo "Own-server APK verified with checksum $dist_sha"

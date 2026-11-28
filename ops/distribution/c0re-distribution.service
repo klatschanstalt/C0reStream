@@ -1,0 +1,21 @@
+[Unit]
+Description=C0reStream signed distribution synchroniser
+Documentation=file:/home/ham3l/Projects/C0reStream/ops/distribution/distribute.sh
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/var/lib/c0re-distribution
+
+[Service]
+Type=oneshot
+User=ham3l
+Group=ham3l
+WorkingDirectory=/home/ham3l/Projects/C0reStream
+Environment=C0RE_DIST_BASE=/var/lib/c0re-distribution
+Environment=C0RE_REPO_DIR=/home/ham3l/Projects/C0reStream
+Environment=C0RE_SDK=/tmp/opencode/toolchain/sdk/build-tools/37.0.0
+ExecStart=/home/ham3l/Projects/C0reStream/ops/distribution/distribute.sh
+# PrivateTmp is intentionally not used: the verified SDK lives under /tmp/opencode.
+NoNewPrivileges=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/c0re-distribution /home/ham3l/Projects/C0reStream
+TimeoutStartSec=600
