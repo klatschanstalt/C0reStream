@@ -231,9 +231,20 @@ jobs:
           cp ../../../../../resources/manifest.json resources.json
           cp ../../../../../resources/manifest.sig resources.sig
           TAG="v$(grep '^versionName=' ../../../../../version.properties | cut -d= -f2)"
+          python3 - <<'PY' > release-notes.md
+          import json
+          d = json.load(open('../../../../../update.json'))
+          lines = [f"# C0reStream {d['latestVersion']}", ""]
+          for key, header in (('de', 'Deutsch'), ('en', 'English'), ('fr', 'Français')):
+              note = d.get(f'notes_{key}', '').strip()
+              if note:
+                  lines += [f"## {header}", "", note, ""]
+          lines += ["---", "", "Signiertes Produktions-APK. Vor der Installation SHA256SUMS und Signaturzertifikat prüfen.", "", "Signed production APK. Verify SHA256SUMS and the signing certificate before installation.", "", "APK de production signé. Vérifiez SHA256SUMS et le certificat de signature avant l'installation."]
+          print('\n'.join(lines))
+          PY
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists; preserving immutable assets. Bump version.properties for a new release."
             exit 0
           fi
           gh release create "$TAG" C0reStream.apk SHA256SUMS resources.json resources.sig --target "$BUILD_SHA" \
-            --title "C0reStream $TAG" --notes "Signed production APK. Verify SHA256SUMS and the signing certificate before installation."
+            --title "C0reStream $TAG" --notes-file release-notes.md
