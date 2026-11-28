@@ -9,8 +9,8 @@ Report vulnerabilities privately to the repository owner; never include real IPT
 - NetworkPolicy accepts HTTP(S) and structurally validated RTSP/RTP URLs. Embedded credentials, control characters and overlong URLs are rejected; HTTPS-to-HTTP downgrades are blocked on every redirect hop, and sensitive headers/query parameters never cross origins. HTTPS is preferred.
 - M3U, XMLTV and Xtream parsers enforce record, depth, line and text limits; DTDs and external entities are rejected.
 - Playlist replacement runs in one Room transaction and refuses suspicious lineup shrinkage; remove-channel cleanup includes dependent reminders.
-- Update metadata must be public HTTPS; an APK is installed only after SHA-256, package-name, monotonic-version and signing-certificate checks, followed by user confirmation. No GitHub token is embedded.
-- The non-executable resource manifest is signed and verified with the existing production certificate over the exact downloaded bytes; a mismatching signature keeps the previous offline version.
+- Update metadata must be public HTTPS; an APK is installed only after SHA-256, package-name, monotonic-version and signing-certificate checks, followed by user confirmation. No GitHub token is embedded. The owner's server is the primary direct-HTTPS distribution source (no redirects, no temporary tokens); GitHub metadata stays compatible for older clients by pointing `apkUrl` at that server.
+- The non-executable resource manifest is signed and verified with the existing production certificate over the exact downloaded bytes; a mismatching signature keeps the previous offline version. Mirrored resources are byte-identical to the published signed assets; their signature is re-verified before activation.
 - Logs redact URLs, user-info pairs and credential parameters; Android backup is disabled; CI permissions are minimal, Actions are SHA-pinned and credentials are never logged.
 - Production APK signature is verified against certificate fingerprint `65FB26B0F617583228EA8813080FA7E2F8F6421022D8D279F928C726EA6E8543` before publication.
 
@@ -46,14 +46,37 @@ for a future client release; they are not a claim about strings shown by v1.7.1.
 | UPD-013 | Installation abgebrochen | Die Installation wurde abgebrochen. | The installation was cancelled. | L'installation a été annulée. |
 | UPD-014 | Unbekannter Installationsfehler | Die Installation konnte nicht abgeschlossen werden. | The installation could not be completed. | L'installation n'a pas pu être terminée. |
 
+## Own-server distribution
+
+The primary update endpoints are served directly from this server with no external redirect, no
+authentication and no temporary tokens:
+
+- `https://stream.c0re.pw/distribution/update.json`
+- `https://stream.c0re.pw/distribution/releases/v1.7.2/C0reStream.apk`
+- `https://stream.c0re.pw/distribution/releases/v1.7.2/SHA256SUMS`
+- `https://stream.c0re.pw/distribution/resources/resources.json`
+- `https://stream.c0re.pw/distribution/resources/resources.sig`
+
+One isolated Caddy route serves these paths from a private canonical tree outside the webroot.
+Directory listing is disabled; version-bound files are immutable and cacheable, while update
+metadata and resources revalidate. A missing file returns a real 404, never the website's
+fallback page. The signing certificate, package name, version and checksum are re-verified before
+a release becomes active, and the publicly served APK is verified again afterwards.
+
 ## Safe manual update path
 
 If the in-app updater is unavailable, download `C0reStream.apk` and `SHA256SUMS` from the
-[latest release](https://github.com/klatschanstalt/C0reStream/releases/latest), verify with
-`sha256sum -c SHA256SUMS`, confirm the signature with
+[latest release](https://github.com/klatschanstalt/C0reStream/releases/latest) or from the
+own-server distribution above, verify with `sha256sum -c SHA256SUMS`, confirm the signature with
 `apksigner verify --print-certs C0reStream.apk` against the fingerprint in `PROJECT_STATUS_REPORT.md`,
 and open the APK on the device. Android will ask for confirmation; the installed app is **not**
 uninstalled and its data is preserved. Never install an APK whose checksum or certificate differs.
+
+Installed v1.7.0/v1.7.1 clients can show a premature failure notification while the system is
+still waiting for the install confirmation (`STATUS_PENDING_USER_ACTION`): their receiver treats
+every non-success status as an error. This cannot be repaired by server or metadata changes.
+If the system confirmation dialog appears, confirm it and check the version in settings instead
+of relying on that notification. v1.7.2 no longer misreports this status.
 
 ## Release evidence
 
