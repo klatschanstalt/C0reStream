@@ -9,6 +9,7 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import pw.c0re.stream.data.M3UParser.RawChannel
+import java.io.IOException
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
@@ -102,6 +103,39 @@ class XtreamApi(
         private fun decode(value: String): String = runCatching { URLDecoder.decode(value, "UTF-8") }.getOrDefault("")
     }
 
+    // Callers surface exception messages in the UI and AppLog. Transport/JSON failures can
+    // embed the request URL or a provider body echoing credentials, so scrub them at the source.
+    private val urlInMessage = Regex("""(?:https?|xtream)://\S+""", RegexOption.IGNORE_CASE)
+    private val userInfoInMessage = Regex("""[A-Za-z0-9._%+-]+:[^@/\s]+@[A-Za-z0-9.-]+""")
+    private val credentialInMessage = Regex(
+        """(?i)(username|user_name|login|password|passwd|pwd|token|secret|api_key|apikey|authorization|auth|signature|sig|jwt)=([^&\s]+)""",
+    )
+
+    private fun redact(message: String?): String =
+        message?.takeIf { it.isNotBlank() }
+            ?.replace(urlInMessage, "[url]")
+            ?.replace(userInfoInMessage, "[redacted]")
+            ?.replace(credentialInMessage, "\$1=[redacted]")
+            ?: ""
+
+    private fun safeFailure(error: Exception): Exception {
+        if (error is CancellationException) return error
+        return IOException(redact(error.message).ifBlank { error.javaClass.simpleName })
+            .apply { initCause(error) }
+    }
+
+    private fun parseJsonObject(value: String): JSONObject = try {
+        JSONObject(value)
+    } catch (error: Exception) {
+        throw safeFailure(error)
+    }
+
+    private fun parseJsonArrayRoot(value: String): JSONArray = try {
+        JSONArray(value)
+    } catch (error: Exception) {
+        throw safeFailure(error)
+    }
+
     private fun client(): OkHttpClient = httpClient.newBuilder()
         // NetworkPolicy.redirectGuard validates every hop; automatic redirects must stay off.
         .followRedirects(false)
@@ -117,9 +151,13 @@ class XtreamApi(
                 .addQueryParameter("action", action)
                 .apply { extra.forEach { (key, value) -> addQueryParameter(key, value) } }
                 .build()
-            client().newCall(Request.Builder().url(url).build()).execute().use { response ->
-                check(response.isSuccessful) { "HTTP ${response.code}" }
-                response.readText(limits.maxResponseBytes)
+            try {
+                client().newCall(Request.Builder().url(url).build()).execute().use { response ->
+                    check(response.isSuccessful) { "HTTP ${response.code}" }
+                    response.readText(limits.maxResponseBytes)
+                }
+            } catch (error: Exception) {
+                throw safeFailure(error)
             }
         }
 
@@ -259,21 +297,21 @@ class XtreamApi(
     }
 
     suspend fun fetchSeriesInfo(creds: Credentials, seriesId: Int): JSONObject =
-        JSONObject(fetchJson(creds, "get_series_info", mapOf("series_id" to seriesId.toString())))
+        parseJsonObject(fetchJson(creds, "get_series_info", mapOf("series_id" to seriesId.toString())))
 
     suspend fun fetchVodStreams(creds: Credentials): JSONArray =
-        JSONArray(fetchJson(creds, "get_vod_streams"))
+        parseJsonArrayRoot(fetchJson(creds, "get_vod_streams"))
 
     suspend fun fetchSeries(creds: Credentials): JSONArray =
-        JSONArray(fetchJson(creds, "get_series"))
+        parseJsonArrayRoot(fetchJson(creds, "get_series"))
 
     private data class JsonPayload(val array: JSONArray, val paginationDetected: Boolean)
 
     /** Some providers wrap arrays in an object with paging hints; never pretend that is complete. */
     private fun parseJsonArray(json: String): JsonPayload {
         val trimmed = json.trim()
-        if (trimmed.startsWith("[")) return JsonPayload(JSONArray(trimmed), false)
-        val obj = JSONObject(trimmed)
+        if (trimmed.startsWith("[")) return JsonPayload(parseJsonArrayRoot(trimmed), false)
+        val obj = parseJsonObject(trimmed)
         val array = obj.optJSONArray("data") ?: JSONArray()
         val paged = obj.has("page") || obj.has("per_page") || obj.has("total") ||
             obj.has("total_count") || obj.has("has_more") || obj.has("next_page") ||

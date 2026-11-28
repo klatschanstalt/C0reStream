@@ -6,10 +6,12 @@ import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.Response
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Proxy
+import java.net.URLDecoder
 import java.util.LinkedHashMap
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -27,10 +29,14 @@ import java.util.concurrent.TimeUnit
  *
  * Two classes of client profiles exist:
  *  - bounded request/response profiles ([apiClient], [importClient], [epgClient],
- *    [downloadClient] and the compatibility [client]) keep an absolute 90 s call deadline;
+ *    [downloadClient], [releaseAssetClient] and the compatibility [client]) keep an absolute
+ *    90 s call deadline;
  *  - continuous stream profiles ([playbackClient], [recordingClient]) deliberately disable
  *    the absolute call deadline so a long-lived live stream is never cut off after 90 s.
  *    They still have connect (20 s) and read (30 s) timeouts, so stalled hops remain bounded.
+ *
+ * [releaseAssetClient] is a narrowly scoped opt-in profile for GitHub release artifacts only;
+ * every other profile keeps the strict "credentials never cross an origin" rule.
  *
  * All profiles share one connection pool and dispatcher. Clients are cached per profile and
  * effective source settings, so repeated calls do not allocate a fresh OkHttpClient each time.
@@ -42,14 +48,21 @@ object NetworkPolicy {
     private const val streamConnectTimeoutMs = 20_000L
     private const val streamReadTimeoutMs = 30_000L
     private const val maxRedirects = 5
+    private const val maxReleaseAssetRedirects = 3
     private const val maxCachedClients = 24
+
+    private const val githubReleaseHost = "github.com"
+    private const val githubReleaseWwwHost = "www.github.com"
+    private const val releaseAssetHost = "release-assets.githubusercontent.com"
+    private const val githubReleasePathPrefix = "/klatschanstalt/C0reStream/releases/"
+    private const val releaseAssetPathPrefix = "/github-production-release-asset/"
 
     /** Shared across every profile so switching profile never strands idle connections. */
     internal val sharedConnectionPool = ConnectionPool(5, 5, TimeUnit.MINUTES)
     internal val sharedDispatcher = Dispatcher()
 
     private enum class Profile {
-        API, IMPORT, EPG, DOWNLOAD, PLAYBACK, RECORDING,
+        API, IMPORT, EPG, DOWNLOAD, PLAYBACK, RECORDING, RELEASE_ASSET,
     }
 
     /** Access-ordered, bounded cache; evicted clients are simply dropped, the pool is shared. */
@@ -245,6 +258,7 @@ object NetworkPolicy {
 
     private val sensitiveHeaderMarkers = listOf(
         "authorization", "token", "secret", "cookie", "credential", "api-key", "apikey", "signature",
+        "username", "password", "passwd", "login",
     )
 
     /** Credential-like headers, including custom "X-..." ones, must never cross an origin. */
@@ -254,28 +268,129 @@ object NetworkPolicy {
         return sensitiveHeaderMarkers.any { lower.contains(it) }
     }
 
+    /**
+     * Single central credential-name set shared by every redirect guard. Xtream-style APIs
+     * identify a subscriber by `username`/`user`/`user_name`/`login`, so those names are just as
+     * sensitive as `password` or `token`. Names are compared case-insensitively and after
+     * percent-decoding; [HttpUrl.queryParameterNames] already reports every distinct name, so
+     * repeated parameters are covered as well.
+     */
     private val sensitiveQueryNames = setOf(
         "token", "access_token", "accesstoken", "auth", "authorization", "password", "passwd",
-        "pwd", "secret", "signature", "sig", "api_key", "apikey", "credential", "session",
+        "pwd", "secret", "signature", "sig", "jwt", "api_key", "apikey", "credential", "session",
+        "username", "user", "user_name", "user-name", "login", "login_name", "logon", "uname",
     )
 
+    private fun normalizedParameterName(name: String): String {
+        val decoded = runCatching { URLDecoder.decode(name, "UTF-8") }.getOrDefault(name)
+        return decoded.lowercase(Locale.ROOT).trim()
+    }
+
     private fun hasSensitiveQuery(url: HttpUrl): Boolean =
-        url.queryParameterNames.any { it.lowercase(Locale.ROOT) in sensitiveQueryNames }
+        url.queryParameterNames.any { normalizedParameterName(it) in sensitiveQueryNames }
+
+    /**
+     * Xtream stream URLs carry the subscriber name and password as path segments:
+     * `/{live|movie|series}/{user}/{password}/{id}.{container}`. Such URLs are credentials too,
+     * even though their secrets are not in the query string.
+     */
+    private val credentialPathPattern =
+        Regex("^/(?:live|movie|series)/[^/]+/[^/]+/[0-9]{1,20}\\.[A-Za-z0-9]{1,10}$")
+
+    private fun hasSensitivePath(url: HttpUrl): Boolean = credentialPathPattern.matches(url.encodedPath)
+
+    private fun hasSensitiveUrl(url: HttpUrl): Boolean = hasSensitiveQuery(url) || hasSensitivePath(url)
 
     /**
      * Resolves one redirect hop. The original transport class is enforced on every hop, so an
      * HTTPS -> HTTP -> HTTPS chain cannot replay credentials over plaintext in the middle.
-     * A hop that changes scheme/host/port while carrying credentials (headers or URL query)
-     * is rejected; callers must close the current response in that case.
+     * A hop that changes scheme/host/port while carrying credentials (headers, URL query or
+     * credential-bearing path segments) is rejected; callers must close the current response.
      */
     internal fun redirectTarget(current: HttpUrl, location: String, originalHttps: Boolean): HttpUrl {
         val next = current.resolve(location) ?: throw IOException("Invalid redirect URL")
         parse(next.toString()) ?: throw IOException("Invalid redirect URL")
         if (originalHttps && !next.isHttps) throw IOException("HTTPS downgrade blocked")
-        if (!sameOrigin(current, next) && (hasSensitiveQuery(current) || hasSensitiveQuery(next))) {
+        if (!sameOrigin(current, next) && (hasSensitiveUrl(current) || hasSensitiveUrl(next))) {
             throw IOException("Credential-bearing cross-origin redirect blocked")
         }
         return next
+    }
+
+    /**
+     * Only the GitHub/Azure parameters signed into a release-asset URL may appear on the asset
+     * host. Anything else that looks like a credential (password, username, token, ...) fails
+     * closed; TLS verification is never relaxed.
+     */
+    private val releaseAssetQueryNames = setOf(
+        "sig", "se", "sp", "sv", "sr", "spr", "skoid", "sktid", "skt", "ske", "sks", "skv",
+        "rscd", "rsct", "response-content-disposition", "response-content-type", "jwt",
+    )
+
+    private fun isGithubReleaseUrl(url: HttpUrl): Boolean =
+        (url.host == githubReleaseHost || url.host == githubReleaseWwwHost) &&
+            url.encodedPath.startsWith(githubReleasePathPrefix)
+
+    private fun isReleaseAssetUrl(url: HttpUrl): Boolean =
+        url.host == releaseAssetHost && url.encodedPath.startsWith(releaseAssetPathPrefix)
+
+    private fun hasOnlyReleaseAssetQueries(url: HttpUrl): Boolean =
+        url.queryParameterNames.all { normalizedParameterName(it) in releaseAssetQueryNames }
+
+    /** Validates one hop of the narrowly scoped GitHub release-artifact redirect chain. */
+    internal fun releaseAssetRedirectTarget(current: HttpUrl, location: String): HttpUrl {
+        val next = current.resolve(location) ?: throw IOException("Invalid redirect URL")
+        parse(next.toString()) ?: throw IOException("Invalid redirect URL")
+        if (current.isHttps && !next.isHttps) throw IOException("HTTPS downgrade blocked")
+        if (!next.isHttps) throw IOException("HTTPS required for release assets")
+        val allowed = when {
+            isReleaseAssetUrl(next) ->
+                isGithubReleaseUrl(current) && hasOnlyReleaseAssetQueries(next)
+            isGithubReleaseUrl(current) && isGithubReleaseUrl(next) ->
+                !hasSensitiveQuery(next)
+            else -> false
+        }
+        if (!allowed) throw IOException("Release asset redirect target blocked")
+        return next
+    }
+
+    /** Release-artifact requests must be plain GitHub URLs with no credentials attached. */
+    private fun isReleaseAssetRequest(request: Request): Boolean =
+        request.url.isHttps && isGithubReleaseUrl(request.url) &&
+            !hasSensitiveQuery(request.url) &&
+            request.headers.names().none(::isSensitiveHeader)
+
+    /**
+     * Purpose-bound redirect guard for GitHub release artifacts. Enforces HTTPS on every hop,
+     * a three-hop ceiling, and an explicit github.com -> release-assets.githubusercontent.com
+     * chain. General clients keep the strict [redirectGuardInterceptor].
+     */
+    internal val releaseAssetRedirectGuardInterceptor: Interceptor = Interceptor { chain ->
+        var request = chain.request()
+        if (!isReleaseAssetRequest(request)) throw IOException("Release asset request blocked by policy")
+        var redirects = 0
+        var finalResponse: Response? = null
+        while (finalResponse == null) {
+            val response = chain.proceed(request)
+            val location = if (response.isRedirect) response.header("Location") else null
+            if (location == null) {
+                finalResponse = response
+            } else {
+                try {
+                    val next = releaseAssetRedirectTarget(request.url, location)
+                    if (++redirects > maxReleaseAssetRedirects) throw IOException("Too many redirects")
+                    val builder = request.newBuilder().url(next)
+                    if (!sameOrigin(request.url, next)) {
+                        // Defensive: never carry a credential header to the asset origin.
+                        request.headers.names().filter(::isSensitiveHeader).forEach(builder::removeHeader)
+                    }
+                    request = builder.build()
+                } finally {
+                    closeQuietly(response)
+                }
+            }
+        }
+        finalResponse
     }
 
     /**
@@ -316,6 +431,7 @@ object NetworkPolicy {
         useProxy: Boolean,
         proxyHost: String?,
         proxyPort: Int?,
+        redirectGuard: Interceptor = redirectGuardInterceptor,
     ): OkHttpClient {
         val effectiveUserAgent = userAgent(userAgent)
         val effectiveProxy = if (useProxy) proxy(proxyHost, proxyPort) else null
@@ -332,7 +448,7 @@ object NetworkPolicy {
                 // Redirects are resolved by redirectGuardInterceptor so every hop is validated.
                 .followRedirects(false)
                 .followSslRedirects(false)
-                .addInterceptor(redirectGuardInterceptor)
+                .addInterceptor(redirectGuard)
             // Streaming profiles disable the absolute deadline; bounded profiles keep it.
             builder.callTimeout(
                 if (profile == Profile.PLAYBACK || profile == Profile.RECORDING) {
@@ -345,6 +461,16 @@ object NetworkPolicy {
             effectiveUserAgent?.let { value ->
                 builder.addInterceptor { chain ->
                     chain.proceed(chain.request().newBuilder().header("User-Agent", value).build())
+                }
+            }
+            if (profile == Profile.RELEASE_ASSET) {
+                // Application interceptors may add headers after the redirect guard has run.
+                // The network interceptor sees the actual wire request and fails closed.
+                builder.addNetworkInterceptor { chain ->
+                    if (chain.request().headers.names().any(::isSensitiveHeader)) {
+                        throw IOException("Credential header blocked on release asset request")
+                    }
+                    chain.proceed(chain.request())
                 }
             }
             effectiveProxy?.let(builder::proxy)
@@ -406,6 +532,31 @@ object NetworkPolicy {
         proxyHost: String? = null,
         proxyPort: Int? = null,
     ): OkHttpClient = profileClient(Profile.DOWNLOAD, userAgent, useProxy, proxyHost, proxyPort)
+
+    /**
+     * Opt-in profile for GitHub release artifacts (APK and signed resource files) only.
+     *
+     * The original request must be HTTPS on `github.com`/`www.github.com` under
+     * `/klatschanstalt/C0reStream/releases/` and must carry no sensitive query parameter or
+     * header. Redirects stay HTTPS, are limited to three hops, and may only move within that
+     * GitHub release path or from it to
+     * `release-assets.githubusercontent.com/github-production-release-asset/` with the known
+     * GitHub/Azure SAS parameters. Every other origin and every other profile stays strict;
+     * TLS/certificate verification is unchanged.
+     */
+    fun releaseAssetClient(
+        userAgent: String? = null,
+        useProxy: Boolean = false,
+        proxyHost: String? = null,
+        proxyPort: Int? = null,
+    ): OkHttpClient = profileClient(
+        Profile.RELEASE_ASSET,
+        userAgent,
+        useProxy,
+        proxyHost,
+        proxyPort,
+        releaseAssetRedirectGuardInterceptor,
+    )
 
     internal fun closeQuietly(response: Response) {
         runCatching { response.close() }

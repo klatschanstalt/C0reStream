@@ -298,4 +298,50 @@ class NetworkPolicyTest {
             NetworkPolicy.redirectTarget(withToken, "/next?token=secret", originalHttps = false).toString(),
         )
     }
+
+    @Test
+    fun `credential name detection includes username variants and encoded names`() {
+        listOf(
+            "username", "user", "user_name", "USER", "UserName", "LOGIN",
+            "user%6Eame", "%75sername", "user%5Fname", "log%69n",
+        ).forEach { name ->
+            val url = NetworkPolicy.requireUrl("http://example.com/live?$name=alice")
+            assertTrue(
+                "$name must be treated as sensitive",
+                runCatching {
+                    NetworkPolicy.redirectTarget(url, "http://cdn.example/live", originalHttps = false)
+                }.exceptionOrNull() is IOException,
+            )
+        }
+    }
+
+    @Test
+    fun `credential bearing path segments block cross origin redirects`() {
+        val stream = NetworkPolicy.requireUrl("https://example.com/live/alice/secret/123.ts")
+        assertTrue(runCatching {
+            NetworkPolicy.redirectTarget(stream, "https://cdn.example/123.ts", originalHttps = true)
+        }.exceptionOrNull() is IOException)
+        // A plain stream path remains redirectable.
+        assertEquals(
+            "https://cdn.example/123.ts",
+            NetworkPolicy.redirectTarget(
+                NetworkPolicy.requireUrl("https://example.com/live/123.ts"),
+                "https://cdn.example/123.ts",
+                originalHttps = true,
+            ).toString(),
+        )
+    }
+
+    @Test
+    fun `release asset profile is additive and bounded`() {
+        val release = NetworkPolicy.releaseAssetClient()
+        assertEquals(20_000, release.connectTimeoutMillis)
+        assertEquals(30_000, release.readTimeoutMillis)
+        assertTrue(release.callTimeoutMillis > 0)
+        assertFalse(release.followRedirects)
+        assertFalse(release.followSslRedirects)
+        assertNotSame(NetworkPolicy.client(), release)
+        assertNotSame(NetworkPolicy.downloadClient(), release)
+        assertSame(release, NetworkPolicy.releaseAssetClient())
+    }
 }

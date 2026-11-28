@@ -142,6 +142,20 @@ class RedirectGuardTest {
     }
 
     @Test
+    fun `blocks credential query redirects across scheme changes`() {
+        val http = NetworkPolicy.requireUrl("http://example.com/player_api.php?username=alice&password=secret")
+        val failure = runCatching {
+            NetworkPolicy.redirectTarget(
+                http,
+                "https://example.com/player_api.php?username=alice&password=secret",
+                originalHttps = false,
+            )
+        }.exceptionOrNull()
+        assertTrue(failure is IOException)
+        assertTrue(failure!!.message!!.contains("Credential-bearing"))
+    }
+
+    @Test
     fun `closes the response when a redirect target is invalid`() {
         val closed = AtomicBoolean(false)
         val guardClient = OkHttpClient.Builder()

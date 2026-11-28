@@ -102,6 +102,51 @@ class XtreamApiTest {
     }
 
     @Test
+    fun `credentials are redacted from object and plain diagnostics`() {
+        val creds = XtreamApi.Credentials("https://example.com:8080", "alice-supersecret", "pw-supersecret")
+        assertEquals("[protected credentials]", creds.toString())
+        assertFalse(creds.apiUrl().toString().contains("alice-supersecret"))
+        assertFalse(creds.baseUrl().contains("pw-supersecret"))
+    }
+
+    @Test
+    fun `http failures never carry credential values`() = runTest {
+        val server = MockWebServer()
+        try {
+            server.enqueue(MockResponse().setResponseCode(500).setBody("upstream error"))
+            val creds = XtreamApi.Credentials(server.url("/").toString(), "alice-supersecret", "pw-supersecret")
+            val failure = runCatching { XtreamApi(NetworkPolicy.client()).fetchLiveChannels(creds) }.exceptionOrNull()
+            assertTrue(failure is Exception)
+            val message = failure!!.message.orEmpty()
+            assertFalse(message.contains("alice-supersecret"))
+            assertFalse(message.contains("pw-supersecret"))
+            assertFalse(message.contains(server.url("/").toString()))
+            // What callers do with the message: it stays safe in the local log as well.
+            AppLog.log("Test", message)
+            assertTrue(AppLog.lines.none { it.contains("alice-supersecret") || it.contains("pw-supersecret") })
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun `malformed provider json never echoes credentials into the exception`() = runTest {
+        val server = MockWebServer()
+        try {
+            val broken = "{\"data\":[{\"name\":\"username=alice-supersecret&password=pw-supersecret]"
+            repeat(4) { server.enqueue(MockResponse().setBody(broken)) }
+            val creds = XtreamApi.Credentials(server.url("/").toString(), "alice-supersecret", "pw-supersecret")
+            val failure = runCatching { XtreamApi(NetworkPolicy.client()).fetchLiveChannels(creds) }.exceptionOrNull()
+            assertTrue(failure is Exception)
+            val message = failure!!.message.orEmpty()
+            assertFalse(message.contains("alice-supersecret"))
+            assertFalse(message.contains("pw-supersecret"))
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
     fun `category failure is reported without losing channels`() = runTest {
         val streams = "[${stream(0)},${stream(1)}]"
         val server = server(streams, categoryCode = 500)
