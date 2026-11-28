@@ -77,7 +77,12 @@ object UpdateInstaller {
         if (target.isFile) {
             when (val cached = verifyApk(context, target, info)) {
                 is Result.Ready -> return@withContext cached
-                else -> target.delete()
+                is Result.Failure -> {
+                    // Report the real integrity/signature verdict instead of silently discarding
+                    // the file and hiding it behind a network failure. The bad cache is removed.
+                    target.delete()
+                    return@withContext cached
+                }
             }
         }
 

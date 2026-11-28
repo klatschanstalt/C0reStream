@@ -51,7 +51,12 @@ fun localizedImportError(error: Throwable, context: Context): String {
 /** Derives a short display name from a provider file name without path or control characters. */
 fun playlistNameFromFileName(candidate: String?, fallback: String): String {
     val cleaned = candidate
-        ?.map { if (it.isISOControl() || it == '/' || it == '\\' || it == ':') ' ' else it }
+        // Providers may supply a path-like display name; keep only the final component before
+        // sanitising control characters so a picked file never inherits directory names.
+        ?.substringAfterLast('/')
+        ?.substringAfterLast('\\')
+        ?.substringAfterLast(':')
+        ?.map { if (it.isISOControl()) ' ' else it }
         ?.joinToString("")
         ?.trim()
         ?.removeSuffix(".gz")
