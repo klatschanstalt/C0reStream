@@ -147,13 +147,14 @@ fun PlayerScreen(
     var showPlaybackOptions by remember { mutableStateOf(false) }
     var showDiagnostics by remember { mutableStateOf(false) }
     var immersive by remember { mutableStateOf(true) }
-    var sleepMinutes by remember { mutableIntStateOf(0) }
+    var sleepDeadline by remember { mutableLongStateOf(0L) }
     var playbackError by remember { mutableStateOf<String?>(null) }
-    var retryCount by remember { mutableIntStateOf(0) }
     var playerView by remember { mutableStateOf<PlayerView?>(null) }
     var resumedPosition by remember { mutableStateOf<Long?>(null) }
-    var loadedKey by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    // One coordinator per screen instance; every delayed action checks a generation snapshot.
+    val retry = remember { PlaybackRetryCoordinator(scope) }
+    var mediaGeneration by remember { mutableLongStateOf(0L) }
     val liveLabel = stringResource(R.string.player_live)
     val showControlsLabel = stringResource(R.string.player_show_controls)
     val orientation = LocalConfiguration.current.orientation
@@ -237,6 +238,7 @@ fun PlayerScreen(
     DisposableEffect(Unit) {
         PlayerHub.connect(context)
         onDispose {
+            retry.onStoppedOrReleased()
             val player = PlayerHub.controller
             if (player != null) {
                 vm.saveProgress(
@@ -259,17 +261,20 @@ fun PlayerScreen(
         }
     }
 
-    // Load the selected media item and restore a saved VOD position.
-    LaunchedEffect(controller, channel?.id, pending?.url, currentId) {
+    // Load the selected media item and restore a saved VOD position. Every load starts a new
+    // media generation; pending retries/progress writes for the previous medium are cancelled.
+    LaunchedEffect(controller, channel?.id, pending?.url, effectiveUrl, currentId) {
         val player = controller ?: return@LaunchedEffect
         val url = effectiveUrl
         if (url == null || NetworkPolicy.parseStreamUrl(url) == null) {
+            retry.invalidatePending()
             playbackError = "Invalid stream URL"
             return@LaunchedEffect
         }
         val loadKey = "$url|${effectiveMediaKey.orEmpty()}"
-        if (loadedKey == loadKey) return@LaunchedEffect
-        loadedKey = loadKey
+        if (retry.isActive(loadKey, player)) return@LaunchedEffect
+        retry.onMediaChanged(loadKey, player)
+        mediaGeneration = retry.generation
         val displayTitle = effectiveTitle ?: liveLabel
         PlayerHub.attach(
             title = displayTitle,
@@ -282,7 +287,7 @@ fun PlayerScreen(
         channel?.let(vm::logWatch)
         PlayerHub.consumePending()
         playbackError = null
-        retryCount = 0
+        retry.onPlaybackRequest()
         player.setMediaItem(
             MediaItem.Builder()
                 .setUri(url)
@@ -300,12 +305,15 @@ fun PlayerScreen(
         player.playWhenReady = true
     }
 
-    // Persist VOD progress every five seconds while playing.
-    LaunchedEffect(controller, effectiveMediaKey, channel?.id) {
+    // Persist VOD progress every five seconds while playing. The generation snapshot prevents a
+    // stale loop from writing the old medium's position from a controller that is now playing B.
+    LaunchedEffect(controller, mediaGeneration, effectiveMediaKey, channel?.id) {
         if (effectiveKind == "live" || effectiveMediaKey == null) return@LaunchedEffect
         val player = controller ?: return@LaunchedEffect
+        val generation = retry.generationFor(player) ?: return@LaunchedEffect
         while (true) {
             delay(5_000)
+            if (!retry.isMediumCurrent(generation)) return@LaunchedEffect
             if (player.isPlaying) {
                 vm.saveProgress(
                     effectiveMediaKey,
@@ -320,11 +328,17 @@ fun PlayerScreen(
         }
     }
 
-    LaunchedEffect(sleepMinutes) {
-        if (sleepMinutes <= 0) return@LaunchedEffect
-        delay(sleepMinutes * 60_000L)
-        controller?.pause()
-        sleepMinutes = 0
+    // Absolute deadline: switching medium does not restart or silently extend the timer, and a
+    // pending timer can never pause a different medium than the one it was set for.
+    LaunchedEffect(controller, mediaGeneration, sleepDeadline) {
+        if (sleepDeadline <= 0L) return@LaunchedEffect
+        val player = controller ?: return@LaunchedEffect
+        val generation = retry.generationFor(player) ?: return@LaunchedEffect
+        val remaining = sleepDeadline - System.currentTimeMillis()
+        if (remaining > 0L) delay(remaining)
+        if (!retry.isMediumCurrent(generation)) return@LaunchedEffect
+        player.pause()
+        sleepDeadline = 0L
     }
 
     LaunchedEffect(resumedPosition) {
@@ -339,14 +353,10 @@ fun PlayerScreen(
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
                 playbackError = error.errorCodeName
-                if (retryCount < 3) {
-                    retryCount++
-                    scope.launch {
-                        delay(1_500L * retryCount)
-                        runCatching {
-                            player.prepare()
-                            player.play()
-                        }
+                retry.scheduleRetry(player) {
+                    runCatching {
+                        player.prepare()
+                        player.play()
                     }
                 }
             }
@@ -354,12 +364,15 @@ fun PlayerScreen(
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_READY) {
                     playbackError = null
-                    retryCount = 0
+                    retry.onReady()
                 }
             }
         }
         player.addListener(listener)
-        onDispose { player.removeListener(listener) }
+        onDispose {
+            player.removeListener(listener)
+            retry.onPlayerChanged(null)
+        }
     }
 
     fun zap(step: Int) {
@@ -367,6 +380,8 @@ fun PlayerScreen(
         if (list.isEmpty()) return
         val index = list.indexOfFirst { it.id == currentId }
         val next = list[((index + step) % list.size + list.size) % list.size]
+        // Kill pending work for A immediately; do not wait for B's asynchronous channel load.
+        retry.invalidatePending()
         currentId = next.id
         PlayerHub.channelId = next.id
     }
@@ -475,10 +490,15 @@ fun PlayerScreen(
                 BrandPrimaryButton(
                     text = stringResource(R.string.action_retry),
                     onClick = {
-                        playbackError = null
-                        retryCount = 0
-                        controller?.prepare()
-                        controller?.play()
+                        val player = controller
+                        if (player != null && retry.retryNow(player, {
+                            runCatching {
+                                player.prepare()
+                                player.play()
+                            }
+                        })) {
+                            playbackError = null
+                        }
                     },
                 )
             }
@@ -827,7 +847,11 @@ fun PlayerScreen(
                                 pluralStringResource(R.plurals.player_sleep_minutes, minutes, minutes)
                             },
                             onClick = {
-                                sleepMinutes = minutes
+                                sleepDeadline = if (minutes == 0) {
+                                    0L
+                                } else {
+                                    System.currentTimeMillis() + minutes * 60_000L
+                                }
                                 showSleep = false
                             },
                             modifier = Modifier.fillMaxWidth(),

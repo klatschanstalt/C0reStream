@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Restore status strings for the structured LibraryBackup.RestoreResult API. -->
+    <string name="backup_restore_state_success">Restore complete: library and settings are up to date.</string>
+    <string name="backup_restore_state_partial">Restore incomplete: some data could not be restored.</string>
+    <string name="backup_restore_state_failed">Restore failed: no data was changed.</string>
+    <string name="backup_restore_state_cancelled">Restore cancelled. No further changes were made.</string>
+    <string name="backup_restore_part_library_restored">Library: restored (%1$s playlists, %2$s channels).</string>
+    <string name="backup_restore_part_library_failed">Library: not restored.</string>
+    <string name="backup_restore_part_library_skipped">Library: not part of this operation.</string>
+    <string name="backup_restore_part_settings_restored">Settings: restored.</string>
+    <string name="backup_restore_part_settings_failed">Settings: not restored. The library is unchanged.</string>
+    <string name="backup_restore_part_settings_absent">Settings: this backup contains no settings.</string>
+    <string name="backup_restore_retry_settings">Retry settings only</string>
+    <string name="backup_restore_retry_settings_note">Retrying settings never changes the already restored library.</string>
+</resources>

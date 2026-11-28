@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Statusmeldungen für das strukturierte Ergebnis der Backup-Wiederherstellung. -->
+    <string name="backup_restore_state_success">Wiederherstellung abgeschlossen: Bibliothek und Einstellungen sind aktuell.</string>
+    <string name="backup_restore_state_partial">Wiederherstellung unvollständig: Einige Daten konnten nicht wiederhergestellt werden.</string>
+    <string name="backup_restore_state_failed">Wiederherstellung fehlgeschlagen: Es wurden keine Daten geändert.</string>
+    <string name="backup_restore_state_cancelled">Wiederherstellung abgebrochen. Es wurden keine weiteren Änderungen vorgenommen.</string>
+    <string name="backup_restore_part_library_restored">Bibliothek: wiederhergestellt (%1$s Playlists, %2$s Sender).</string>
+    <string name="backup_restore_part_library_failed">Bibliothek: nicht wiederhergestellt.</string>
+    <string name="backup_restore_part_library_skipped">Bibliothek: nicht Teil dieses Vorgangs.</string>
+    <string name="backup_restore_part_settings_restored">Einstellungen: wiederhergestellt.</string>
+    <string name="backup_restore_part_settings_failed">Einstellungen: nicht wiederhergestellt. Die Bibliothek bleibt unverändert.</string>
+    <string name="backup_restore_part_settings_absent">Einstellungen: Dieses Backup enthält keine Einstellungen.</string>
+    <string name="backup_restore_retry_settings">Nur Einstellungen erneut versuchen</string>
+    <string name="backup_restore_retry_settings_note">Ein erneuter Versuch ändert die bereits wiederhergestellte Bibliothek nicht.</string>
+</resources>

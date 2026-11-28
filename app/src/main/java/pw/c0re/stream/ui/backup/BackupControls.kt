@@ -18,6 +18,7 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.OutlinedSecureTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,7 +27,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -52,16 +52,50 @@ fun BackupControls() {
     val password by remember { derivedStateOf { passwordState.text.toString() } }
     var busy by remember { mutableStateOf(false) }
     var statusRes by remember { mutableStateOf<Int?>(null) }
-    var restoredCount by remember { mutableStateOf<Int?>(null) }
-    val statusText = when {
-        restoredCount != null -> pluralStringResource(
-            R.plurals.backup_restored_playlists,
-            restoredCount!!,
-            restoredCount!!,
-        )
-        statusRes != null -> stringResource(statusRes!!)
-        else -> ""
+    var restoreState by remember { mutableStateOf<RestoreResult?>(null) }
+    // Kept only while a settings-only retry is possible. The copy is wiped as soon as it is
+    // consumed or the screen leaves composition; the original password is wiped in `finally`.
+    var retryEnvelope by remember { mutableStateOf<ByteArray?>(null) }
+    var retrySecret by remember { mutableStateOf<CharArray?>(null) }
+
+    fun clearRetry() {
+        retrySecret?.fill('\u0000')
+        retrySecret = null
+        retryEnvelope = null
     }
+    DisposableEffect(Unit) {
+        onDispose { clearRetry() }
+    }
+
+    val result = restoreState
+    val stateRes = when (result?.outcome) {
+        RestoreOutcome.SUCCESS -> R.string.backup_restore_state_success
+        RestoreOutcome.PARTIAL -> R.string.backup_restore_state_partial
+        RestoreOutcome.FAILED -> R.string.backup_restore_state_failed
+        RestoreOutcome.CANCELLED -> R.string.backup_restore_state_cancelled
+        null -> null
+    }
+    val libraryRes = when (result?.libraryStatus) {
+        RestorePartStatus.RESTORED -> R.string.backup_restore_part_library_restored
+        RestorePartStatus.FAILED, RestorePartStatus.CANCELLED -> R.string.backup_restore_part_library_failed
+        RestorePartStatus.NOT_APPLICABLE, null -> R.string.backup_restore_part_library_skipped
+    }
+    val settingsRes = when (result?.settingsStatus) {
+        RestorePartStatus.RESTORED -> R.string.backup_restore_part_settings_restored
+        RestorePartStatus.FAILED, RestorePartStatus.CANCELLED -> R.string.backup_restore_part_settings_failed
+        RestorePartStatus.NOT_APPLICABLE, null -> R.string.backup_restore_part_settings_absent
+    }
+    val libraryText = if (result?.libraryStatus == RestorePartStatus.RESTORED) {
+        stringResource(libraryRes, result.playlists.toString(), result.channels.toString())
+    } else {
+        stringResource(libraryRes)
+    }
+    val statusText = listOfNotNull(
+        statusRes?.let { stringResource(it) },
+        stateRes?.let { stringResource(it) },
+        if (result != null) libraryText else null,
+        if (result != null) stringResource(settingsRes) else null,
+    ).joinToString("\n")
 
     val create = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream"),
@@ -69,12 +103,14 @@ fun BackupControls() {
         if (uri != null) {
             selected = uri
             operation = "export"
+            clearRetry()
         }
     }
     val open = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             selected = uri
             operation = "restore"
+            clearRetry()
         }
     }
 
@@ -101,8 +137,38 @@ fun BackupControls() {
             Text(
                 statusText,
                 style = MaterialTheme.typography.bodyMedium,
-                maxLines = 3,
+                maxLines = 6,
                 overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (retrySecret != null && retryEnvelope != null && !busy) {
+            Text(
+                stringResource(R.string.backup_restore_retry_settings_note),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            BrandSecondaryButton(
+                text = stringResource(R.string.backup_restore_retry_settings),
+                onClick = {
+                    val envelope = retryEnvelope ?: return@BrandSecondaryButton
+                    val secretCopy = retrySecret?.copyOf() ?: return@BrandSecondaryButton
+                    busy = true
+                    scope.launch {
+                        try {
+                            val retried = LibraryBackup.restoreSettingsOnly(app.settings, envelope, secretCopy)
+                            restoreState = retried
+                            if (!retried.settingsRetryable) clearRetry()
+                        } catch (error: CancellationException) {
+                            throw error
+                        } catch (error: Exception) {
+                            statusRes = R.string.backup_failed
+                        } finally {
+                            secretCopy.fill('\u0000')
+                            busy = false
+                        }
+                    }
+                },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
@@ -151,7 +217,8 @@ fun BackupControls() {
                         operation = null
                         busy = true
                         statusRes = null
-                        restoredCount = null
+                        restoreState = null
+                        clearRetry()
                         scope.launch {
                             try {
                                 if (exporting) {
@@ -176,7 +243,11 @@ fun BackupControls() {
                                         }
                                     }
                                     val restored = LibraryBackup.restore(db, app.settings, bytes, secret)
-                                    restoredCount = restored.playlists
+                                    restoreState = restored
+                                    if (restored.settingsRetryable) {
+                                        retryEnvelope = bytes
+                                        retrySecret = secret.copyOf()
+                                    }
                                 }
                             } catch (error: CancellationException) {
                                 throw error

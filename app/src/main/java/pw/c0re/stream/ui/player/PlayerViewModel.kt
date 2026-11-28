@@ -3,6 +3,9 @@ package pw.c0re.stream.ui.player
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -86,4 +89,128 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+}
+
+/** Identity of one delayed playback action. All fields are checked before the action runs. */
+internal data class PlaybackGeneration(
+    val media: Long,
+    val error: Long,
+    val request: Long,
+    val medium: String,
+    val player: Any,
+)
+
+/**
+ * Binds delayed player work (error retry, progress persistence, sleep timer) to a unique media
+ * generation, player instance, error generation and playback request. A stale action is dropped
+ * instead of preparing, pausing or writing progress for whichever medium is active by the time
+ * its delay expires. All methods are called from the main/Compose thread.
+ */
+internal class PlaybackRetryCoordinator(
+    private val scope: CoroutineScope,
+    private val maxAttempts: Int = 3,
+    private val delayForAttempt: (Int) -> Long = { attempt -> 1_500L * attempt },
+) {
+    private var mediaGeneration = 0L
+    private var errorGeneration = 0L
+    private var requestGeneration = 0L
+    private var activeMedium: String? = null
+    private var activePlayer: Any? = null
+    private var retryJob: Job? = null
+    private var attempts = 0
+
+    val generation: Long get() = mediaGeneration
+
+    fun isActive(medium: String, player: Any): Boolean =
+        activeMedium == medium && activePlayer === player
+
+    fun generationFor(player: Any): PlaybackGeneration? {
+        val medium = activeMedium ?: return null
+        if (activePlayer !== player) return null
+        return PlaybackGeneration(mediaGeneration, errorGeneration, requestGeneration, medium, player)
+    }
+
+    fun onMediaChanged(medium: String, player: Any) {
+        retryJob?.cancel()
+        mediaGeneration++
+        errorGeneration++
+        requestGeneration++
+        attempts = 0
+        activeMedium = medium
+        activePlayer = player
+    }
+
+    fun onPlayerChanged(player: Any?) {
+        if (activePlayer === player) return
+        retryJob?.cancel()
+        activePlayer = player
+        errorGeneration++
+        attempts = 0
+    }
+
+    fun onStoppedOrReleased() {
+        retryJob?.cancel()
+        mediaGeneration++
+        errorGeneration++
+        requestGeneration++
+        attempts = 0
+        activeMedium = null
+        activePlayer = null
+    }
+
+    /** Immediately supersedes pending work, e.g. when the user zaps to another channel. */
+    fun invalidatePending() {
+        retryJob?.cancel()
+        errorGeneration++
+    }
+
+    fun onPlaybackRequest() {
+        requestGeneration++
+    }
+
+    fun onReady() {
+        retryJob?.cancel()
+        errorGeneration++
+        attempts = 0
+    }
+
+    /** Schedules one bounded retry. Returns false when the medium is gone or the limit is hit. */
+    fun scheduleRetry(player: Any, retry: () -> Unit): Boolean {
+        retryJob?.cancel()
+        errorGeneration++
+        val generation = generationFor(player) ?: return false
+        if (attempts >= maxAttempts) return false
+        val attempt = ++attempts
+        retryJob = scope.launch {
+            delay(delayForAttempt(attempt))
+            if (!isRetryCurrent(generation)) return@launch
+            onPlaybackRequest()
+            retry()
+        }
+        return true
+    }
+
+    /** Immediate, user-triggered retry: still verifies the medium and player identity. */
+    fun retryNow(player: Any, retry: () -> Unit): Boolean {
+        retryJob?.cancel()
+        errorGeneration++
+        if (generationFor(player) == null) return false
+        attempts = 0
+        onPlaybackRequest()
+        retry()
+        return true
+    }
+
+    /** Medium/player identity only: progress and sleep timers survive recoverable errors. */
+    fun isMediumCurrent(generation: PlaybackGeneration): Boolean =
+        mediaGeneration == generation.media &&
+            activeMedium == generation.medium &&
+            activePlayer === generation.player
+
+    /** Full guard: no retry may run for a superseded error or playback request. */
+    fun isRetryCurrent(generation: PlaybackGeneration): Boolean =
+        isMediumCurrent(generation) &&
+            requestGeneration == generation.request &&
+            errorGeneration == generation.error &&
+            retryJob?.isActive == true
 }

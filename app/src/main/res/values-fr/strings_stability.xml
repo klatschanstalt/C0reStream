@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Messages de statut pour le résultat structuré de la restauration de sauvegarde. -->
+    <string name="backup_restore_state_success">Restauration terminée : bibliothèque et paramètres sont à jour.</string>
+    <string name="backup_restore_state_partial">Restauration incomplète : certaines données n\'ont pas pu être restaurées.</string>
+    <string name="backup_restore_state_failed">Restauration échouée : aucune donnée n\'a été modifiée.</string>
+    <string name="backup_restore_state_cancelled">Restauration annulée. Aucune autre modification n\'a été effectuée.</string>
+    <string name="backup_restore_part_library_restored">Bibliothèque : restaurée (%1$s listes, %2$s chaînes).</string>
+    <string name="backup_restore_part_library_failed">Bibliothèque : non restaurée.</string>
+    <string name="backup_restore_part_library_skipped">Bibliothèque : non concernée par cette opération.</string>
+    <string name="backup_restore_part_settings_restored">Paramètres : restaurés.</string>
+    <string name="backup_restore_part_settings_failed">Paramètres : non restaurés. La bibliothèque reste inchangée.</string>
+    <string name="backup_restore_part_settings_absent">Paramètres : cette sauvegarde ne contient aucun paramètre.</string>
+    <string name="backup_restore_retry_settings">Réessayer uniquement les paramètres</string>
+    <string name="backup_restore_retry_settings_note">Un nouvel essai des paramètres ne modifie pas la bibliothèque déjà restaurée.</string>
+</resources>
