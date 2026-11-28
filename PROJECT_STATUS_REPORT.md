@@ -33,10 +33,20 @@ CI-Lauf `46096463279` vollständig grün (Unit-Tests, Lint, instrumentierte Test
 - **Player / EPG / Ressourcen / UI:** Retry-Aufträge sind an Medien-/Fehlergeneration und Player-Identität gebunden (Regression A→B grün); gleiche Absicherung für VOD-Fortschritt und Sleep-Timer. Ungültige XMLTV-Offsets werden nicht mehr als UTC ausgegeben, sondern begrenzt verworfen; gültige Offsets und `Z` behalten ihre Semantik. Signierte leere Kataloge aktivierbar; nicht leere Manifeste verlangen genau die erwarteten, intakten Ressourcen; atomare Aktivierung, Offline-Fallback und Rollback erhalten. Sekundärbutton-Kontrast zentral korrigiert (automatisierte WCAG-Prüfungen grün). Wirkungslose responsive Typografie-Abstraktion entfernt, `sp`-Skala und Systemschriftgröße erhalten. `ACTION_SEND` mit separatem Intentfilter und validierter Eingabe; History-Leerzustand in DE/EN/FR korrigiert.
 - **Dokumentation/CI:** README in DE/EN/FR unterscheidet Actions-Secrets (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`) von der Repository-Variable `ANDROID_CERT_SHA256` (kein Geheimnis). `THIRD_PARTY_NOTICES.md` weist Guava, FailureAccess, ListenableFuture und ZXing mit belegten Upstream-Lizenzen aus. PR-Trigger führt nur Verifikation aus; Signierung und Publishing bleiben auf vertrauenswürdige Pushes zu `main` beschränkt; manueller Dispatch baut signiert, veröffentlicht aber nicht.
 
-## Nicht verifiziert / offen
+## Weiterhin unvollständig / nicht verifiziert (bewusst offen)
 
-- Kein physisches Android-Gerät: keine echte Reproduktion des Importfehlers, keine Bestätigung des Installationsabschlusses, kein PiP-Verhalten beim Sperren (App-seitig wird Wiedergabe pausiert und der Gate geschlossen; ein bereits vorhandenes PiP-Fenster kann bis zur Rückkehr das letzte Bild zeigen).
-- Visuelle Prüfung von 1,5-facher Systemschriftgröße, Android-TV-Fokus und AMOLED/Cyan/Ember-Schemen nicht auf Gerät erfolgt; nur strukturelle `sp`-, Token- und Kontrastprüfungen automatisiert.
-- API 37 nicht in der Emulator-Matrix: `sdkmanager` veröffentlicht `system-images;android-37.0;aosp_atd`, der Emulator-Runner löst aus `api-level: 37` jedoch `android-37;aosp_atd` auf; keine verlässliche Zuordnung. API 30/36 bleiben die stabile Matrix.
-- Android 17/18 nicht zertifiziert; keine Netzwerkwechsel-, Keystore-Gerätefehler- oder Langzeitläufe (5/30/60 Minuten), keine belastbaren Messwerte zu Startzeit, RAM, CPU, Akku oder Datenbank.
-- FFmpeg-AAR, Casting, Stalker/MAG, rohes UDP/Multicast, Timeshift, Multiview, RTMP/SRT und DRM-Umgehung bleiben ohne vertrauenswürdige Quelle, Autorisierung oder Gerätematrix und sind nicht Teil dieses Releases.
+Diese Punkte sind **nicht** durch dieses Release abgeschlossen und werden in einem späteren Auftrag bearbeitet. Die vollständige Liste steht in `MASTERPLAN.md`.
+
+| Punkt | Status | Grund |
+| --- | --- | --- |
+| Lokaler Playlist-Import auf echtem Gerät | **offen / unvollständig** | Code und instrumentierte End-to-end-Tests grün; kein physisches Gerät, Betreiberbefund nicht dort nachgestellt. |
+| In-App-Update bis Installationsabschluss | **offen / unvollständig** | Root Cause (GitHub-Asset-Redirect) bestätigt und behoben; Download/Integrität/Signatur/Übergabe instrumentiert, Installation auf Gerät ungeprüft. |
+| PIN-Gate und Picture-in-Picture | **offen / unvollständig** | App-seitiges Pausieren und Sperren geprüft; PiP-Fenster-Verhalten auf Gerät ungeprüft. |
+| Externe Playlist-Übergabe aus Browser/Share-Sheet | **offen / unvollständig** | Intentfilter und Validierung instrumentiert geprüft; reale externe Apps nicht getestet. |
+| Backup-Teilwiederherstellung auf Gerät | **offen / unvollständig** | Struktur und UI-Wiederholung instrumentiert geprüft; Geräteanzeige ungeprüft. |
+| Visuelle Schrift-/Kontrast-/TV-Fokusprüfung | **offen / unvollständig** | Nur automatisierte `sp`-, Token- und WCAG-Prüfungen; 1,5× Systemschrift, AMOLED/Cyan/Ember und TV-Fokus nicht visuell geprüft. |
+| Reproduzierbare APK-Prüfsumme | **offen / unvollständig** | Git-Revision im APK ändert R8-Map-ID und SHA bei jedem Metadaten-Commit; `update.json` manuelle nach dem Publishing angeglichen. |
+| API-37-Emulator | **offen / unvollständig** | `android-37.0;aosp_atd` vorhanden, Runner erwartet `android-37;aosp_atd`; stabile Matrix bleibt API 30/36. |
+| Android 17/18, Langzeit- und Messwertprüfung | **offen / unvollständig** | Nicht zertifiziert; keine Netzwerkwechsel-, Keystore-, 5/30/60-Minuten- oder Performance-Baselines. |
+| Abhängigkeitsverifikation nach Updates | **offen / bei Bedarf** | `gradle/verification-metadata.xml` muss bei künftigen Dependency-Änderungen regeneriert werden. |
+| FFmpeg, Casting, Stalker/MAG, UDP/Multicast, Timeshift, Multiview, RTMP/SRT, DRM | **offen / außerhalb dieses Releases** | Keine vertrauenswürdige Quelle, Autorisierung oder Gerätematrix; keine DRM-Umgehung. |
