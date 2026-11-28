@@ -1,5 +1,6 @@
 package pw.c0re.stream.ui
 
+import android.app.Application
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,10 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -57,17 +56,27 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import pw.c0re.stream.C0reStreamApp
 import pw.c0re.stream.R
-import pw.c0re.stream.data.profiles.PinVerification
-import pw.c0re.stream.data.profiles.ProfileEntity
+import pw.c0re.stream.data.profiles.ActiveProfile
+import pw.c0re.stream.data.profiles.PinFailure
+import pw.c0re.stream.data.profiles.ProfileConfigEvents
+import pw.c0re.stream.data.profiles.ProfileGate
+import pw.c0re.stream.data.profiles.ProfileGatePhase
+import pw.c0re.stream.data.profiles.ProfileGateState
 import pw.c0re.stream.data.profiles.ProfileSessionRepository
+import pw.c0re.stream.data.profiles.RoomProfilePinStore
 import pw.c0re.stream.ui.backup.M3UExporter
 import pw.c0re.stream.ui.components.AdaptivePane
 import pw.c0re.stream.ui.components.BrandBackdrop
@@ -97,25 +106,67 @@ object Routes {
 
 private data class Tab(val route: String, val labelRes: Int, val icon: ImageVector)
 
+/**
+ * Owns the lock state for the whole app. The gate is closed (Loading/Locked/Error) until the
+ * active profile, its PIN configuration and the unlock result are known, so no protected UI is
+ * composed and no protected route is reachable during cold start, process restart or a switch.
+ */
+class ProfileGateViewModel(app: Application) : AndroidViewModel(app) {
+    private val session = ProfileSessionRepository(app)
+    private val gate = ProfileGate(
+        store = RoomProfilePinStore((app as C0reStreamApp).database.profileDao()),
+        pins = ProfileSessionRepository.pinManager,
+    )
+    val state: StateFlow<ProfileGateState> = gate.state
+
+    init {
+        viewModelScope.launch {
+            session.activeProfile.collect { active ->
+                gate.observeActive(active)
+                gate.evaluate()
+            }
+        }
+        // A PIN set/changed on the active profile must take effect immediately, even though the
+        // active profile id itself did not change.
+        viewModelScope.launch {
+            ProfileConfigEvents.changes.collect { profileId ->
+                if (session.activeProfile.first() == ActiveProfile.Selected(profileId)) {
+                    gate.retry()
+                }
+            }
+        }
+    }
+
+    fun submitPin(pin: String) = viewModelScope.launch {
+        // Re-read the selection before accepting input: a switch may have landed meanwhile.
+        val latest = session.activeProfile.first()
+        gate.observeActive(latest)
+        val chars = pin.toCharArray()
+        try {
+            gate.unlock(chars)
+        } finally {
+            chars.fill('\u0000')
+        }
+    }
+
+    fun retry() = viewModelScope.launch { gate.retry() }
+}
+
 @Composable
 fun C0reStreamRoot(sharedM3uUrl: String?) {
     val nav = rememberNavController()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val app = context.applicationContext as C0reStreamApp
-    val session = remember { ProfileSessionRepository(context) }
-    val activeId by session.activeId.collectAsState(initial = 0L)
-    var gateProfile by remember { mutableStateOf<ProfileEntity?>(null) }
-    var unlocked by remember { mutableStateOf(false) }
-    LaunchedEffect(activeId) {
-        val profile = if (activeId > 0) app.database.profileDao().byId(activeId) else null
-        if (profile?.pinHash.isNullOrBlank()) {
-            gateProfile = null
-            unlocked = true
-        } else {
-            gateProfile = profile
-            unlocked = false
-        }
+    val gateViewModel: ProfileGateViewModel = viewModel()
+    val gate by gateViewModel.state.collectAsState()
+    // Closed is the default: no content and no route until the business logic says UNLOCKED.
+    val unlocked = gate.phase == ProfileGatePhase.UNLOCKED
+
+    // Locked sessions pause playback but keep the MediaSession and position; nothing auto-resumes.
+    // The mini-player, full player and nav bars are not composed while the gate is closed.
+    LaunchedEffect(unlocked) {
+        if (!unlocked) runCatching { PlayerHub.controller?.pause() }
     }
     val tabs = listOf(
         Tab(Routes.PLAYLISTS, R.string.nav_live, Icons.Filled.LiveTv),
@@ -128,8 +179,11 @@ fun C0reStreamRoot(sharedM3uUrl: String?) {
     val topLevel = tabs.any { it.route == current }
     val playerRoute = current?.startsWith("player/") == true
 
-    LaunchedEffect(sharedM3uUrl) {
-        if (sharedM3uUrl != null && current != Routes.PLAYLISTS) {
+    // External intents are only handled after the gate opens; while closed there is no NavHost
+    // and therefore no reachable protected route or restored navigation state.
+    LaunchedEffect(sharedM3uUrl, unlocked) {
+        if (!unlocked || sharedM3uUrl == null) return@LaunchedEffect
+        if (nav.currentDestination?.route != Routes.PLAYLISTS) {
             nav.navigate(Routes.PLAYLISTS) {
                 popUpTo(nav.graph.findStartDestination().id) { saveState = true }
                 launchSingleTop = true
@@ -235,11 +289,12 @@ fun C0reStreamRoot(sharedM3uUrl: String?) {
         }
     }
 
-    val gate = gateProfile
-    if (!unlocked && gate != null) {
-        PinGate(profile = gate, onUnlocked = { unlocked = true })
-    } else {
-        BrandBackdrop(Modifier.fillMaxSize()) {
+    when (gate.phase) {
+        ProfileGatePhase.LOADING -> ProfileGateLoading()
+        ProfileGatePhase.LOCKED -> PinGate(state = gate, onSubmit = { gateViewModel.submitPin(it) })
+        ProfileGatePhase.ERROR -> ProfileGateError(onRetry = { gateViewModel.retry() })
+        ProfileGatePhase.UNLOCKED -> {
+            BrandBackdrop(Modifier.fillMaxSize()) {
             Scaffold(
                 // Explicit, single source of truth for safe areas. Scaffold distributes these
                 // insets to the top/bottom bars and the content; no manual unions are needed.
@@ -317,12 +372,48 @@ fun C0reStreamRoot(sharedM3uUrl: String?) {
             }
         }
     }
+    }
 }
 
 @Composable
-private fun PinGate(profile: ProfileEntity, onUnlocked: () -> Unit) {
+private fun ProfileGateLoading() {
+    BrandBackdrop(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            CircularProgressIndicator()
+            Spacer(Modifier.height(16.dp))
+            Text(stringResource(R.string.pin_gate_checking), style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+private fun ProfileGateError(onRetry: () -> Unit) {
+    BrandBackdrop(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.fillMaxSize()
+                .windowInsetsPadding(WindowInsets.systemBars)
+                .padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                stringResource(R.string.pin_gate_error),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Spacer(Modifier.height(16.dp))
+            BrandPrimaryButton(stringResource(R.string.pin_gate_retry), onClick = onRetry)
+        }
+    }
+}
+
+@Composable
+private fun PinGate(state: ProfileGateState, onSubmit: (String) -> Unit) {
     val pinState = rememberTextFieldState()
-    var error by remember { mutableStateOf(false) }
     BrandBackdrop(Modifier.fillMaxSize()) {
         Column(
             Modifier.fillMaxSize()
@@ -338,20 +429,28 @@ private fun PinGate(profile: ProfileEntity, onUnlocked: () -> Unit) {
                 state = pinState,
                 inputTransformation = InputTransformation.maxLengthReject(64)
                     .byValue { input, _ -> input.filter(Char::isDigit) },
-                label = { Text(profile.name) },
+                label = { Text(state.profileName ?: stringResource(R.string.profiles_title)) },
             )
-            if (error) {
-                Text(stringResource(R.string.profiles_pin_wrong), color = MaterialTheme.colorScheme.error)
+            state.failure?.let { failure ->
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(
+                        when (failure) {
+                            PinFailure.WRONG_CURRENT, PinFailure.MISMATCHED_NEW, PinFailure.INVALID_FORMAT ->
+                                R.string.profiles_pin_wrong
+                            PinFailure.TOO_MANY_ATTEMPTS -> R.string.pin_error_locked
+                            else -> R.string.pin_gate_error
+                        },
+                    ),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
             Spacer(Modifier.height(16.dp))
             BrandPrimaryButton(stringResource(R.string.action_confirm), onClick = {
                 val value = pinState.text.toString()
                 pinState.clearText()
-                val chars = value.toCharArray()
-                val result = ProfileSessionRepository.pinManager.verify(profile.pinHash, chars, profile.id)
-                chars.fill('\u0000')
-                if (result == PinVerification.Success || result == PinVerification.NoPin) onUnlocked()
-                else error = true
+                onSubmit(value)
             })
         }
     }

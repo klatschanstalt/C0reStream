@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Durcissement du PIN des profils : états du verrou et erreurs de gestion du PIN. -->
+    <string name="pin_gate_checking">Vérification de l’accès au profil…</string>
+    <string name="pin_gate_error">L’accès au profil n’a pas pu être vérifié. L’accès reste verrouillé.</string>
+    <string name="pin_gate_retry">Réessayer</string>
+    <string name="pin_current_label">PIN actuel</string>
+    <string name="pin_new_label">Nouveau PIN</string>
+    <string name="pin_confirm_label">Confirmer le nouveau PIN</string>
+    <string name="pin_action_change">Modifier le PIN</string>
+    <string name="pin_error_wrong_current">Le PIN actuel est incorrect</string>
+    <string name="pin_error_mismatch">Les nouveaux PIN ne correspondent pas</string>
+    <string name="pin_error_invalid">Le PIN doit comporter 4 à 64 chiffres</string>
+    <string name="pin_error_locked">Trop de tentatives. Réessayez plus tard.</string>
+    <string name="pin_error_unavailable">Le PIN du profil n’a pas pu être lu. L’accès reste verrouillé.</string>
+    <string name="pin_error_profile_changed">Le profil a changé. Veuillez réessayer.</string>
+    <string name="pin_error_busy">Une autre opération sur le profil est en cours</string>
+</resources>

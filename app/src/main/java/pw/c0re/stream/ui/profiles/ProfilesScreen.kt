@@ -37,15 +37,22 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import pw.c0re.stream.C0reStreamApp
 import pw.c0re.stream.R
-import pw.c0re.stream.data.profiles.PinVerification
+import pw.c0re.stream.data.profiles.DataStorePinSession
+import pw.c0re.stream.data.profiles.PinFailure
+import pw.c0re.stream.data.profiles.PinOperationResult
 import pw.c0re.stream.data.profiles.ProfileEntity
+import pw.c0re.stream.data.profiles.ProfilePinOperations
 import pw.c0re.stream.data.profiles.ProfileSessionRepository
 import pw.c0re.stream.data.profiles.ProfileUiModel
+import pw.c0re.stream.data.profiles.RoomProfilePinStore
 import pw.c0re.stream.ui.components.BrandBackdrop
 import pw.c0re.stream.ui.components.BrandBadge
 import pw.c0re.stream.ui.components.BrandCard
@@ -54,10 +61,22 @@ import pw.c0re.stream.ui.components.BrandSecondaryButton
 import pw.c0re.stream.ui.components.BrandTopBar
 import pw.c0re.stream.ui.components.rememberResponsivePadding
 
+data class PinOperationUiState(
+    val busy: Boolean = false,
+    val failure: PinFailure? = null,
+)
+
 class ProfilesViewModel(app: Application) : AndroidViewModel(app) {
     private val dao = (app as C0reStreamApp).database.profileDao()
     private val session = ProfileSessionRepository(app)
     private val pinManager = ProfileSessionRepository.pinManager
+    private val operations = ProfilePinOperations(
+        store = RoomProfilePinStore(dao),
+        session = DataStorePinSession(session),
+        pins = pinManager,
+    )
+    private val _operation = MutableStateFlow(PinOperationUiState())
+    val operation: StateFlow<PinOperationUiState> = _operation.asStateFlow()
 
     val profiles = dao.all().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val activeId = session.activeId.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
@@ -67,39 +86,74 @@ class ProfilesViewModel(app: Application) : AndroidViewModel(app) {
         dao.upsert(ProfileEntity(name = name.take(64), createdAt = System.currentTimeMillis()))
     }
 
-    fun setPin(id: Long, pin: String) = viewModelScope.launch {
-        val entity = dao.byId(id) ?: return@launch
-        val chars = pin.toCharArray()
-        val record = if (chars.size in 4..64) pinManager.hash(chars) else null
-        chars.fill('\u0000')
-        dao.upsert(entity.copy(pinHash = record))
-        pinManager.reset(id)
+    suspend fun setPin(
+        id: Long,
+        currentPin: String,
+        newPin: String,
+        confirmation: String,
+    ): PinOperationResult = runOperation {
+        val current = currentPin.toCharArray()
+        val next = newPin.toCharArray()
+        val confirm = confirmation.toCharArray()
+        try {
+            operations.changePin(id, current, next, confirm)
+        } finally {
+            wipe(current, next, confirm)
+        }
     }
 
-    suspend fun unlock(id: Long, pin: String): Boolean {
-        val entity = dao.byId(id) ?: return false
-        val chars = pin.toCharArray()
-        val result = try {
-            pinManager.verify(entity.pinHash, chars, id)
+    suspend fun removePin(id: Long, currentPin: String): PinOperationResult = runOperation {
+        val current = currentPin.toCharArray()
+        try {
+            operations.removePin(id, current)
         } finally {
-            chars.fill('\u0000')
+            wipe(current)
         }
-        if (result == PinVerification.Success || result == PinVerification.NoPin) {
-            session.setActive(id)
-            return true
-        }
-        return false
     }
+
+    suspend fun switchProfile(id: Long, pin: String): PinOperationResult = runOperation {
+        val chars = pin.toCharArray()
+        try {
+            operations.unlockAndSwitch(id, chars)
+        } finally {
+            wipe(chars)
+        }
+    }
+
+    fun clearError() {
+        if (!_operation.value.busy) _operation.value = PinOperationUiState()
+    }
+
+    private suspend fun runOperation(block: suspend () -> PinOperationResult): PinOperationResult {
+        if (_operation.value.busy) {
+            _operation.value = PinOperationUiState(failure = PinFailure.BUSY)
+            return PinOperationResult.Failure(PinFailure.BUSY)
+        }
+        _operation.value = PinOperationUiState(busy = true)
+        val result = try {
+            block()
+        } finally {
+            _operation.value = PinOperationUiState()
+        }
+        if (result is PinOperationResult.Failure) {
+            _operation.value = PinOperationUiState(failure = result.reason)
+        }
+        return result
+    }
+
+    private fun wipe(vararg pins: CharArray) = pins.forEach { it.fill('\u0000') }
 }
+
+private enum class PinDialogAction { SET, CHANGE, REMOVE }
 
 @Composable
 fun ProfilesScreen(onDone: () -> Unit, vm: ProfilesViewModel = viewModel()) {
     val profiles by vm.profiles.collectAsState()
     val activeId by vm.activeId.collectAsState()
+    val operation by vm.operation.collectAsState()
     var addDialog by remember { mutableStateOf(false) }
-    var pinTarget by remember { mutableStateOf<ProfileUiModel?>(null) }
+    var pinTarget by remember { mutableStateOf<Pair<ProfileUiModel, PinDialogAction>?>(null) }
     var switchTarget by remember { mutableStateOf<ProfileUiModel?>(null) }
-    var error by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -148,18 +202,49 @@ fun ProfilesScreen(onDone: () -> Unit, vm: ProfilesViewModel = viewModel()) {
                                     }
                                 }
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    BrandSecondaryButton(
-                                        text = stringResource(
-                                            if (profile.hasPin) R.string.profiles_pin_remove else R.string.profiles_pin_set,
-                                        ),
-                                        onClick = { pinTarget = profile },
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .heightIn(min = 48.dp),
-                                    )
+                                    if (profile.hasPin) {
+                                        BrandSecondaryButton(
+                                            text = stringResource(R.string.pin_action_change),
+                                            onClick = {
+                                                vm.clearError()
+                                                pinTarget = profile to PinDialogAction.CHANGE
+                                            },
+                                            enabled = !operation.busy,
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .heightIn(min = 48.dp),
+                                        )
+                                        BrandSecondaryButton(
+                                            text = stringResource(R.string.profiles_pin_remove),
+                                            onClick = {
+                                                vm.clearError()
+                                                pinTarget = profile to PinDialogAction.REMOVE
+                                            },
+                                            enabled = !operation.busy,
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .heightIn(min = 48.dp),
+                                        )
+                                    } else {
+                                        BrandSecondaryButton(
+                                            text = stringResource(R.string.profiles_pin_set),
+                                            onClick = {
+                                                vm.clearError()
+                                                pinTarget = profile to PinDialogAction.SET
+                                            },
+                                            enabled = !operation.busy,
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .heightIn(min = 48.dp),
+                                        )
+                                    }
                                     BrandSecondaryButton(
                                         text = stringResource(R.string.profiles_switch),
-                                        onClick = { switchTarget = profile },
+                                        onClick = {
+                                            vm.clearError()
+                                            switchTarget = profile
+                                        },
+                                        enabled = !operation.busy,
                                         modifier = Modifier
                                             .weight(1f)
                                             .heightIn(min = 48.dp),
@@ -170,15 +255,6 @@ fun ProfilesScreen(onDone: () -> Unit, vm: ProfilesViewModel = viewModel()) {
                     }
                 }
 
-                if (error) {
-                    BrandCard(modifier = Modifier.fillMaxWidth(), onClick = null) {
-                        Text(
-                            stringResource(R.string.profiles_pin_wrong),
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                }
                 BrandPrimaryButton(
                     text = stringResource(R.string.profiles_add),
                     onClick = { addDialog = true },
@@ -222,30 +298,86 @@ fun ProfilesScreen(onDone: () -> Unit, vm: ProfilesViewModel = viewModel()) {
         )
     }
 
-    pinTarget?.let { profile ->
-        val pinState = rememberTextFieldState()
+    pinTarget?.let { target ->
+        val (profile, action) = target
+        val currentState = rememberTextFieldState()
+        val newState = rememberTextFieldState()
+        val confirmState = rememberTextFieldState()
+        fun clearInputs() {
+            currentState.clearText()
+            newState.clearText()
+            confirmState.clearText()
+        }
         AlertDialog(
-            onDismissRequest = { pinTarget = null },
+            onDismissRequest = {
+                // Cancellation never reaches the business logic: there is no mutation to undo.
+                clearInputs()
+                vm.clearError()
+                pinTarget = null
+            },
             title = {
-                Text(stringResource(if (profile.hasPin) R.string.profiles_pin_remove else R.string.profiles_pin_set))
+                Text(
+                    stringResource(
+                        when (action) {
+                            PinDialogAction.SET -> R.string.profiles_pin_set
+                            PinDialogAction.CHANGE -> R.string.pin_action_change
+                            PinDialogAction.REMOVE -> R.string.profiles_pin_remove
+                        },
+                    ),
+                )
             },
             text = {
-                OutlinedSecureTextField(
-                    state = pinState,
-                    inputTransformation = InputTransformation.maxLengthReject(64)
-                        .byValue { input, _ -> input.filter(Char::isDigit) },
-                    label = { Text(stringResource(R.string.profiles_pin_prompt)) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (action != PinDialogAction.SET) {
+                        OutlinedSecureTextField(
+                            state = currentState,
+                            inputTransformation = pinInputTransformation(),
+                            label = { Text(stringResource(R.string.pin_current_label)) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    if (action != PinDialogAction.REMOVE) {
+                        OutlinedSecureTextField(
+                            state = newState,
+                            inputTransformation = pinInputTransformation(),
+                            label = { Text(stringResource(R.string.pin_new_label)) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedSecureTextField(
+                            state = confirmState,
+                            inputTransformation = pinInputTransformation(),
+                            label = { Text(stringResource(R.string.pin_confirm_label)) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    operation.failure?.let { failure ->
+                        Text(
+                            failure.message(),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
             },
             confirmButton = {
                 BrandPrimaryButton(
                     text = stringResource(R.string.action_confirm),
+                    enabled = !operation.busy,
                     onClick = {
-                        val value = pinState.text.toString()
-                        vm.setPin(profile.id, if (value.length in 4..64) value else "")
-                        pinState.clearText()
-                        pinTarget = null
+                        val current = currentState.text.toString()
+                        val next = newState.text.toString()
+                        val confirm = confirmState.text.toString()
+                        scope.launch {
+                            val result = when (action) {
+                                PinDialogAction.SET -> vm.setPin(profile.id, "", next, confirm)
+                                PinDialogAction.CHANGE -> vm.setPin(profile.id, current, next, confirm)
+                                PinDialogAction.REMOVE -> vm.removePin(profile.id, current)
+                            }
+                            if (result == PinOperationResult.Success) {
+                                clearInputs()
+                                pinTarget = null
+                            }
+                        }
                     },
                     modifier = Modifier.heightIn(min = 48.dp),
                 )
@@ -253,7 +385,11 @@ fun ProfilesScreen(onDone: () -> Unit, vm: ProfilesViewModel = viewModel()) {
             dismissButton = {
                 BrandSecondaryButton(
                     text = stringResource(R.string.action_cancel),
-                    onClick = { pinTarget = null },
+                    onClick = {
+                        clearInputs()
+                        vm.clearError()
+                        pinTarget = null
+                    },
                     modifier = Modifier.heightIn(min = 48.dp),
                 )
             },
@@ -263,25 +399,41 @@ fun ProfilesScreen(onDone: () -> Unit, vm: ProfilesViewModel = viewModel()) {
     switchTarget?.let { profile ->
         val pinState = rememberTextFieldState()
         AlertDialog(
-            onDismissRequest = { switchTarget = null },
+            onDismissRequest = {
+                pinState.clearText()
+                vm.clearError()
+                switchTarget = null
+            },
             title = { Text(stringResource(R.string.profiles_switch)) },
             text = {
-                OutlinedSecureTextField(
-                    state = pinState,
-                    inputTransformation = InputTransformation.maxLengthReject(64)
-                        .byValue { input, _ -> input.filter(Char::isDigit) },
-                    label = { Text(stringResource(R.string.profiles_pin_prompt)) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedSecureTextField(
+                        state = pinState,
+                        inputTransformation = pinInputTransformation(),
+                        label = { Text(stringResource(R.string.profiles_pin_prompt)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    operation.failure?.let { failure ->
+                        Text(
+                            failure.message(),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
             },
             confirmButton = {
                 BrandPrimaryButton(
                     text = stringResource(R.string.action_confirm),
+                    enabled = !operation.busy,
                     onClick = {
                         val value = pinState.text.toString()
                         pinState.clearText()
-                        switchTarget = null
-                        scope.launch { error = !vm.unlock(profile.id, value) }
+                        scope.launch {
+                            if (vm.switchProfile(profile.id, value) == PinOperationResult.Success) {
+                                switchTarget = null
+                            }
+                        }
                     },
                     modifier = Modifier.heightIn(min = 48.dp),
                 )
@@ -289,10 +441,32 @@ fun ProfilesScreen(onDone: () -> Unit, vm: ProfilesViewModel = viewModel()) {
             dismissButton = {
                 BrandSecondaryButton(
                     text = stringResource(R.string.action_cancel),
-                    onClick = { switchTarget = null },
+                    onClick = {
+                        pinState.clearText()
+                        vm.clearError()
+                        switchTarget = null
+                    },
                     modifier = Modifier.heightIn(min = 48.dp),
                 )
             },
         )
     }
 }
+
+private fun pinInputTransformation(): InputTransformation =
+    InputTransformation.maxLengthReject(64).byValue { input, _ -> input.filter(Char::isDigit) }
+
+@Composable
+private fun PinFailure.message(): String = stringResource(
+    when (this) {
+        PinFailure.WRONG_CURRENT -> R.string.pin_error_wrong_current
+        PinFailure.MISMATCHED_NEW -> R.string.pin_error_mismatch
+        PinFailure.INVALID_FORMAT -> R.string.pin_error_invalid
+        PinFailure.TOO_MANY_ATTEMPTS -> R.string.pin_error_locked
+        PinFailure.UNREADABLE_RECORD -> R.string.pin_error_unavailable
+        PinFailure.PROFILE_UNAVAILABLE -> R.string.pin_error_unavailable
+        PinFailure.PROFILE_CHANGED -> R.string.pin_error_profile_changed
+        PinFailure.BUSY -> R.string.pin_error_busy
+        PinFailure.CANCELLED -> R.string.pin_error_busy
+    },
+)

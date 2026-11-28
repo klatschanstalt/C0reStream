@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Profile PIN hardening: gate states and PIN management errors. -->
+    <string name="pin_gate_checking">Checking profile access…</string>
+    <string name="pin_gate_error">Profile access could not be verified. Access stays locked.</string>
+    <string name="pin_gate_retry">Retry</string>
+    <string name="pin_current_label">Current PIN</string>
+    <string name="pin_new_label">New PIN</string>
+    <string name="pin_confirm_label">Confirm new PIN</string>
+    <string name="pin_action_change">Change PIN</string>
+    <string name="pin_error_wrong_current">Current PIN is incorrect</string>
+    <string name="pin_error_mismatch">New PINs do not match</string>
+    <string name="pin_error_invalid">PIN must be 4–64 digits</string>
+    <string name="pin_error_locked">Too many attempts. Try again later.</string>
+    <string name="pin_error_unavailable">Profile PIN could not be read. Access stays locked.</string>
+    <string name="pin_error_profile_changed">Profile changed. Please try again.</string>
+    <string name="pin_error_busy">Another profile operation is in progress</string>
+</resources>

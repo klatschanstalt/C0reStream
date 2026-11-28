@@ -98,6 +98,21 @@ class PinManager {
         }
     }
 
+    /**
+     * Whether [record] is absent (unrestricted) or a supported hash record. This parses the
+     * record only; it makes no verification attempt and does not affect lockout state. Callers
+     * use it to fail closed on corrupt storage before asking for a PIN.
+     */
+    fun isValidRecord(record: String?): Boolean {
+        if (record.isNullOrEmpty()) return true
+        return try {
+            parse(record)
+            true
+        } catch (_: IllegalArgumentException) {
+            false
+        }
+    }
+
     /** Whether [profileId] is currently locked out. */
     fun isLocked(profileId: Long, nowMs: Long = System.currentTimeMillis()): Boolean =
         synchronized(lock) {

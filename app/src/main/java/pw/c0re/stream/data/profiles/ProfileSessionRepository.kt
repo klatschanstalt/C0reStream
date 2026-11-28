@@ -15,6 +15,15 @@ class ProfileSessionRepository(private val context: Context) {
 
     val activeId: Flow<Long> = context.profileSession.data.map { it[activeKey] ?: 0L }
 
+    /**
+     * Distinguishes "no profile selected yet" from "profile 0 selected". The gate must not open
+     * on DataStore's initial empty snapshot when a protected profile is stored on disk.
+     */
+    val activeProfile: Flow<ActiveProfile> = context.profileSession.data.map { preferences ->
+        val id = preferences[activeKey]
+        if (id == null) ActiveProfile.Unset else ActiveProfile.Selected(id)
+    }
+
     suspend fun setActive(id: Long) = context.profileSession.edit { it[activeKey] = id }
 
     companion object {
