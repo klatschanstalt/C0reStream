@@ -3,6 +3,7 @@ name: Build C0reStream
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -72,8 +73,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Android 11 (API 30) and Android 16 (API 36). Add newer API levels once
-        # the emulator runner publishes matching system images.
+        # Android 11 (API 30) and Android 16 (API 36). API 37 is intentionally not in
+        # the matrix: sdkmanager publishes `system-images;android-37.0;aosp_atd` but
+        # not the `android-37;aosp_atd` id the emulator runner resolves from api-level 37.
+        # Verify runner support before adding it; keep 30/36 as the stable matrix.
         api-level: [30, 36]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -118,7 +121,8 @@ jobs:
 
   publish-production:
     needs: [verify, instrumented]
-    if: github.ref == 'refs/heads/main'
+    # Never sign or publish for pull requests (including fork PRs). Only trusted main pushes.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
