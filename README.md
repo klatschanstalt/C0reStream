@@ -51,7 +51,7 @@ sha256sum --check SHA256SUMS
 - **Backup:** Verschlüsselte Sicherung und Wiederherstellung von Einstellungen, Favoriten, Verlauf, Fortschritt, Merkliste und Erinnerungen.
 - <img src="assets/branding/feature-multi-device.png" width="28" alt=""> **Oberfläche:** Material 3, Hell/Dunkel/AMOLED, responsiv, DE/EN/FR, Android-TV-Launcher und D-Pad-Navigation.
 - **Einstellungen:** Expertenmodus, Reset, globale und senderbezogene Wiedergabeprofile.
-- **Updates:** Signierte Ressourcenmanifeste und APK-Updates mit SHA-256-, Paketnamen- und Signaturprüfung.
+- **Updates:** Signierte Ressourcenmanifeste und APK-Updates mit SHA-256-, Paketnamen- und Signaturprüfung. Die Update-Informationen verweisen auf eine stabile HTTPS-Kopie der geprüften APK ohne Zugangsdaten in Weiterleitungen, damit auch ältere Installationen aktualisieren können. Falls nötig: manuelle Installation der geprüften Artefakte aus dem neuesten Release; vorhandene Daten bleiben erhalten.
 - **Sicherheit:** Android Keystore, begrenzte Parser, URL-Validierung, HTTPS-Downgrade-Schutz. Keine Werbung, Analysen oder Tracking.
 
 > [!WARNING]
@@ -124,7 +124,7 @@ sha256sum --check SHA256SUMS
 - **Backup:** Encrypted backup and restore of settings, favourites, history, progress, watchlist and reminders.
 - <img src="assets/branding/feature-multi-device.png" width="28" alt=""> **Interface:** Material 3, Light/Dark/AMOLED, responsive layout, DE/EN/FR, Android TV launcher and D-pad navigation.
 - **Settings:** Expert mode, reset, global and per-channel playback preferences.
-- **Updates:** Signed resource manifests and APK updates with SHA-256, package-name and certificate checks.
+- **Updates:** Signed resource manifests and APK updates with SHA-256, package-name and certificate checks. The update manifest points to a stable HTTPS copy of the verified APK with no credentials in redirects, so older installations can update too. If needed, install the verified artifacts from the latest release manually; existing data is preserved.
 - **Security:** Android Keystore, bounded parsers, URL validation and HTTPS downgrade protection. No ads, analytics or tracking.
 
 > [!WARNING]
@@ -197,7 +197,7 @@ sha256sum --check SHA256SUMS
 - **Sauvegarde:** sauvegarde et restauration chiffrées des paramètres, favoris, historique, progression, liste de suivi et rappels.
 - <img src="assets/branding/feature-multi-device.png" width="28" alt=""> **Interface:** Material 3, clair/sombre/AMOLED, adaptative, DE/EN/FR, lanceur Android TV et navigation D-pad.
 - **Paramètres:** mode expert, réinitialisation, préférences globales ou par chaîne.
-- **Mises à jour:** manifestes signés et APK vérifiés par SHA-256, nom de paquet et certificat.
+- **Mises à jour:** manifestes signés et APK vérifiés par SHA-256, nom de paquet et certificat. Le manifeste pointe vers une copie HTTPS stable de l'APK vérifiée, sans identifiants dans les redirections, afin que les anciennes installations puissent aussi se mettre à jour. Si nécessaire, installer manuellement les artefacts vérifiés de la dernière version ; les données existantes sont conservées.
 - **Sécurité:** Android Keystore, analyseurs bornés, validation des URL et protection contre le déclassement HTTPS. Sans publicité, analyse ni pistage.
 
 > [!WARNING]
