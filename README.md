@@ -78,7 +78,8 @@ Android 11 (API 30) oder neuer. Physische TV-Hardware ist nicht Teil der automat
 <summary>Toolchain · Signing · Documentation</summary>
 
 - JDK 17 · SDK 37.1 · Build-Tools 37.0.0 · Gradle 9.9.3
-- Production signing: `ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `ANDROID_CERT_SHA256`.
+- Signing (GitHub Actions Secrets, vertraulich): `ANDROID_KEYSTORE_BASE64` (wird in CI dekodiert und als Pfad `ANDROID_KEYSTORE_FILE` an den Build übergeben), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
+- Signing (GitHub Repository Variable, kein Secret): `ANDROID_CERT_SHA256` – der SHA-256-Fingerprint des Signaturzertifikats ist öffentliche Prüfinformation und kein Geheimnis.
 - [SECURITY.md](SECURITY.md) · [PROJECT_STATUS_REPORT.md](PROJECT_STATUS_REPORT.md) · [Branding](assets/branding/) · [Previews](docs/)
 - Apache License 2.0: [LICENSE](LICENSE) · [NOTICE.md](NOTICE.md) · [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
@@ -150,7 +151,8 @@ Android 11 (API 30) or newer. Physical TV hardware is not part of the automated 
 <summary>Toolchain · Signing · Documentation</summary>
 
 - JDK 17 · SDK 37.1 · Build-Tools 37.0.0 · Gradle 9.9.3
-- Production signing: `ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `ANDROID_CERT_SHA256`.
+- Signing (GitHub Actions Secrets, confidential): `ANDROID_KEYSTORE_BASE64` (decoded in CI and passed to the build as the `ANDROID_KEYSTORE_FILE` path), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
+- Signing (GitHub Repository Variable, not a secret): `ANDROID_CERT_SHA256` – the SHA-256 signing-certificate fingerprint is public verification data, not a secret.
 - [SECURITY.md](SECURITY.md) · [PROJECT_STATUS_REPORT.md](PROJECT_STATUS_REPORT.md) · [Branding](assets/branding/) · [Previews](docs/)
 - Apache License 2.0: [LICENSE](LICENSE) · [NOTICE.md](NOTICE.md) · [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
@@ -222,7 +224,8 @@ Android 11 (API 30) ou supérieur. Le matériel TV physique ne fait pas partie d
 <summary>Toolchain · Signing · Documentation</summary>
 
 - JDK 17 · SDK 37.1 · Build-Tools 37.0.0 · Gradle 9.9.3
-- Production signing: `ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `ANDROID_CERT_SHA256`.
+- Signature (Secrets GitHub Actions, confidentiels) : `ANDROID_KEYSTORE_BASE64` (décodé en CI et transmis au build comme chemin `ANDROID_KEYSTORE_FILE`), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
+- Signature (variable de dépôt GitHub, non secrète) : `ANDROID_CERT_SHA256` – l’empreinte SHA-256 du certificat de signature est une information de vérification publique, pas un secret.
 - [SECURITY.md](SECURITY.md) · [PROJECT_STATUS_REPORT.md](PROJECT_STATUS_REPORT.md) · [Branding](assets/branding/) · [Previews](docs/)
 - Apache License 2.0: [LICENSE](LICENSE) · [NOTICE.md](NOTICE.md) · [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 

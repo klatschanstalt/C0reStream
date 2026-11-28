@@ -20,6 +20,8 @@
 - Revert released defects with a new correctly versioned release, never by rewriting.
 - Pure docs/CI/test/project cleanup changes do not bump app version or publish APKs.
 - Update compatibility: semantic versions are parsed numerically (1.9.x → 1.10.x → 1.11.x); `versionCode` remains authoritative.
+- Consistency before publishing: `version.properties` (`versionName`/`versionCode`), APK badging, the `v<versionName>` Git tag and `update.json` `latestVersion` must match; a published version number, tag or artifact is never reused or overwritten.
+- PATCH and MINOR releases stay backward compatible; hotfixes are cut independently from the last released state and versioned separately from ongoing work.
 
 ## Maintenance
 

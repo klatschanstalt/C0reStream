@@ -1,10 +1,10 @@
 # Third-party notices
 
-C0reStream steht unter der Apache License 2.0 (`LICENSE`). Diese Datei listet die tatsächlich aufgelösten Laufzeitabhängigkeiten und ihre in den POM-Metadaten deklarierten Lizenzen.
+C0reStream steht unter der Apache License 2.0 (`LICENSE`). Diese Datei listet die tatsächlich aufgelösten Laufzeitabhängigkeiten und ihre Lizenzen.
 
-Ermittelt aus `releaseRuntimeClasspath` des Release-Builds; die Namen stammen aus den zwischengespeicherten Maven-POMs. Bei fehlender Deklaration gilt die jeweilige Upstream-Lizenz. Build-Zeit-Only-Werkzeuge werden nicht in die APK aufgenommen; Lizenzhinweise der Abhängigkeiten bleiben im APK erhalten.
+Ermittelt aus `releaseRuntimeClasspath` des Release-Builds; Namen und Lizenzangaben stammen aus den zwischengespeicherten Maven-POMs bzw. den in den Artefakten enthaltenen `META-INF/LICENSE`-Dateien. Wo das Artefakt-POM keine Lizenz deklariert, ist die Lizenz über das Eltern-POM oder die Upstream-Lizenzdatei belegt (siehe Nachweise am Ende). Build-Zeit-Only-Werkzeuge werden nicht in die APK aufgenommen; Lizenzhinweise der Abhängigkeiten bleiben im APK erhalten.
 
-## Apache License 2.0 (115)
+## Apache License 2.0 (119)
 
 - `androidx.activity:activity-compose:1.13.0`
 - `androidx.activity:activity-ktx:1.13.0`
@@ -112,6 +112,10 @@ Ermittelt aus `releaseRuntimeClasspath` des Release-Builds; die Namen stammen au
 - `androidx.window:window:1.5.0`
 - `androidx.work:work-runtime-ktx:2.12.0`
 - `androidx.work:work-runtime:2.12.0`
+- `com.google.guava:failureaccess:1.0.3`
+- `com.google.guava:guava:33.8.0-android`
+- `com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava`
+- `com.google.zxing:core:3.5.4`
 - `com.squareup.okhttp3:okhttp-android:5.5.1`
 - `com.squareup.okio:okio-jvm:3.18.1`
 - `org.jetbrains.kotlin:kotlin-stdlib:2.4.21`
@@ -126,9 +130,13 @@ Ermittelt aus `releaseRuntimeClasspath` des Release-Builds; die Namen stammen au
 
 - `androidx.datastore:datastore-preferences-external-protobuf:1.3.0`
 
-## Im POM nicht deklariert (Upstream-Lizenz maßgeblich) (4)
+## Lizenznachweise ohne Direktdeklaration im Artefakt-POM
 
-- `com.google.guava:failureaccess:1.0.3`
-- `com.google.guava:guava:33.8.0-android`
-- `com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava`
-- `com.google.zxing:core:3.5.4`
+Die folgenden vier Artefakte nennen in ihrem eigenen POM keine `<licenses>`. Die Einstufung als Apache License 2.0 ist nicht geschätzt, sondern aus den vorliegenden Upstream-Artefakten belegt:
+
+| Artefakt | Upstream-Projekt | Beleg |
+| --- | --- | --- |
+| `com.google.guava:guava:33.8.0-android` | https://github.com/google/guava | `META-INF/LICENSE` im JAR („Apache License, Version 2.0“); `guava-parent-33.8.0-android.pom`: „Apache License, Version 2.0“ |
+| `com.google.guava:failureaccess:1.0.3` | https://github.com/google/guava | `META-INF/LICENSE` im JAR („Apache License, Version 2.0“); Eltern-POM `guava-parent-33.4.0-android.pom`: „Apache License, Version 2.0“ |
+| `com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava` | https://github.com/google/guava | Leeres Platzhalter-Artefakt ohne eigene LICENSE-Datei; Eltern-POM `guava-parent-26.0-android.pom`: „The Apache Software License, Version 2.0“ |
+| `com.google.zxing:core:3.5.4` | https://github.com/zxing/zxing | POM-Kopf: „Licensed under the Apache License, Version 2.0“; Eltern-POM `zxing-parent-3.5.4.pom`: „The Apache Software License, Version 2.0“ |
