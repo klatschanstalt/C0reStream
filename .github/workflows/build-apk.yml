@@ -44,6 +44,7 @@ jobs:
         run: |
           set -euo pipefail
           version_code=$(grep '^versionCode=' version.properties | cut -d= -f2)
+          version_name=$(grep '^versionName=' version.properties | cut -d= -f2)
           latest_tag=$(gh api "repos/$GH_REPO/releases/latest" --jq .tag_name 2>/dev/null || true)
           if [ -n "$latest_tag" ] && [ "$latest_tag" != "v$version_name" ]; then
             published_code=$(gh api "repos/$GH_REPO/contents/version.properties?ref=$latest_tag" --jq .content \
