@@ -62,7 +62,7 @@ Die veröffentlichte v1.7.2-APK wird unverändert direkt von `stream.c0re.pw` au
 
 - Hermetisch ausgeführt: `255` Unit-Tests, `0` Fehler, `0` Exceptions, `1` bewusst übersprungen; `:app:lintDebug` 0 Issues. Enthalten sind 8 neue Tests in `DistributionDeliveryTest.kt` (direkte HTTPS-URL ohne Redirect, HTTPS→HTTP-Block, cross-origin `sig`/`jwt`/`username`/`password`-Block, `update.json`-Felder, numerische Versionierung, Manifest-Signatur mit Produktionszertifikat) sowie der Test, der die Own-Server-URL für das v1.7.2-Release-Asset-Profil nachweislich ablehnt.
 - Kryptografie extern geprüft: `sha256sum -c SHA256SUMS` → `OK`; `openssl dgst -sha256 -verify … resources.json` → `Verified OK`; Zertifikatsfingerprint `65FB26B0…E8543`.
-- Vorherige, unverändert gültige CI-Läufe: `46102219126` (PR: Verify + instrumentierte Tests API 30/36 grün), `46103012176` (main: grün, Publish durch bestehenden Tag korrekt übersprungen), `46096463279` (voller Release-Lauf grün; 29 instrumentierte Tests je API 30/36).
+- Abschließender CI-Lauf `46164104941` auf `main` grün: `verify`, `instrumented (30)`, `instrumented (36)` und `publish-production` erfolgreich; Publish-/Metadatenschritte wurden durch den bestehenden v1.7.2-Tag korrekt übersprungen. Vorherige, unverändert gültige Läufe: `46102219126` (PR: Verify + instrumentierte Tests API 30/36 grün), `46103012176` (main: grün), `46096463279` (voller Release-Lauf grün; 29 instrumentierte Tests je API 30/36).
 - Ein physisches Gerät oder ein lokaler Emulator stand nicht zur Verfügung; die Systeminstallation und der Erhalt von Nutzerdaten konnten hier nicht ausgeführt werden.
 
 ## Weiterhin unvollständig / nicht verifiziert (bewusst offen)
