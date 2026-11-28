@@ -288,7 +288,9 @@ fun C0reStreamThemeFromPrefs(content: @Composable () -> Unit) {
 
     val scheme = brandColorScheme(mode, brand, systemDark)
     val tokens = brandThemeTokens(mode, brand, systemDark)
-    val typography = rememberBrandTypography()
+    // One sp-based typography scale for every screen size: system font scaling (including
+    // 1.5x) is never neutralized, and width is handled by responsive padding/panes/layout.
+    val typography = BrandTypography.Base
 
     CompositionLocalProvider(
         LocalBrandTokens provides tokens,

@@ -172,7 +172,9 @@ fun BrandSecondaryButton(
     icon: ImageVector? = null,
 ) {
     val tokens = LocalBrandTokens.current
-    val borderColor = if (enabled) tokens.accentSecondary else tokens.states.disabled
+    // Text, border and decoration are separate roles: the label must keep 4.5:1 on dark
+    // backgrounds, while the brand accent hue stays available for decorative elements.
+    val borderColor = if (enabled) tokens.accentSecondaryBorder else tokens.states.disabled
     OutlinedButton(
         onClick = onClick,
         modifier = modifier.heightIn(min = tokens.spacing.touchTarget),
@@ -180,7 +182,7 @@ fun BrandSecondaryButton(
         shape = BrandButtonShape,
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = Color.Transparent,
-            contentColor = tokens.accentSecondary,
+            contentColor = tokens.accentSecondaryText,
             disabledContainerColor = Color.Transparent,
             disabledContentColor = tokens.states.disabled,
         ),

@@ -86,7 +86,10 @@ sealed interface DownloadResult {
  * `<path>.sha256` and `<path>.etag` sidecars, in-progress `<path>.part` files and an
  * `ACTIVE` marker containing the active version number. A version is "fully verified"
  * when it contains at least one file whose SHA-256 matches its sidecar, no part/temp
- * files and no oversized files.
+ * files and no oversized files. A signed manifest with zero entries is also a valid
+ * state: it is represented by an explicit `EMPTY` marker inside `v<version>`, created
+ * only after signature and structural verification, so missing or corrupt resources
+ * can never be mistaken for an intentionally empty catalog.
  *
  * Only HTTPS is accepted. No function logs URLs, headers or credentials; failures are
  * reported as typed reasons instead.
@@ -104,6 +107,8 @@ object ResourceCatalog {
     private const val MAX_ETAG = 256
     private const val MAX_SIGNATURE_HEX = 1024
     private const val ACTIVE_FILE = "ACTIVE"
+    private const val EMPTY_FILE = "EMPTY"
+    private const val EMPTY_CONTENT = "empty"
     private val HEX64 = Regex("[0-9a-fA-F]{64}")
     private val VERSION_DIR = Regex("v[1-9][0-9]{0,17}")
     private val SAFE_PATH = Regex("[A-Za-z0-9._/-]+")
@@ -452,15 +457,88 @@ object ResourceCatalog {
 
     // ------------------------------------------------ activation and upkeep
 
-    /** Atomically marks a fully verified version active. Returns false if it is not usable. */
+    /** Atomically marks a fully verified, non-empty version active. Returns false if unusable. */
     fun activate(dir: File, version: Long): Boolean {
         if (version <= 0 || !isVerified(dir, version)) return false
-        return try {
-            writeAtomic(File(dir, ACTIVE_FILE), version.toString().toByteArray(StandardCharsets.UTF_8))
-            true
-        } catch (error: IOException) {
-            false
+        return writeActive(dir, version)
+    }
+
+    /**
+     * Applies a manifest that has ALREADY passed signature and structural verification.
+     * It only decides the activation strategy: non-empty manifests require fully staged,
+     * verified resources, while an empty manifest gets an explicit marker so that missing
+     * or corrupt resources are never accepted as "empty". Re-applying the same or an older
+     * version is a no-op. Downloads are the caller's responsibility and happen before this.
+     */
+    fun activateManifest(dir: File, manifest: ResourceManifest): Boolean {
+        if (manifest.configVersion <= (activeVersion(dir) ?: 0L)) return true
+        return if (manifest.entries.isEmpty()) {
+            activateEmpty(dir, manifest.configVersion)
+        } else {
+            // An unrelated but well-formed file must never satisfy the signed manifest. Verify
+            // the staged directory against the entries themselves before making it active.
+            if (!manifestResourcesReady(dir, manifest)) return false
+            activate(dir, manifest.configVersion)
         }
+    }
+
+    /** True only when every expected resource is present, intact and unaccompanied by extras. */
+    private fun manifestResourcesReady(dir: File, manifest: ResourceManifest): Boolean {
+        val versionDir = File(dir, "v${manifest.configVersion}")
+        if (!versionDir.isDirectory) return false
+        val files = versionDir.walkTopDown().filter { it.isFile }.toList()
+        if (files.any { file ->
+            val name = file.name
+            name.endsWith(".part") || name.endsWith(".tmp") || file.length() > MAX_RESOURCE_BYTES
+        }
+        ) return false
+
+        val allowed = HashSet<String>()
+        for (entry in manifest.entries) {
+            if (!HEX64.matches(entry.sha256)) return false
+            val target = safeResolve(versionDir, entry.path) ?: return false
+            if (!target.isFile || target.length() != entry.bytes) return false
+            val expectedHash = entry.sha256.lowercase(Locale.ROOT)
+            val sidecar = File(target.parentFile, "${target.name}.sha256")
+            val declared = try {
+                sidecar.readText(StandardCharsets.UTF_8).trim().lowercase(Locale.ROOT)
+            } catch (error: IOException) {
+                return false
+            }
+            if (!HEX64.matches(declared) || declared != expectedHash) return false
+            if (sha256(target) != expectedHash) return false
+            allowed += target.absolutePath
+            allowed += sidecar.absolutePath
+            allowed += File(target.parentFile, "${target.name}.etag").absolutePath
+        }
+        return files.isNotEmpty() && files.all { it.absolutePath in allowed }
+    }
+
+    /**
+     * Atomically activates a version whose signed manifest contained no entries. Call only
+     * after signature and structural verification: the marker is what distinguishes an
+     * intentionally empty catalog from missing or corrupt expected resources. Fails closed
+     * when the version directory already holds anything other than a valid empty marker.
+     */
+    fun activateEmpty(dir: File, version: Long): Boolean {
+        if (version <= 0) return false
+        val versionDir = File(dir, "v$version")
+        val existing = if (versionDir.isDirectory) {
+            versionDir.walkTopDown().filter { it.isFile }.toList()
+        } else {
+            emptyList()
+        }
+        if (existing.isNotEmpty() && !isEmptyVerified(dir, version)) return false
+        if (!versionDir.isDirectory && !versionDir.mkdirs()) return false
+        if (!isEmptyVerified(dir, version)) {
+            try {
+                writeAtomic(File(versionDir, EMPTY_FILE), EMPTY_CONTENT.toByteArray(StandardCharsets.UTF_8))
+            } catch (error: IOException) {
+                return false
+            }
+        }
+        if (!isEmptyVerified(dir, version)) return false
+        return writeActive(dir, version)
     }
 
     /** Active version from the marker, or null when absent/corrupt. */
@@ -470,14 +548,30 @@ object ResourceCatalog {
         null
     }
 
-    /** Highest fully verified version available offline, or null. */
-    fun latestAvailable(dir: File): Long? = versionDirs(dir).filter { isVerified(dir, it) }.maxOrNull()
+    /** Highest fully verified version available offline, including intentional empty ones. */
+    fun latestAvailable(dir: File): Long? = versionDirs(dir)
+        .filter { isVerified(dir, it) || isEmptyVerified(dir, it) }
+        .maxOrNull()
 
-    /** Switches ACTIVE to the highest verified version below the current one, if any. */
+    /** Switches ACTIVE to the highest usable version below the current one, if any. */
     fun rollback(dir: File): Long? {
         val active = activeVersion(dir) ?: return null
-        val previous = versionDirs(dir).filter { it < active && isVerified(dir, it) }.maxOrNull() ?: return null
-        return if (activate(dir, previous)) previous else null
+        val previous = versionDirs(dir)
+            .filter { it < active && (isVerified(dir, it) || isEmptyVerified(dir, it)) }
+            .maxOrNull() ?: return null
+        return if (activateAny(dir, previous)) previous else null
+    }
+
+    private fun writeActive(dir: File, version: Long): Boolean = try {
+        writeAtomic(File(dir, ACTIVE_FILE), version.toString().toByteArray(StandardCharsets.UTF_8))
+        true
+    } catch (error: IOException) {
+        false
+    }
+
+    private fun activateAny(dir: File, version: Long): Boolean {
+        if (version <= 0 || (!isVerified(dir, version) && !isEmptyVerified(dir, version))) return false
+        return writeActive(dir, version)
     }
 
     /**
@@ -490,7 +584,7 @@ object ResourceCatalog {
         val active = activeVersion(dir)
         val keep = HashSet<Long>()
         if (active != null) keep += active
-        versionDirs(dir).filter { isVerified(dir, it) }.sortedDescending()
+        versionDirs(dir).filter { isVerified(dir, it) || isEmptyVerified(dir, it) }.sortedDescending()
             .take(maxOf(0, keepVersions)).forEach { keep += it }
         dir.listFiles()?.forEach { file ->
             when {
@@ -512,6 +606,7 @@ object ResourceCatalog {
         for (file in files) {
             val name = file.name
             if (name.endsWith(".sha256") || name.endsWith(".etag")) continue
+            if (name == EMPTY_FILE) continue
             if (name.endsWith(".part") || name.endsWith(".tmp")) return false
             if (file.length() > MAX_RESOURCE_BYTES) return false
             val sidecar = File(file.parentFile, "$name.sha256")
@@ -526,6 +621,20 @@ object ResourceCatalog {
         return resources > 0
     }
 
+    /** True only for a version directory holding nothing but a valid empty marker. */
+    private fun isEmptyVerified(dir: File, version: Long): Boolean {
+        val versionDir = File(dir, "v$version")
+        if (!versionDir.isDirectory) return false
+        val files = versionDir.walkTopDown().filter { it.isFile }.toList()
+        return files.size == 1 && files[0].name == EMPTY_FILE && validEmptyMarker(files[0])
+    }
+
+    private fun validEmptyMarker(file: File): Boolean = try {
+        file.readText(StandardCharsets.UTF_8).trim() == EMPTY_CONTENT
+    } catch (error: IOException) {
+        false
+    }
+
     private fun versionDirs(dir: File): List<Long> = dir.listFiles { file ->
         file.isDirectory && VERSION_DIR.matches(file.name)
     }?.mapNotNull { it.name.drop(1).toLongOrNull() }.orEmpty()
@@ -534,6 +643,9 @@ object ResourceCatalog {
         versionDir.walkTopDown().filter { it.isFile }.forEach { file ->
             val name = file.name
             when {
+                name == EMPTY_FILE -> {
+                    if (!validEmptyMarker(file)) runCatching { file.delete() }
+                }
                 name.endsWith(".part") || name.endsWith(".tmp") -> runCatching { file.delete() }
                 name.endsWith(".sha256") || name.endsWith(".etag") -> {
                     val base = File(file.parentFile, name.substringBeforeLast('.'))

@@ -1,21 +1,17 @@
 package pw.c0re.stream.ui.theme
 
 import androidx.compose.material3.Typography
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 
 /**
- * Typography for C0reStream. Every size is in `sp`, so the system font-size setting
- * is honored automatically. [rememberBrandTypography] additionally picks a compact,
- * regular or expanded step from the window width; it never applies a second font
- * scale on top of the platform's own scaling.
+ * Typography for C0reStream. Every size is in `sp`, so Android's own font-size setting
+ * (including 1.5x) is honored automatically. There is deliberately no width-dependent
+ * scale: layout responsiveness is handled by `rememberResponsivePadding` and
+ * `AdaptivePane`, and shrinking text on narrow screens would work against users who
+ * need larger text. See [C0reStreamThemeFromPrefs] for how this scale is installed.
  *
  * The Material3 slots are the canonical set used by `MaterialTheme.typography`.
  * `player*` and `status*` styles are brand-specific slots exposed through
@@ -46,33 +42,6 @@ data class BrandTypography(
     val statusBody: TextStyle,
     val statusLabel: TextStyle,
 ) {
-    /** Returns a copy with all sizes scaled by [factor] while remaining in `sp`. */
-    fun scaled(factor: Float): BrandTypography = copy(
-        displayLarge = displayLarge.scaledBy(factor),
-        displayMedium = displayMedium.scaledBy(factor),
-        displaySmall = displaySmall.scaledBy(factor),
-        headlineLarge = headlineLarge.scaledBy(factor),
-        headlineMedium = headlineMedium.scaledBy(factor),
-        headlineSmall = headlineSmall.scaledBy(factor),
-        titleLarge = titleLarge.scaledBy(factor),
-        titleMedium = titleMedium.scaledBy(factor),
-        titleSmall = titleSmall.scaledBy(factor),
-        bodyLarge = bodyLarge.scaledBy(factor),
-        bodyMedium = bodyMedium.scaledBy(factor),
-        bodySmall = bodySmall.scaledBy(factor),
-        labelLarge = labelLarge.scaledBy(factor),
-        labelMedium = labelMedium.scaledBy(factor),
-        labelSmall = labelSmall.scaledBy(factor),
-        playerTitle = playerTitle.scaledBy(factor),
-        playerSubtitle = playerSubtitle.scaledBy(factor),
-        playerTime = playerTime.scaledBy(factor),
-        playerMetadata = playerMetadata.scaledBy(factor),
-        playerControlLabel = playerControlLabel.scaledBy(factor),
-        statusTitle = statusTitle.scaledBy(factor),
-        statusBody = statusBody.scaledBy(factor),
-        statusLabel = statusLabel.scaledBy(factor),
-    )
-
     /** Adapts the full set to Material3 so `MaterialTheme.typography` stays consistent. */
     fun asMaterialTypography(): Typography = Typography(
         displayLarge = displayLarge,
@@ -134,29 +103,15 @@ private fun textStyle(
     letterSpacing = tracking.sp,
 )
 
-private fun TextStyle.scaledBy(factor: Float): TextStyle = copy(
-    fontSize = (fontSize.value * factor).sp,
-    lineHeight = if (lineHeight == TextUnit.Unspecified) {
-        TextUnit.Unspecified
-    } else {
-        (lineHeight.value * factor).sp
-    },
-    letterSpacing = if (letterSpacing == TextUnit.Unspecified) {
-        TextUnit.Unspecified
-    } else {
-        (letterSpacing.value * factor).sp
-    },
-)
-
-/** Static typography for previews and non-composable callers. */
-val C0reStreamTypography: Typography = BrandTypography.Base.asMaterialTypography()
+/**
+ * Static typography for previews and non-composable callers. Lazy on purpose: eagerly deriving
+ * this at file level while [BrandTypography.Base] is being constructed creates a circular class
+ * initialization (the companion calls the file-level `textStyle` helper).
+ */
+val C0reStreamTypography: Typography by lazy { BrandTypography.Base.asMaterialTypography() }
 
 /** Brand-specific typography slots (player/status) for composables. */
 val LocalBrandTypography = compositionLocalOf<BrandTypography> { BrandTypography.Base }
 
-/**
- * Selects a width-appropriate typography step. The scale is applied to `sp` values,
- * so user font-size preferences still work exactly as with any other Compose text.
- */
-@Composable
-fun rememberBrandTypography(): BrandTypography = BrandTypography.Base
+// No width-dependent typography selection exists on purpose: the single sp-based scale above
+// follows the platform font setting, and screen widths are handled by layout (padding/panes).

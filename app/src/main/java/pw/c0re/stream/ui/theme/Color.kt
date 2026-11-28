@@ -54,6 +54,35 @@ val BrandMagentaLight = Color(0xFFA31584)
 val BrandCyanLight = Color(0xFF006C82)
 val BrandOrangeLight = Color(0xFF8A4E07)
 
+// --- Semantic action roles with verified contrast -------------------------------
+/**
+ * Packed ARGB values for roles whose contrast is checked by JVM tests. They stay plain
+ * constants so those checks need no UI runtime; the design-system colors below are built
+ * from the same values. The original spectrum stops remain the branding source of truth.
+ */
+object BrandContrastRoles {
+    // Enabled secondary-action labels must reach 4.5:1 on every surface behind them.
+    const val SECONDARY_TEXT_DARK = 0xFFC6B0FF
+    const val SECONDARY_BORDER_DARK = 0xFF8F6BFF
+    const val SECONDARY_TEXT_LIGHT = 0xFF0057C7
+    const val SECONDARY_BORDER_LIGHT = 0xFF0057C7
+    const val SECONDARY_TEXT_EMBER_DARK = 0xFFFFB8DD
+    const val SECONDARY_BORDER_EMBER_DARK = 0xFFFF36AD
+    const val SECONDARY_TEXT_EMBER_LIGHT = 0xFFA31584
+    const val SECONDARY_BORDER_EMBER_LIGHT = 0xFFA31584
+
+    // Focus indicators are non-text UI and must reach 3:1 against adjacent surfaces.
+    const val FOCUS_DARK = 0xFF52FAFF
+    const val FOCUS_LIGHT = 0xFF0057C7
+    const val FOCUS_EMBER = 0xFFFFDA72
+    const val FOCUS_EMBER_LIGHT = 0xFF8A3B12
+}
+
+/** Contrast-safe tints that keep the violet/pink hue for secondary-action text and borders. */
+val BrandVioletText = Color(BrandContrastRoles.SECONDARY_TEXT_DARK)
+val BrandVioletBorder = Color(BrandContrastRoles.SECONDARY_BORDER_DARK)
+val BrandPinkText = Color(BrandContrastRoles.SECONDARY_TEXT_EMBER_DARK)
+
 // --- AMOLED: pure black with the same spectrum ---------------------------------
 val BrandAmoledBackground = Color(0xFF000000)
 val BrandAmoledSurface = Color(0xFF05060A)
@@ -73,7 +102,7 @@ val EmberSecondaryLight = Color(0xFFA31584)
 val BrandError = Color(0xFFFF5473)
 val BrandSuccess = Color(0xFF36E0A4)
 val BrandWarning = BrandOrange
-val BrandFocus = BrandCyan
+val BrandFocus = Color(BrandContrastRoles.FOCUS_DARK)
 val BrandSelection = BrandViolet
 val BrandDisabledDark = Color(0xFF4A556C)
 val BrandDisabledLight = Color(0xFFB7C1D0)
@@ -100,7 +129,7 @@ data class BrandStateColors(
             error = Color(0xFFB32644),
             success = Color(0xFF00785A),
             warning = BrandOrangeLight,
-            focus = BrandBlueLight,
+            focus = Color(BrandContrastRoles.FOCUS_LIGHT),
             selection = BrandVioletLight,
             disabled = BrandDisabledLight,
         )
@@ -108,7 +137,7 @@ data class BrandStateColors(
         val Ember = Dark.copy(
             error = BrandError,
             warning = BrandGold,
-            focus = BrandGold,
+            focus = Color(BrandContrastRoles.FOCUS_EMBER),
             selection = BrandPink,
         )
     }

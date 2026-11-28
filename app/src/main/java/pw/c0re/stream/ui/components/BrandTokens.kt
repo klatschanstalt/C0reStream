@@ -13,6 +13,7 @@ import pw.c0re.stream.ui.theme.BrandBlue
 import pw.c0re.stream.ui.theme.BrandBlueLight
 import pw.c0re.stream.ui.theme.BrandBorderDark
 import pw.c0re.stream.ui.theme.BrandBorderLight
+import pw.c0re.stream.ui.theme.BrandContrastRoles
 import pw.c0re.stream.ui.theme.BrandCyan
 import pw.c0re.stream.ui.theme.BrandCyanLight
 import pw.c0re.stream.ui.theme.BrandGold
@@ -23,13 +24,16 @@ import pw.c0re.stream.ui.theme.BrandNavyStart
 import pw.c0re.stream.ui.theme.BrandOrange
 import pw.c0re.stream.ui.theme.BrandOrangeLight
 import pw.c0re.stream.ui.theme.BrandPink
+import pw.c0re.stream.ui.theme.BrandPinkText
 import pw.c0re.stream.ui.theme.BrandPlumDeep
 import pw.c0re.stream.ui.theme.BrandStateColors
 import pw.c0re.stream.ui.theme.BrandSurfaceDark
 import pw.c0re.stream.ui.theme.BrandSurfaceDarkHigh
 import pw.c0re.stream.ui.theme.BrandSurfaceLight
 import pw.c0re.stream.ui.theme.BrandViolet
+import pw.c0re.stream.ui.theme.BrandVioletBorder
 import pw.c0re.stream.ui.theme.BrandVioletLight
+import pw.c0re.stream.ui.theme.BrandVioletText
 import pw.c0re.stream.ui.theme.EmberBackground
 import pw.c0re.stream.ui.theme.EmberBackgroundLight
 import pw.c0re.stream.ui.theme.EmberPrimaryLight
@@ -61,10 +65,14 @@ data class BrandSpacing(
  * Everything visual that a screen needs but should never hardcode: gradients, glow,
  * spacing and the semantic state palette. Provided by `C0reStreamThemeFromPrefs()`.
  * Brushes are immutable and sized by the drawing bounds, so one instance is reused.
+ * [accentSecondary] keeps the brand hue for decoration; [accentSecondaryText] and
+ * [accentSecondaryBorder] are the contrast-checked roles for interactive controls.
  */
 data class BrandThemeTokens(
     val accent: Color,
     val accentSecondary: Color,
+    val accentSecondaryText: Color,
+    val accentSecondaryBorder: Color,
     val onAccent: Color,
     val backdrop: Brush,
     val primaryGradient: Brush,
@@ -93,6 +101,8 @@ object BrandTokens {
     val Dark = BrandThemeTokens(
         accent = BrandCyan,
         accentSecondary = BrandViolet,
+        accentSecondaryText = BrandVioletText,
+        accentSecondaryBorder = BrandVioletBorder,
         onAccent = BrandNavyDeep,
         backdrop = spectrumBrush(listOf(BrandNavyStart, BrandNavyDeep, BrandPlumDeep)),
         primaryGradient = spectrumBrush(spectrum),
@@ -121,6 +131,8 @@ object BrandTokens {
     val Light = BrandThemeTokens(
         accent = BrandVioletLight,
         accentSecondary = BrandBlueLight,
+        accentSecondaryText = Color(BrandContrastRoles.SECONDARY_TEXT_LIGHT),
+        accentSecondaryBorder = Color(BrandContrastRoles.SECONDARY_BORDER_LIGHT),
         onAccent = Color.White,
         backdrop = spectrumBrush(listOf(BrandBaseLight, Color(0xFFEAF0FA))),
         primaryGradient = spectrumBrush(
@@ -141,6 +153,8 @@ object BrandTokens {
     val EmberDark = Dark.copy(
         accent = BrandGold,
         accentSecondary = BrandPink,
+        accentSecondaryText = BrandPinkText,
+        accentSecondaryBorder = Color(BrandContrastRoles.SECONDARY_BORDER_EMBER_DARK),
         onAccent = EmberBackground,
         backdrop = spectrumBrush(listOf(EmberSurfaceHigh, EmberBackground, BrandPlumDeep)),
         primaryGradient = spectrumBrush(listOf(BrandGold, BrandOrange, BrandPink)),
@@ -157,6 +171,8 @@ object BrandTokens {
     val EmberLight = Dark.copy(
         accent = EmberPrimaryLight,
         accentSecondary = EmberSecondaryLight,
+        accentSecondaryText = Color(BrandContrastRoles.SECONDARY_TEXT_EMBER_LIGHT),
+        accentSecondaryBorder = Color(BrandContrastRoles.SECONDARY_BORDER_EMBER_LIGHT),
         onAccent = Color.White,
         backdrop = spectrumBrush(listOf(EmberBackgroundLight, Color(0xFFFFEEE7))),
         primaryGradient = spectrumBrush(
@@ -171,7 +187,7 @@ object BrandTokens {
         cardBorder = Color(0xFFE0CECF),
         topBarBackground = BrandSurfaceLight,
         states = BrandStateColors.Light.copy(
-            focus = EmberPrimaryLight,
+            focus = Color(BrandContrastRoles.FOCUS_EMBER_LIGHT),
             selection = EmberSecondaryLight,
         ),
     )

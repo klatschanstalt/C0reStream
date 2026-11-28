@@ -230,6 +230,146 @@ class ResourceCatalogTest {
         assertEquals(2L, ResourceCatalog.activeVersion(root)!!)
     }
 
+    @Test
+    fun `signed empty manifest activates without any resource files`() {
+        val dir = temp.root
+        val keys = keys()
+        val bytes = manifestJson(config = 5, entries = "[]")
+        val signature = ResourceCatalog.sign(bytes, keys.private)
+        val fingerprint = ResourceCatalog.fingerprint(keys.public)
+
+        assertTrue(ResourceCatalog.verifySignedBytes(bytes, signature, keys.public, fingerprint))
+        val manifest = ResourceCatalog.parse(bytes)
+        assertTrue(manifest.entries.isEmpty())
+
+        // The non-empty activation path must fail for an empty manifest: it requires resources.
+        assertFalse(ResourceCatalog.activate(dir, 5))
+        assertNull(ResourceCatalog.activeVersion(dir))
+
+        assertTrue(ResourceCatalog.activateManifest(dir, manifest))
+        assertEquals(5L, ResourceCatalog.activeVersion(dir)!!)
+        assertEquals(5L, ResourceCatalog.latestAvailable(dir)!!)
+        assertTrue(File(File(dir, "v5"), "EMPTY").isFile)
+    }
+
+    @Test
+    fun `non-empty manifest activates only with fully staged resources`() {
+        val dir = temp.root
+        val manifest = singleManifest()
+
+        assertFalse(ResourceCatalog.activateManifest(dir, manifest))
+        assertNull(ResourceCatalog.activeVersion(dir))
+
+        stageEntry(dir, manifest.entries[0], "hello")
+        assertTrue(ResourceCatalog.activateManifest(dir, manifest))
+        assertEquals(1L, ResourceCatalog.activeVersion(dir)!!)
+        assertEquals(1L, ResourceCatalog.latestAvailable(dir)!!)
+    }
+
+    @Test
+    fun `invalid signature never reaches activation`() {
+        val dir = temp.root
+        val keys = keys()
+        val bytes = manifestJson(config = 6, entries = "[]")
+        val wrongSignature = ResourceCatalog.sign(bytes, keys().private)
+        val fingerprint = ResourceCatalog.fingerprint(keys.public)
+
+        assertFalse(ResourceCatalog.verifySignedBytes(bytes, wrongSignature, keys.public, fingerprint))
+        // ResourceManager gates activation on verification; mirror that order here.
+        if (ResourceCatalog.verifySignedBytes(bytes, wrongSignature, keys.public, fingerprint)) {
+            ResourceCatalog.activateManifest(dir, ResourceCatalog.parse(bytes))
+        }
+        assertNull(ResourceCatalog.activeVersion(dir))
+        assertNull(ResourceCatalog.latestAvailable(dir))
+
+        val nonEmptyBytes = ResourceCatalog.serialize(singleManifest())
+        val wrongNonEmpty = ResourceCatalog.sign(nonEmptyBytes, keys().private)
+        assertFalse(ResourceCatalog.verifySignedBytes(nonEmptyBytes, wrongNonEmpty, keys.public, fingerprint))
+        if (ResourceCatalog.verifySignedBytes(nonEmptyBytes, wrongNonEmpty, keys.public, fingerprint)) {
+            ResourceCatalog.activateManifest(dir, ResourceCatalog.parse(nonEmptyBytes))
+        }
+        assertNull(ResourceCatalog.activeVersion(dir))
+    }
+
+    @Test
+    fun `missing expected resource and corrupt resource fail closed`() {
+        val dir = temp.root
+        val manifest = singleManifest()
+        val versionDir = File(dir, "v1")
+        versionDir.mkdirs()
+
+        // A valid unrelated file is not the resource the signed manifest requires.
+        File(versionDir, "other.txt").writeText("hello")
+        File(versionDir, "other.txt.sha256").writeText(sha256("hello".toByteArray(StandardCharsets.UTF_8)))
+        assertFalse(ResourceCatalog.activateManifest(dir, manifest))
+        assertNull(ResourceCatalog.activeVersion(dir))
+
+        // The expected file exists but its checksum sidecar is corrupt.
+        File(versionDir, "a.txt").writeText("hello")
+        File(versionDir, "a.txt.sha256").writeText("0".repeat(64))
+        assertFalse(ResourceCatalog.activateManifest(dir, manifest))
+        assertNull(ResourceCatalog.activeVersion(dir))
+    }
+
+    @Test
+    fun `repeated update is idempotent and never downgrades`() {
+        val dir = temp.root
+        val newer = ResourceCatalog.parse(manifestJson(config = 2, entries = "[]"))
+
+        assertTrue(ResourceCatalog.activateManifest(dir, newer))
+        assertTrue(ResourceCatalog.activateManifest(dir, newer))
+        assertEquals(2L, ResourceCatalog.activeVersion(dir)!!)
+
+        val older = ResourceCatalog.parse(manifestJson(config = 1, entries = "[]"))
+        assertTrue(ResourceCatalog.activateManifest(dir, older))
+        assertEquals(2L, ResourceCatalog.activeVersion(dir)!!)
+    }
+
+    @Test
+    fun `rollback restores verified and intentional empty versions`() {
+        val dir = temp.root
+        verifiedVersion(dir, 1)
+        val empty = ResourceCatalog.parse(manifestJson(config = 2, entries = "[]"))
+
+        assertTrue(ResourceCatalog.activateManifest(dir, empty))
+        assertEquals(2L, ResourceCatalog.activeVersion(dir)!!)
+        assertEquals(1L, ResourceCatalog.rollback(dir)!!)
+        assertEquals(1L, ResourceCatalog.activeVersion(dir)!!)
+
+        assertTrue(ResourceCatalog.activateEmpty(dir, 2))
+        assertEquals(2L, ResourceCatalog.activeVersion(dir)!!)
+        assertEquals(1L, ResourceCatalog.rollback(dir)!!)
+        assertEquals(1L, ResourceCatalog.activeVersion(dir)!!)
+    }
+
+    @Test
+    fun `empty activation rejects injected files and cleanup preserves a valid marker`() {
+        val dir = temp.root
+        val versionDir = File(dir, "v4")
+        versionDir.mkdirs()
+        File(versionDir, "stray.bin").writeText("x")
+        assertFalse(ResourceCatalog.activateEmpty(dir, 4))
+        assertNull(ResourceCatalog.activeVersion(dir))
+
+        assertTrue(File(versionDir, "stray.bin").delete())
+        assertTrue(ResourceCatalog.activateEmpty(dir, 4))
+        assertEquals(4L, ResourceCatalog.activeVersion(dir)!!)
+
+        ResourceCatalog.cleanup(dir)
+        assertEquals(4L, ResourceCatalog.latestAvailable(dir)!!)
+        assertTrue(File(versionDir, "EMPTY").isFile)
+
+        File(versionDir, "EMPTY").writeText("tampered")
+        assertNull(ResourceCatalog.latestAvailable(dir))
+        assertNull(ResourceCatalog.rollback(dir))
+    }
+
+    private fun stageEntry(root: File, entry: ResourceEntry, content: String) {
+        val dir = File(root, "v${entry.version}").apply { mkdirs() }
+        File(dir, entry.path).writeText(content)
+        File(dir, "${entry.path}.sha256").writeText(sha256(content.toByteArray(StandardCharsets.UTF_8)))
+    }
+
     private fun verifiedVersion(root: File, version: Long) {
         val dir = File(root, "v$version")
         dir.mkdirs()

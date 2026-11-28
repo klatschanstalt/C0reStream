@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- History has its own empty state; the watchlist text must not be reused here. -->
+    <string name="history_empty">Your watch history is empty.</string>
+</resources>

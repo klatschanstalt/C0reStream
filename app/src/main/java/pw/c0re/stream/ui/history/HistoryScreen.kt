@@ -60,7 +60,7 @@ fun HistoryScreen(onPlay: (Long) -> Unit, vm: HistoryViewModel = viewModel()) {
             )
             Spacer(Modifier.height(12.dp))
             if (history.isEmpty()) {
-                BrandEmptyState(stringResource(R.string.watchlist_empty))
+                BrandEmptyState(stringResource(R.string.history_empty))
             } else {
                 AdaptivePane(
                     modifier = Modifier.weight(1f),

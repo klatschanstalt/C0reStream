@@ -30,7 +30,10 @@ object ResourceManager {
         val publicKey = ownPublicKey(context) ?: return@withContext false
         val fingerprint = ResourceCatalog.fingerprint(publicKey)
         try {
-            val client = NetworkPolicy.client()
+            // GitHub redirects release assets to a different host with short-lived SAS query
+            // parameters. The generic policy blocks that credential-bearing cross-origin hop,
+            // so resource downloads use the opt-in, narrowly scoped release-asset profile.
+            val client = NetworkPolicy.releaseAssetClient()
             val manifestBytes = client.newCall(Request.Builder().url(NetworkPolicy.requireUrl(manifestUrl)).build())
                 .execute().use { it.readBytes(256 * 1024) }
             val signatureHex = client.newCall(Request.Builder().url(NetworkPolicy.requireUrl(signatureUrl)).build())
@@ -51,7 +54,9 @@ object ResourceManager {
                     }
                 }
             }
-            if (!ResourceCatalog.activate(directory, manifest.configVersion)) return@withContext false
+            // Signature and structure were verified above; only now may a version become active.
+            // An empty manifest is a valid signed state and is activated with an explicit marker.
+            if (!ResourceCatalog.activateManifest(directory, manifest)) return@withContext false
             ResourceCatalog.cleanup(directory)
             true
         } catch (error: kotlinx.coroutines.CancellationException) {
